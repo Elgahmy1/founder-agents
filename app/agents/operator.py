@@ -14,6 +14,7 @@ from app.agents.base import Agent
 
 class Reply(BaseModel):
     feedback: str = Field(description="The feedback being answered, quoted exactly")
+    feedback_english: str = Field("", description="The feedback translated to English (copy it if already English)")
     category: str = Field(description="bug | confusion | feature request | praise | pricing | other")
     reply: str = Field(description="Short, honest reply signed with the founder name given")
     product_change: str = Field(description="What this suggests changing, or 'none'")

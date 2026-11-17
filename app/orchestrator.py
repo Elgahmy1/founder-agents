@@ -40,7 +40,7 @@ from app.brief import FounderBrief
 from app.config import Settings
 from app.decision_log import DecisionLog
 from app.evidence import Ledger, RawClaim, resolve
-from app.gates import (OUTCOMES, DemandTargets, GateResult, build_gate, commercial_gate, demand_gate, discover_gate,
+from app.gates import (OUTCOMES, problem_mentions, DemandTargets, GateResult, build_gate, commercial_gate, demand_gate, discover_gate,
                        launch_gate, learn_gate)
 from app.sale_to_cash import run_payment_test
 from app.store import render_store
@@ -89,7 +89,7 @@ P4_STEPS = ["Pricer: tiers from comparable products", "Policy drafter: terms, pr
             "Gate: commercial gate"]
 P5_STEPS = ["Launcher: store page, launch posts and targets", "Delivery: sale-to-cash test on MOCKED events",
             "Gate: launch gate"]
-P6_STEPS = ["Metrics: launch results vs locked targets", "Support: drafting replies to real feedback",
+P6_STEPS = ["Support: drafting replies to real feedback", "Metrics: launch results vs locked targets",
             "Gate: learn gate", "Analyst: learning memo"]
 
 
@@ -603,9 +603,18 @@ class Orchestrator:
         st.error = None
         op = st.operate
         targets = st.launch["targets"]
+        mvp = MvpSpec(**st.mvp)
         self._step(st, P6_STEPS, 0)
-        problem_words = {w for w in re.findall(r"[a-z]{5,}", " ".join(MvpSpec(**st.mvp).user_stories[0].i_want.lower().split()))}
-        problem_mentions = sum(1 for f in op["feedback"] if problem_words & set(re.findall(r"[a-z]{5,}", f.lower())))
+        drafts = SupportAgent(ctx).draft_replies(mvp.product_name, brief.signature, op["feedback"]) \
+            if op["feedback"] else SupportDrafts(replies=[])
+        if len(drafts.replies) == len(op["feedback"]):
+            english = {f.strip(): r.feedback_english for f, r in zip(op["feedback"], drafts.replies)}
+        else:
+            english = {r.feedback.strip(): r.feedback_english for r in drafts.replies}
+        story = mvp.user_stories[0]
+        mentions = problem_mentions(f"{story.i_want} {story.so_that}",
+                                    [(f, english.get(f.strip(), "")) for f in op["feedback"]])
+        self._step(st, P6_STEPS, 1)
         self.write_output(st, "phase6_step1_metrics.md", "\n".join([
             "# Phase 6, step 1: Launch results vs targets locked before launch", "",
             "| Metric | Target | Actual | Source |", "|---|---|---|---|",
@@ -613,16 +622,14 @@ class Orchestrator:
             f"| Free sign-ups since launch | {targets['free_signups']} | {op['signups']} | counted by the app from real form posts |",
             f"| Paid orders | {targets['paid_orders']} | {op['paid_orders']} | entered by the founder (checkout is MOCKED) |",
             f"| Users who wrote feedback | 3 | {len(op['feedback'])} | pasted by the founder |",
-            f"| Feedback mentioning the core problem | - | {problem_mentions} | computed |",
+            f"| Feedback mentioning the core problem | - | {mentions} | computed in code: stems of the primary user story "
+            f"('{story.i_want}') matched in each item or its English rendering |",
             "", f"Window: {targets['window_days']} days."]) + "\n")
 
-        self._step(st, P6_STEPS, 1)
-        drafts = SupportAgent(ctx).draft_replies(MvpSpec(**st.mvp).product_name, brief.signature, op["feedback"]) \
-            if op["feedback"] else SupportDrafts(replies=[])
         lines = ["# Phase 6, step 2: Support reply drafts (the founder sends them personally; sending is MOCKED)", ""]
         q.supersede("send_support_reply_mock")
         for r in drafts.replies:
-            v = guard.check_output(r.reply)
+            v = guard.check_support_reply(r.reply)
             fake = invented_identity(r.reply, brief.signature)
             ok = v.allowed and not fake
             lines += [f"## {r.category}: \"{r.feedback}\"", "",
@@ -636,7 +643,7 @@ class Orchestrator:
 
         self._step(st, P6_STEPS, 2)
         g = learn_gate(targets=targets, visits=op["visits"], signups=op["signups"], paid_orders=op["paid_orders"],
-                       feedback_items=len(op["feedback"]), problem_mentions=problem_mentions)
+                       feedback_items=len(op["feedback"]), problem_mentions=mentions)
         st.gates.append(g.to_dict())
         self.log.append(agent="gate", action="learn_gate", run_id=st.run_id, outcome=g.recommendation, phase=6)
         gmd = g.md()

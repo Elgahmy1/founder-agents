@@ -224,6 +224,29 @@ def check_output(text: str) -> Verdict:
     return _check(NEGATED_GUARANTEE.sub(" ", text), OUTPUT_RULES)
 
 
+PAYMENT_DETAILS_ASK = re.compile(
+    r"\b(transaction|order|payment|receipt|invoice)\s*(id|number|no\.?|reference|details)\b"
+    r"|\b(card|bank|iban|cvv|account)\s*(number|details|info)\b|\bcvv\b|\bpassword\b"
+    r"|رقم\s*(المعامل[ةه]|العملي[ةه]|الكارت|البطاق[ةه]|الحساب)|كلم[ةه]\s*(السر|المرور)", re.I)
+REFUND_PROMISE = re.compile(
+    r"\b(i|we)\s*(?:'ll|will|am going to|are going to|can)\s+(?:\w+\s+){0,4}(refund|reimburse)"
+    r"|\b(i|we)\s*(?:'ll|will)\s+(?:\w+\s+){0,3}(initiate|process|issue)\b[^.]{0,30}\brefund"
+    r"|\byour refund (?:has been|is being|will be) (?:issued|processed|sent)", re.I)
+
+
+def check_support_reply(text: str) -> Verdict:
+    """A support reply the founder may send. On top of check_output: never ask for payment or account details,
+    and never promise a refund (the system takes no money; refunds are the founder's own decision)."""
+    v = check_output(text)
+    if not v.allowed:
+        return v
+    if PAYMENT_DETAILS_ASK.search(text):
+        return Verdict(False, "asks_payment_details", "asks the user for payment, account or password details")
+    if REFUND_PROMISE.search(text):
+        return Verdict(False, "refund_promise", "promises or claims a refund; refunds are the founder's decision")
+    return Verdict(True, None, None)
+
+
 def scrub_output(text: str) -> tuple[str, list[str]]:
     """Remove offending lines from generated copy; return text and removed rule ids."""
     removed: list[str] = []

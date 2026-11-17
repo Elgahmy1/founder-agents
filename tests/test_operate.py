@@ -83,3 +83,38 @@ def test_finished_launch_run_can_continue_into_operate(make_orch, brief):
     orch.save(st, q)
     st = orch.founder_continue(st.run_id)
     assert st.stage == "p6_collecting"
+
+
+def test_problem_mentions_match_plurals_and_translated_feedback():
+    from app.gates import problem_mentions
+    core = "to paste my lecture notes I can get a summary"
+    assert problem_mentions(core, [("The summaries are too long", "")]) == 1
+    assert problem_mentions(core, [("الملخصات طويلة جدا", "The summaries are very long")]) == 1
+    assert problem_mentions(core, [("love the colours", "love the colours"), ("الشكل حلو", "It looks nice")]) == 0
+
+
+def test_arabic_feedback_about_the_problem_turns_stop_into_pivot(make_orch, brief):
+    orch = make_orch()
+    orch.llm.translations = {"الملخصات طويلة جدا": "The summaries are very long",
+                             "محتاج ملخص أقصر للمحاضرة": "I need a shorter lecture summary"}
+    st = _to_operate(orch, brief)
+    st = orch.founder_record_launch_results(st.run_id, visits=40, paid_orders=0, feedback=list(orch.llm.translations))
+    g = st.gates[-1]
+    assert g["recommendation"] == "pivot", g
+
+
+def test_support_reply_never_promises_refunds_or_asks_payment_details(make_orch, brief):
+    from app import guard
+    for bad in ("I'll initiate the refund on my end. Let me know the transaction ID.",
+                "We will refund you today.", "Please send your card number.", "Your refund has been processed.",
+                "ابعتلي رقم المعاملة"):
+        assert not guard.check_support_reply(bad).allowed, bad
+    for ok in ("No payment has been taken through this product, so there is nothing to refund. — [your name]",
+               "Thanks, I'll look into it personally. — [your name]"):
+        assert guard.check_support_reply(ok).allowed, ok
+    orch = make_orch()
+    orch.llm.support_reply = "Sorry! I'll process your refund now, just send the transaction ID. — Mohamed"
+    st = _to_operate(orch, brief)
+    st = orch.founder_record_launch_results(st.run_id, visits=40, paid_orders=0, feedback=["I want a refund"])
+    _, q = orch.load(st.run_id)
+    assert not [i for i in q.pending() if i.executor == "send_support_reply_mock"]

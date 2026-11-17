@@ -50,6 +50,8 @@ class FakeLLM:
         self.usage = Usage()
         self.strong = strong
 
+    translations: dict = {}   # feedback -> English rendering returned by the fake support agent
+    support_reply = "Thanks for telling me. — Mohamed"
     mvp_hours = 8.0       # per feature; tests raise it to force an over-scope build gate
     mvp_extra_inputs: list = []
 
@@ -133,7 +135,8 @@ class FakeLLM:
             PricingPlan: self.pricing(),
             PolicyDrafts: self.policies(),
             LaunchKit: self.launch(),
-            SupportDrafts: {"replies": [{"feedback": f, "category": "other", "reply": "Thanks for telling me. — Mohamed",
+            SupportDrafts: {"replies": [{"feedback": f, "feedback_english": self.translations.get(f, f), "category": "other",
+                                         "reply": self.support_reply,
                                          "product_change": "none" if i else "add key terms export"}
                                         for i, f in enumerate(re.findall(r"^- (.+)$", user, re.M))]},
         }[schema]

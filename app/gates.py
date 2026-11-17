@@ -9,6 +9,7 @@ Outcomes: go | repeat | pivot | stop.
 """
 from __future__ import annotations
 
+import re
 from dataclasses import asdict, dataclass, field
 
 OUTCOMES = ("go", "repeat", "pivot", "stop")
@@ -290,3 +291,20 @@ def learn_gate(*, targets: dict, visits: int, signups: int, paid_orders: int, fe
         reasons.insert(0, f"Sign-ups reached {share:.0%} of target (under 25%) and feedback does not show the problem. "
                           "Stopping now saves the founder's time and money.")
     return GateResult("learn_gate", 6, rec, reasons, checks)
+
+
+_STOP = {"about", "after", "their", "there", "these", "those", "which", "would", "could", "should", "using",
+         "where", "while", "other", "every", "being", "within", "without", "really", "thing", "things"}
+
+
+def _stems(text: str) -> set[str]:
+    """Crude, language-light stemming: words of 5+ letters reduced to their first 5 letters,
+    so summary / summaries / summarize all match. Deterministic and easy to audit."""
+    return {w[:5] for w in re.findall(r"[a-z]{5,}", text.lower()) if w not in _STOP}
+
+
+def problem_mentions(core_problem: str, feedback: list[tuple[str, str]]) -> int:
+    """How many feedback items talk about the core problem. Each item is (original, English rendering);
+    the English rendering lets non-English feedback count. Matching is on stems, never on the model's opinion."""
+    core = _stems(core_problem)
+    return sum(1 for orig, en in feedback if core & (_stems(orig) | _stems(en)))
