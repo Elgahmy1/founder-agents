@@ -51,3 +51,17 @@ Brief `briefs/egypt-freelancers.json` (an Arabic-first tool for Egyptian freelan
 | Market with strongest counter-evidence | [output](../outputs/phase1_step2_market-an-arabic-first-web-tool.md) |
 | Mom Test interview plan | [output](../outputs/phase1_step3_interview_plan-an-arabic-first-web-tool.md) |
 | Co-founder verdict, fixes and launch window | [output](../outputs/phase1_step4_cofounder_verdict-an-arabic-first-web-tool.md) |
+
+
+## Third committed run (`64844083`)
+
+Brief `briefs/freelance-dev-updates.json`, run on `openai/gpt-oss-120b`.
+
+| Step | Output |
+|---|---|
+| Evidence gate with unproven assumptions (ASM IDs) | [output](../outputs/phase1_gate_decision-a-web-tool-that-turns-a.md) |
+| Area check | [output](../outputs/phase1_step0_area_check-a-web-tool-that-turns-a.md) |
+| Opportunities with strongest alternative | [output](../outputs/phase1_step1_opportunities-a-web-tool-that-turns-a.md) |
+| Market with strongest counter-evidence | [output](../outputs/phase1_step2_market-a-web-tool-that-turns-a.md) |
+| Mom Test interview plan | [output](../outputs/phase1_step3_interview_plan-a-web-tool-that-turns-a.md) |
+| Co-founder verdict, fixes and launch window | [output](../outputs/phase1_step4_cofounder_verdict-a-web-tool-that-turns-a.md) |

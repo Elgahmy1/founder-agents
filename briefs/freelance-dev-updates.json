@@ -1,0 +1,11 @@
+{
+  "founder_name": "Mohamed",
+  "idea": "A web tool that turns a freelance developer's git commits and task notes into a clear weekly progress update for non-technical clients",
+  "skills": ["Python", "AI/LLM apps", "web development", "freelance client communication"],
+  "budget_usd": 150,
+  "hours_per_week": 12,
+  "target_market": "Freelance software developers",
+  "location": "Egypt",
+  "values": ["honesty", "no fake reviews or inflated claims", "user privacy"],
+  "source_urls": []
+}
