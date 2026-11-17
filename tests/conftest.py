@@ -2,6 +2,7 @@
 the app itself always uses the real local model."""
 from __future__ import annotations
 
+import re
 import sys
 from dataclasses import replace
 from pathlib import Path
@@ -15,6 +16,7 @@ from app.agents.advisor import Advice  # noqa: E402
 from app.agents.analyst import DemandTestPlan, GateMemo  # noqa: E402
 from app.agents.builder import MvpSpec  # noqa: E402
 from app.agents.launcher import LaunchKit  # noqa: E402
+from app.agents.operator import SupportDrafts  # noqa: E402
 from app.agents.policy_drafter import PolicyDrafts  # noqa: E402
 from app.agents.pricer import PricingPlan  # noqa: E402
 from app.agents.interviewer import InterviewPlan  # noqa: E402
@@ -131,6 +133,9 @@ class FakeLLM:
             PricingPlan: self.pricing(),
             PolicyDrafts: self.policies(),
             LaunchKit: self.launch(),
+            SupportDrafts: {"replies": [{"feedback": f, "category": "other", "reply": "Thanks for telling me. — Mohamed",
+                                         "product_change": "none" if i else "add key terms export"}
+                                        for i, f in enumerate(re.findall(r"^- (.+)$", user, re.M))]},
         }[schema]
         return schema.model_validate(data)
 

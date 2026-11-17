@@ -6,7 +6,7 @@ then stops and waits. Phases 1-2 are built; phases 3-6 are STUBBED.
 
 Stages:
   new -> p1_running -> p1_gate_wait -> p2_running -> p2_targets_wait
-      -> p2_collecting -> p2_gate_wait -> p3_running -> p3_gate_wait -> p4_running -> p4_gate_wait -> p5_running -> p5_gate_wait -> p6_stubbed -> done
+      -> p2_collecting -> p2_gate_wait -> p3_running -> p3_gate_wait -> p4_running -> p4_gate_wait -> p5_running -> p5_gate_wait -> p6_collecting -> p6_running -> p6_gate_wait -> done
   any gate can end in: stopped
 """
 from __future__ import annotations
@@ -29,6 +29,7 @@ from app.agents.marketer import LandingCopy, MarketerAgent
 from app.agents.researcher import ResearcherAgent
 from app.agents.builder import BuilderAgent, MvpSpec
 from app.agents.launcher import LaunchKit, LauncherAgent
+from app.agents.operator import SupportAgent, SupportDrafts
 from app.agents.policy_drafter import PolicyDrafterAgent, PolicyDrafts
 from app.agents.pricer import PricerAgent, PricingPlan
 from app.agents.scout import Opportunities, Opportunity, ScoutAgent
@@ -40,7 +41,7 @@ from app.config import Settings
 from app.decision_log import DecisionLog
 from app.evidence import Ledger, RawClaim, resolve
 from app.gates import (OUTCOMES, DemandTargets, GateResult, build_gate, commercial_gate, demand_gate, discover_gate,
-                       launch_gate)
+                       launch_gate, learn_gate)
 from app.sale_to_cash import run_payment_test
 from app.store import render_store
 from app.prototype import prototype_is_safe, render_prototype
@@ -88,6 +89,8 @@ P4_STEPS = ["Pricer: tiers from comparable products", "Policy drafter: terms, pr
             "Gate: commercial gate"]
 P5_STEPS = ["Launcher: store page, launch posts and targets", "Delivery: sale-to-cash test on MOCKED events",
             "Gate: launch gate"]
+P6_STEPS = ["Metrics: launch results vs locked targets", "Support: drafting replies to real feedback",
+            "Gate: learn gate", "Analyst: learning memo"]
 
 
 def slugify(s: str, n: int = 24) -> str:
@@ -117,6 +120,7 @@ class RunState:
     commercial_feedback: str | None = None
     launch: dict | None = None
     launch_feedback: str | None = None
+    operate: dict | None = None
     targets: dict | None = None
     results: dict | None = None
     gates: list[dict] = field(default_factory=list)
@@ -185,6 +189,7 @@ class Orchestrator:
             "publish_store_local": self._publish_store_local,
             "post_launch_mock": self._post_launch_mock,
             "lock_launch_targets": self._lock_launch_targets,
+            "send_support_reply_mock": self._send_outreach_mock,
         })
 
     # ---------- executors (only reachable through an approved item) ----------
@@ -284,6 +289,8 @@ class Orchestrator:
                 self._phase4(st, q)
             elif st.stage == "p5_running":
                 self._phase5(st, q)
+            elif st.stage == "p6_running":
+                self._phase6(st, q)
             elif st.stage in ("p6_stubbed", "p5_6_stubbed", "p4_6_stubbed", "p3_6_stubbed"):
                 self._stubs(st)
         except Exception as e:  # surface, never hide
@@ -589,6 +596,79 @@ class Orchestrator:
         self.write_output(st, "phase5_gate_decision.md", g.md())
         st.stage = "p5_gate_wait"
 
+    # ---------- phase 6: Operate and learn ----------
+    def _phase6(self, st: RunState, q: ApprovalQueue) -> None:
+        brief = FounderBrief(**st.brief)
+        ctx = self.ctx(st)
+        st.error = None
+        op = st.operate
+        targets = st.launch["targets"]
+        self._step(st, P6_STEPS, 0)
+        problem_words = {w for w in re.findall(r"[a-z]{5,}", " ".join(MvpSpec(**st.mvp).user_stories[0].i_want.lower().split()))}
+        problem_mentions = sum(1 for f in op["feedback"] if problem_words & set(re.findall(r"[a-z]{5,}", f.lower())))
+        self.write_output(st, "phase6_step1_metrics.md", "\n".join([
+            "# Phase 6, step 1: Launch results vs targets locked before launch", "",
+            "| Metric | Target | Actual | Source |", "|---|---|---|---|",
+            f"| Store visits | {targets['store_visits']} | {op['visits']} | entered by the founder |",
+            f"| Free sign-ups since launch | {targets['free_signups']} | {op['signups']} | counted by the app from real form posts |",
+            f"| Paid orders | {targets['paid_orders']} | {op['paid_orders']} | entered by the founder (checkout is MOCKED) |",
+            f"| Users who wrote feedback | 3 | {len(op['feedback'])} | pasted by the founder |",
+            f"| Feedback mentioning the core problem | - | {problem_mentions} | computed |",
+            "", f"Window: {targets['window_days']} days."]) + "\n")
+
+        self._step(st, P6_STEPS, 1)
+        drafts = SupportAgent(ctx).draft_replies(MvpSpec(**st.mvp).product_name, brief.signature, op["feedback"]) \
+            if op["feedback"] else SupportDrafts(replies=[])
+        lines = ["# Phase 6, step 2: Support reply drafts (the founder sends them personally; sending is MOCKED)", ""]
+        q.supersede("send_support_reply_mock")
+        for r in drafts.replies:
+            v = guard.check_output(r.reply)
+            fake = invented_identity(r.reply, brief.signature)
+            ok = v.allowed and not fake
+            lines += [f"## {r.category}: \"{r.feedback}\"", "",
+                      r.reply if ok else f"[removed by guard: {v.reason or 'speaks as ' + str(fake)}]", "",
+                      f"Suggested product change: {r.product_change}", ""]
+            if ok:
+                q.submit("send", f"Reply to feedback: {r.feedback[:50]}", r.reply, "send_support_reply_mock", 6)
+        if not drafts.replies:
+            lines.append("No feedback was entered.")
+        self.write_output(st, "phase6_step2_support_replies.md", "\n".join(lines) + "\n")
+
+        self._step(st, P6_STEPS, 2)
+        g = learn_gate(targets=targets, visits=op["visits"], signups=op["signups"], paid_orders=op["paid_orders"],
+                       feedback_items=len(op["feedback"]), problem_mentions=problem_mentions)
+        st.gates.append(g.to_dict())
+        self.log.append(agent="gate", action="learn_gate", run_id=st.run_id, outcome=g.recommendation, phase=6)
+        gmd = g.md()
+        self.write_output(st, "phase6_gate_decision.md", gmd)
+
+        self._step(st, P6_STEPS, 3)
+        memo = AnalystAgent(ctx).gate_memo(gmd)
+        self.write_output(st, "phase6_step3_learning_memo.md", "\n".join([
+            f"# Phase 6, step 3: Learning memo (the recommendation above is {g.recommendation.upper()} and the memo cannot change it)",
+            "", memo.summary, "", "## What we learned", *[f"- {x}" for x in memo.what_we_learned],
+            "", "## Next steps", *[f"- {x}" for x in memo.next_steps],
+            "", "## Product changes suggested by feedback", *[f"- {r.product_change}" for r in drafts.replies
+                                                              if r.product_change.lower() != "none"]]) + "\n")
+        st.stage = "p6_gate_wait"
+
+    def founder_record_launch_results(self, run_id: str, visits: int, paid_orders: int, feedback: list[str]) -> RunState:
+        with self.lock(run_id):
+            st, q = self.load(run_id)
+            if st.stage != "p6_collecting":
+                raise ValueError(f"not collecting launch results (stage={st.stage})")
+            if visits < 0 or paid_orders < 0:
+                raise ValueError("numbers cannot be negative")
+            fb = [f.strip()[:500] for f in feedback if f.strip()][:20]
+            since = self.signups(run_id) - st.launch.get("signups_at_launch", 0)
+            st.operate = {"visits": visits, "paid_orders": paid_orders, "signups": max(0, since), "feedback": fb}
+            self.log.append(agent="founder", action="record_launch_results", approved_by="founder", run_id=run_id,
+                            detail=f"{visits} visits, {paid_orders} paid orders, {len(fb)} feedback items; "
+                                   f"{st.operate['signups']} sign-ups counted by app")
+            st.stage = "p6_running"
+            self.save(st, q)
+            return self._advance(run_id)
+
     def _stubs(self, st: RunState) -> None:
         for p in STUB_PHASES:
             self.write_output(st, f"phase{p.phase}_step1_{slugify(p.name, 20)}-STUBBED.md", stub_report(p))
@@ -604,7 +684,7 @@ class Orchestrator:
         if decision not in OUTCOMES:
             raise ValueError(f"decision must be one of {OUTCOMES}")
         st, q = self.load(run_id)
-        if st.stage not in ("p1_gate_wait", "p2_gate_wait", "p3_gate_wait", "p4_gate_wait", "p5_gate_wait"):
+        if st.stage not in ("p1_gate_wait", "p2_gate_wait", "p3_gate_wait", "p4_gate_wait", "p5_gate_wait", "p6_gate_wait"):
             raise ValueError(f"no gate is waiting (stage={st.stage})")
         from app.gates import Check
         g_full = st.gates[-1]
@@ -635,13 +715,22 @@ class Orchestrator:
             else:
                 st.tried.append(st.chosen)
                 st.stage = "p1_running"
+        elif phase == 6:
+            if decision == "go":
+                st.stage = "done"  # persevere: keep operating
+            elif decision == "repeat":
+                st.stage = "p6_collecting"  # another window with the same locked targets
+            else:  # pivot: back to Discover with what was learned
+                st.tried.append(st.chosen)
+                st.stage = "p1_running"
         elif phase == 5:
             if decision == "go":
                 need = [i for i in q.items if i.executor in ("publish_store_local", "lock_launch_targets")
                         and i.status != "superseded"]
                 if len(need) < 2 or any(i.status != "executed" for i in need):
                     raise ValueError("GO needs the founder to approve the store page and lock the launch targets first")
-                st.stage = "p6_stubbed"
+                st.launch["signups_at_launch"] = self.signups(run_id)  # launch sign-ups are counted from here
+                st.stage = "p6_collecting"
             else:
                 failed = [c for c in gr.checks if not c.passed]
                 st.launch_feedback = "\n".join([f"- {c.name}: target {c.target}, got {c.actual}" for c in failed]
@@ -687,6 +776,13 @@ class Orchestrator:
                 st.stage, phase = "p4_running", 4
             elif st.pricing and not st.launch and "commercial_gate" in passed:
                 st.stage, phase = "p5_running", 5
+            elif st.launch and not st.operate and "launch_gate" in passed:
+                self.log.append(agent="founder", action="start_phase6", approved_by="founder", run_id=run_id,
+                                outcome="go", phase=6)
+                st.launch["signups_at_launch"] = self.signups(run_id)
+                st.stage = "p6_collecting"
+                self.save(st, q)
+                return st
             else:
                 raise ValueError("nothing to continue: the next phase needs a gate the founder passed with GO")
             self.log.append(agent="founder", action=f"start_phase{phase}", approved_by="founder", run_id=run_id,

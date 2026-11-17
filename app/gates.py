@@ -262,3 +262,31 @@ def launch_gate(*, store_safe: list[str], store_guard_removed: list[str], prices
     for c in failed:
         reasons.append(f"Failed: {c.name} (target {c.target}, actual {c.actual}).")
     return GateResult("launch_gate", 5, rec, reasons, checks)
+
+
+def learn_gate(*, targets: dict, visits: int, signups: int, paid_orders: int, feedback_items: int,
+               problem_mentions: int) -> GateResult:
+    """Phase 6: results vs the launch targets the founder locked before launch."""
+    tv, ts = max(1, targets["store_visits"]), max(1, targets["free_signups"])
+    checks = [
+        Check("Store visits in the window", f">= {tv}", str(visits), visits >= tv),
+        Check("Free sign-ups (counted by the app from real form posts)", f">= {ts}", str(signups), signups >= ts),
+        Check("Users who wrote feedback", ">= 3", str(feedback_items), feedback_items >= 3),
+    ]
+    reasons = [f"Paid orders: target {targets['paid_orders']}, recorded {paid_orders}. Checkout is MOCKED in this "
+               "prototype, so paid orders are reported, not used for the recommendation."]
+    share = signups / ts
+    if all(c.passed for c in checks):
+        rec = "go"
+        reasons.insert(0, "Every launch target was met: persevere and keep operating.")
+    elif share >= 0.5:
+        rec = "repeat"
+        reasons.insert(0, f"Sign-ups reached {share:.0%} of target: run another window with the same targets before deciding.")
+    elif share >= 0.25 or problem_mentions >= 2:
+        rec = "pivot"
+        reasons.insert(0, "Some pull but well under target: go back to Discover with what users said.")
+    else:
+        rec = "stop"
+        reasons.insert(0, f"Sign-ups reached {share:.0%} of target (under 25%) and feedback does not show the problem. "
+                          "Stopping now saves the founder's time and money.")
+    return GateResult("learn_gate", 6, rec, reasons, checks)

@@ -8,7 +8,7 @@ An open-source team of AI agents that takes a founder's brief (idea, skills, bud
 docker compose up
 ```
 
-Then open http://localhost:8000, fill in a founder brief and press **Start Discover**. The run goes Discover → Validate → Build → Commercial setup → Launch, and stops at every gate for your decision. The first start downloads the open-weight model (about 5 GB for `qwen3:8b`), so it takes a few minutes once.
+Then open http://localhost:8000, fill in a founder brief and press **Start Discover**. The run goes through all six phases (Discover → Validate → Build → Commercial setup → Launch → Operate and learn) and stops at every gate for your decision. The first start downloads the open-weight model (about 5 GB for `qwen3:8b`), so it takes a few minutes once.
 
 Without Docker: install [Ollama](https://ollama.com), run `ollama pull qwen3:8b`, then `pip install -r requirements.txt && uvicorn app.main:app`. A terminal version is available with `python -m app.cli run briefs/study-notes.json`.
 
@@ -42,7 +42,8 @@ Without Docker: install [Ollama](https://ollama.com), run `ollama pull qwen3:8b`
 | Phase 5 Launch: store page rendered from the founder-approved prices, launch post drafts per channel, launch targets locked before launch, launch gate | **Working** |
 | Phase 5 Launch: public hosting, posting to channels, checkout | **MOCKED** (founder posts personally; store served locally; no checkout) |
 | Phase 5 Launch: payment → delivery, refunds, idempotency, reconciliation | **MOCKED** (real logic runs on mock events inside the launch gate; no provider) |
-| Phase 6 Operate and learn | **STUBBED** |
+| Phase 6 Operate and learn: launch results vs the targets locked before launch (sign-ups counted by the app), support reply drafts for real feedback, learn gate (persevere / repeat / pivot / stop), learning memo | **Working** |
+| Phase 6: sending support replies; usage analytics | **MOCKED** (founder sends replies personally and enters store visits from their own analytics) |
 
 ## Architecture
 
@@ -77,6 +78,6 @@ Link to be added.
 ## How the project stays alive after the hackathon
 
 - Maintainers: Mohamed (@Elgahmy1) and contributors; MIT licensed.
-- Roadmap: phase 3 code generation in a sandbox, then phase 6, in the order of [ARCHITECTURE.md](ARCHITECTURE.md#roadmap).
-- Community: [CONTRIBUTING.md](CONTRIBUTING.md) lists first contributions (guard rules, research tools, phase 6 agents, translations); red-team prompts in `evals/` run in `tests/` and live via `python evals/run_red_team.py`.
+- Roadmap: phase 3 code generation in a sandbox, real payment-provider webhooks in the founder's own account, and product analytics for phase 6, in the order of [ARCHITECTURE.md](ARCHITECTURE.md#roadmap).
+- Community: [CONTRIBUTING.md](CONTRIBUTING.md) lists first contributions (guard rules, research tools, new agents, translations); red-team prompts in `evals/` run in `tests/` and live via `python evals/run_red_team.py`.
 - Funding: runs on free local models, so there is no hosting bill to cover; grants or sponsorship would pay for maintainer time, never for paywalling features.

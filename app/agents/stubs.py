@@ -1,4 +1,4 @@
-"""Phase 6 agents (phases 3-5 are built: app/agents/builder.py, pricer.py, policy_drafter.py, launcher.py). STUBBED in this prototype: each one records what it
+"""Stub phases. All six phases are built now (phase 6: app/agents/operator.py); this stays for runs saved by older versions. STUBBED in this prototype: each one records what it
 would do and which gate it would hit, without calling a model or any
 external service. See ARCHITECTURE.md for the full design."""
 from __future__ import annotations
@@ -16,12 +16,7 @@ class StubPhase:
     gate: str
 
 
-STUB_PHASES = (
-    StubPhase(6, "Operate and learn", "None", ("support", "metrics", "analyst"),
-              ("Draft support replies for founder approval",
-               "Track activation/retention against targets set at launch",
-               "Write a persevere-or-pivot memo"),
-              "metrics vs targets -> persevere / pivot / stop"),
+STUB_PHASES: tuple[StubPhase, ...] = (
 )
 
 

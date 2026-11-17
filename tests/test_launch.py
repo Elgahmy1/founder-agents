@@ -53,9 +53,8 @@ def test_clean_launch_go_needs_store_and_targets(make_orch, brief, settings):
         orch.approve(st.run_id, i.id, True)
     assert (settings.data_dir / "sites" / st.run_id / "store.html").exists()
     st = orch.founder_gate_decision(st.run_id, "go")
-    assert st.stage == "done"
-    assert any(o.startswith("phase6_") and "STUBBED" in o for o in st.outputs)
-    assert not any(o.startswith("phase5_") and "STUBBED" in o for o in st.outputs)
+    assert st.stage == "p6_collecting"
+    assert not any("STUBBED" in o for o in st.outputs)
     assert not validate(orch.log.read())
 
 

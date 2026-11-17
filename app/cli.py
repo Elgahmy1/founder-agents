@@ -46,7 +46,8 @@ def run(path: str) -> None:
             d = ask("Approve?", ("y", "n"))
             note = input("Note (optional): ").strip() or None
             st = orch.approve(st.run_id, item.id, d == "y", note)
-        if st.stage in ("p1_gate_wait", "p2_gate_wait", "p3_gate_wait", "p4_gate_wait", "p5_gate_wait"):
+        if st.stage in ("p1_gate_wait", "p2_gate_wait", "p3_gate_wait", "p4_gate_wait", "p5_gate_wait",
+                        "p6_gate_wait"):
             g = st.gates[-1]
             print(f"\nGATE {g['gate']} -> system recommends {g['recommendation'].upper()}")
             for c in g["checks"]:
@@ -68,6 +69,19 @@ def run(path: str) -> None:
             n = int(input("Interviews completed: "))
             k = int(input("Of those, how many confirmed the problem: "))
             st = orch.founder_record_results(st.run_id, n, k)
+        elif st.stage == "p6_collecting":
+            print(f"\nSign-ups counted by the app since launch: "
+                  f"{orch.signups(st.run_id) - st.launch.get('signups_at_launch', 0)}")
+            if ask("Record launch results now and run the learn gate?", ("y", "n")) == "n":
+                print(f"Paused. Resume in the web UI: {s.public_base_url}/runs/{st.run_id}")
+                break
+            visits = int(input("Store page visits (from your own analytics): "))
+            paid = int(input("Paid orders (from your own payment provider; 0 while checkout is MOCKED): "))
+            print("Paste real user feedback, one item per line; empty line to finish:")
+            fb = []
+            while (line := input().strip()):
+                fb.append(line)
+            st = orch.founder_record_launch_results(st.run_id, visits, paid, fb)
         elif st.stage in ("stopped", "done"):
             break
     print(f"\nRun {st.run_id} ended at stage '{st.stage}'. Outputs: {', '.join(st.outputs)}")

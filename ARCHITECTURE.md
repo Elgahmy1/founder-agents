@@ -2,7 +2,7 @@
 
 ## Overview
 
-Founder Agents is a team of single-purpose agents coordinated by an explicit state machine. A run starts from a founder brief, passes a policy screen, then moves phase by phase. Every phase ends in a gate: a recommendation computed from thresholds fixed in advance (or tests passing), followed by the founder's decision: **go**, **repeat**, **pivot** or **stop**. Agents only draft; anything that leaves the system (publish, send, spend, sign) becomes an item in the approval queue, and the only code path that executes it refuses unless the founder approved it. All agent actions append to `decision_log.json`. Phases 1-5 are built (phase 3 up to a clickable prototype and acceptance tests, with code generation STUBBED; phase 5 with checkout, hosting and posting MOCKED); phase 6 is designed here and STUBBED.
+Founder Agents is a team of single-purpose agents coordinated by an explicit state machine. A run starts from a founder brief, passes a policy screen, then moves phase by phase. Every phase ends in a gate: a recommendation computed from thresholds fixed in advance (or tests passing), followed by the founder's decision: **go**, **repeat**, **pivot** or **stop**. Agents only draft; anything that leaves the system (publish, send, spend, sign) becomes an item in the approval queue, and the only code path that executes it refuses unless the founder approved it. All agent actions append to `decision_log.json`. All six phases are built. Phase 3 stops at a clickable prototype and acceptance tests (code generation is STUBBED); checkout, public hosting, posting and sending are MOCKED, because the system never takes money or acts on the founder's accounts.
 
 ```mermaid
 flowchart LR
@@ -31,7 +31,8 @@ flowchart LR
     G5 -- repeat --> L
     G5 -- stop --> STOP
     G5 -- go --> O[6 Operate and learn]
-    O --> G6{Persevere / pivot / stop}
+    O --> G6{Learn gate: persevere / repeat / pivot / stop}
+    G6 -- stop --> STOP
     G6 -- pivot --> D
 
     subgraph Control["Founder control (every phase)"]
@@ -75,8 +76,13 @@ stateDiagram-v2
     p5_running --> p5_gate_wait: launch gate computed
     p5_gate_wait --> p5_running: repeat (redraft with failed checks)
     p5_gate_wait --> stopped: stop
-    p5_gate_wait --> p6_stubbed: go, only after store page approved and targets locked
-    p6_stubbed --> done
+    p5_gate_wait --> p6_collecting: go, only after store page approved and targets locked
+    p6_collecting --> p6_running: founder enters real launch results
+    p6_running --> p6_gate_wait: learn gate computed
+    p6_gate_wait --> done: go (persevere)
+    p6_gate_wait --> p6_collecting: repeat (another window)
+    p6_gate_wait --> p1_running: pivot (back to Discover)
+    p6_gate_wait --> stopped: stop
 ```
 
 ## Phases
@@ -196,10 +202,27 @@ flowchart LR
 - **Output:** `phase5_step1_store_page-*.html`, `phase5_step2_launch_kit-*.md`, `phase5_step3_payment_test-*.md`, `phase5_gate_decision-*.md`, `payment_test_log.md`.
 - **MOCKED:** public hosting, posting to channels (the founder posts personally), checkout and the payment provider. The system never creates accounts or takes money.
 
-### Phase 6: Operate and learn (STUBBED)
+### Phase 6: Operate and learn (built; sending and analytics MOCKED)
+
+```mermaid
+flowchart LR
+    T[launch targets locked before launch] --> LG{learn gate}
+    SU[free sign-ups since launch, counted by the app] --> LG
+    FV[store visits + paid orders, entered by founder] --> LG
+    FB[real user feedback, pasted by founder] --> SP[support: reply drafts] --> AQ[send items: founder sends personally]
+    FB --> LG
+    LG --> MEMO[analyst: learning memo, cannot change the recommendation]
+    LG -- go --> P[persevere]
+    LG -- repeat --> W[another window]
+    LG -- pivot --> D[back to Discover]
+    LG -- stop --> S((STOP))
+```
+
 - **Core step:** none (ongoing).
-- **Agents:** `support` (drafts replies for approval), `metrics` (activation, retention, refunds vs targets), `analyst` (persevere-or-pivot memo).
-- **Gate:** metrics vs targets → persevere, pivot (back to Discover with what was learned) or stop.
+- **Agents:** `support` (`app/agents/operator.py`) drafts an honest reply to each piece of real feedback, signed with the founder's name or a placeholder; `analyst` writes the learning memo after the gate.
+- **Method:** free sign-ups are counted by the app from real form posts since the launch decision (never typed in); the founder enters store visits from their own analytics and paid orders from their own provider (checkout is MOCKED, so usually 0). Replies are `send` items the founder sends personally; blocked replies are shown as removed.
+- **Learn gate (`app/gates.py: learn_gate`):** visits and sign-ups against the targets locked before launch, plus at least 3 users giving feedback. All met → **go** (persevere); sign-ups ≥ 50% of target → **repeat** for another window; ≥ 25% or feedback that names the core problem → **pivot** back to Discover; otherwise → **stop**. Paid orders are reported but cannot drive the recommendation while checkout is MOCKED.
+- **Output:** `phase6_step1_metrics-*.md`, `phase6_step2_support_replies-*.md`, `phase6_gate_decision-*.md`, `phase6_step3_learning_memo-*.md`.
 
 ## Gates
 
@@ -211,7 +234,7 @@ flowchart LR
 | Phase 3 build gate | ≥2 stories; all stories testable; all features traced; ≤6 must-haves; hours ≤ founder budget; prototype safe | go / repeat / pivot / stop |
 | Phase 4 commercial gate | Core feature free; ≥2 comparables; price basis disclosed; 3 policy drafts; privacy lists data; 0 guard flags; founder signed pricing + 3 policies | go / repeat / stop |
 | Phase 5 launch gate | Store page safe; prices = approved pricing; posts pass the guard; targets set and locked by founder; policies signed; sale-to-cash test PASS | go / repeat / stop |
-| Phase 6 learn gate | Retention and refund targets | persevere / pivot / stop |
+| Phase 6 learn gate | Visits and sign-ups since launch vs locked targets; ≥3 users gave feedback | go (persevere) / repeat / pivot / stop |
 
 **When the system recommends STOP** (`app/gates.py`):
 - The product is excluded (physical, financial/crypto, health or legal advice), before any agent runs.
@@ -220,6 +243,7 @@ flowchart LR
 - Discover, second pass: after one repeat or pivot, still fewer than 2 independent sources show the pain. One retry is allowed; a second failing pass is a stop, not another retry.
 - Build: scope still exceeds the founder's hours after one smaller-MVP rebuild.
 - Launch: required launch checks still fail after one redraft.
+- Operate: sign-ups since launch are under 25% of the locked target and feedback does not name the core problem.
 - Commercial setup: the plan still fails a required check (for example the core feature is behind a paywall) after one redraft.
 - Validate: interviews are complete but fewer than half the target share confirm the problem, or sign-ups are under 25% of target and interviews also miss.
 - Example: target 100 sign-ups in 14 days, 12 arrive and interviews miss → **stop**, not "promising early traction".
@@ -277,7 +301,7 @@ Persistence is plain files (JSON, CSV, Markdown) so runs are inspectable and por
 
 | Component | Status |
 |---|---|
-| Orchestrator state machine, phases 1-5 agents, evidence ledger, gates 1-5, approval queue, guard, decision log, web UI, CLI | Built |
+| Orchestrator state machine, phases 1-6 agents, evidence ledger, gates 1-6, approval queue, guard, decision log, web UI, CLI | Built |
 | Landing page publishing | Built locally; public hosting MOCKED |
 | Outreach sending | MOCKED (founder sends personally) |
 | Payment → delivery, refunds, idempotency, reconciliation | MOCKED events, real logic |
@@ -285,12 +309,12 @@ Persistence is plain files (JSON, CSV, Markdown) so runs are inspectable and por
 | Phase 3 code generation and test execution in a sandbox | STUBBED |
 | Phase 4 Commercial setup: pricing, policy drafts, founder sign-off, commercial gate | Built |
 | Phase 5 Launch: store page, launch posts, launch targets, launch gate | Built (hosting, posting, checkout MOCKED) |
-| Phase 6 Operate | STUBBED (report in `outputs/` when a run reaches it) |
+| Phase 6 Operate and learn: results vs targets, support drafts, learn gate, memo | Built (sending replies and analytics MOCKED) |
 
 ## Roadmap
 
 1. Phase 3: generate the MVP's code from the spec in a no-network container sandbox, and turn the acceptance criteria into the tests that gate it.
 2. Phase 4: a targeted price lookup tool so more comparable prices are SOURCED instead of ASSUMPTION.
 3. Phase 5: webhook handler for a real provider in the founder's own account (founder-configured, never our keys), replacing the MOCKED events.
-4. Phase 6: metrics dashboard from real product events; persevere-or-pivot memo.
+4. Phase 6: read visits and activation from privacy-friendly analytics instead of founder entry.
 5. Community: more free research tools, more red-team prompts in `evals/` (runner: `python evals/run_red_team.py`), translations (Arabic first). See [CONTRIBUTING.md](CONTRIBUTING.md).

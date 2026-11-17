@@ -33,7 +33,7 @@ STATUS = [
     ("Phase 4 Commercial setup: pricing with a free core tier, policy drafts, founder sign-off, commercial gate", "Working"),
     ("Phase 5 Launch: store page, launch post drafts, launch targets, launch gate", "Working"),
     ("Phase 5 checkout, public hosting and posting", "MOCKED"),
-    ("Phase 6 Operate and learn", "STUBBED"),
+    ("Phase 6 Operate and learn: results vs locked targets, support reply drafts, learn gate, learning memo", "Working"),
 ]
 
 CSS = """
@@ -140,11 +140,12 @@ def create_run(founder_name: str = Form("Founder"), idea: str = Form(...), skill
 
 
 PHASES = [(1, "Discover", "Working"), (2, "Validate", "Working"), (3, "Build", "Working"),
-          (4, "Commercial setup", "Working"), (5, "Launch", "Working"), (6, "Operate & learn", "STUBBED")]
+          (4, "Commercial setup", "Working"), (5, "Launch", "Working"), (6, "Operate & learn", "Working")]
 STAGE_PHASE = {"new": 1, "p1_running": 1, "p1_gate_wait": 1, "p2_running": 2, "p2_targets_wait": 2,
                "p2_collecting": 2, "p2_gate_wait": 2, "p3_running": 3, "p3_gate_wait": 3, "p3_6_stubbed": 3,
                "p4_6_stubbed": 4, "p4_running": 4, "p4_gate_wait": 4, "p5_6_stubbed": 5,
-               "p5_running": 5, "p5_gate_wait": 5, "p6_stubbed": 6, "done": 6, "stopped": 0}
+               "p5_running": 5, "p5_gate_wait": 5, "p6_stubbed": 6,
+               "p6_collecting": 6, "p6_running": 6, "p6_gate_wait": 6, "done": 6, "stopped": 0}
 OUTCOME_HELP = {
     "go": "Move on to the next phase.",
     "repeat": "Run this phase again (new research or a longer test).",
@@ -161,7 +162,7 @@ def _stepper(st: RunState) -> str:
         if stopped_at is not None:
             cls = "done" if n < stopped_at else ("stopped" if n == stopped_at else "off")
         elif st.stage == "done":
-            cls = "done" if n <= (5 if st.launch else 4 if st.pricing else 3 if st.mvp else 2) else "stub"
+            cls = "done" if n <= (6 if st.operate else 5 if st.launch else 4 if st.pricing else 3 if st.mvp else 2) else "stub"
         else:
             cls = "done" if n < cur else ("cur" if n == cur else ("stub" if status != "Working" else "off"))
         label = "" if status == "Working" else f"<small>{status}</small>"
@@ -218,7 +219,18 @@ def _next_step(st: RunState, q, run_id: str) -> str:
 <pre>{html.escape(i.content[:3000])}</pre><form method="post" action="/runs/{run_id}/approvals/{i.id}" class="once">
 <input name="note" placeholder="Note (optional)"><div class="row"><button name="approve" value="1">Approve</button>
 <button class="rej" name="approve" value="0">Reject</button></div></form></div>"""
-    if st.stage in ("p1_gate_wait", "p2_gate_wait", "p3_gate_wait", "p4_gate_wait", "p5_gate_wait"):
+    if st.stage == "p6_collecting":
+        t = st.launch["targets"]
+        return f"""<div class="card next"><div class="kicker">Your input is needed: real launch results</div>
+<h2>Enter what really happened in the {t['window_days']}-day launch window</h2>
+<p>Targets you locked before launch: {t['store_visits']} store visits, {t['free_signups']} free sign-ups, {t['paid_orders']} paid orders.
+Free sign-ups since launch are counted by the app (never typed in): <b>{max(0, orch.signups(run_id) - st.launch.get('signups_at_launch', 0))}</b>.</p>
+<form method="post" action="/runs/{run_id}/operate" class="once"><label>Store visits (from your analytics)</label>
+<input type="number" name="visits" min="0" required><label>Paid orders recorded in your own payment provider (checkout is MOCKED here, so usually 0)</label>
+<input type="number" name="paid_orders" min="0" value="0" required>
+<label>Real user feedback, one item per line (optional)</label><textarea name="feedback" rows="4"></textarea>
+<button>Run the learn gate</button></form></div>"""
+    if st.stage in ("p1_gate_wait", "p2_gate_wait", "p3_gate_wait", "p4_gate_wait", "p5_gate_wait", "p6_gate_wait"):
         g = st.gates[-1]
         rec = g["recommendation"]
         unsigned = st.stage == "p4_gate_wait" and any(
@@ -261,21 +273,24 @@ Sign-ups so far (counted by the app, never typed in): <b>{orch.signups(run_id)}<
         return ("<div class='card next end'><div class='kicker'>Run ended</div><h2 class='stop'>STOP</h2>"
                 + (_gate_table(g) if g else "") + "<p>Stopping saved your time and money. Everything is in the decision log.</p></div>")
     if st.stage == "done":
-        built = ("Discover, Validate, Build, Commercial setup and Launch" if st.launch else
+        built = ("All six phases" if st.operate else
+                 "Discover, Validate, Build, Commercial setup and Launch" if st.launch else
                  "Discover, Validate, Build and Commercial setup" if st.pricing else
                  "Discover, Validate and Build" if st.mvp else "Discover and Validate")
-        rest = "6" if st.launch else "5-6" if st.pricing else "4-6" if st.mvp else "3-6"
+        rest = "" if st.operate else "6" if st.launch else "5-6" if st.pricing else "4-6" if st.mvp else "3-6"
         proto = (f" <a href='/proto/{run_id}' target='_blank'>Open the prototype</a>."
                  if (settings.data_dir / "sites" / run_id / "prototype.html").exists() else "")
         passed = {g["gate"] for g in st.gates if g.get("founder_decision") == "go"}
         nxt = (3, "Build") if (not st.mvp and "demand_gate" in passed) else \
               (4, "Commercial setup") if (st.mvp and not st.pricing and "build_gate" in passed) else \
-              (5, "Launch") if (st.pricing and not st.launch and "commercial_gate" in passed) else None
+              (5, "Launch") if (st.pricing and not st.launch and "commercial_gate" in passed) else \
+              (6, "Operate and learn") if (st.launch and not st.operate and "launch_gate" in passed) else None
         build_btn = (f"<form method='post' action='/runs/{run_id}/build' class='once'><p>This run finished before Phase {nxt[0]} "
                      f"was available. You passed the gate before it, so it can continue now.</p>"
                      f"<button>Run Phase {nxt[0]} {nxt[1]}</button></form>" if nxt else "")
         return (f"<div class='card next end'><div class='kicker'>Run finished</div><h2 class='go'>{built} complete</h2>"
-                f"<p>Phases {rest} are STUBBED in this prototype: their reports below describe what would happen next.{proto}</p>{build_btn}</div>")
+                + (f"<p>Phases {rest} are STUBBED in this prototype: their reports below describe what would happen next.{proto}</p>" if rest else
+                   f"<p>The founder chose to persevere: keep operating and re-run the learn gate each window.{proto}</p>") + f"{build_btn}</div>")
     return ""
 
 
@@ -363,6 +378,17 @@ def build(run_id: str):
         except ValueError:
             pass  # not eligible; the page shows the current state
     _bg(run_id, "Running the next phase", go)
+    return RedirectResponse(f"/runs/{run_id}", status_code=303)
+
+
+@app.post("/runs/{run_id}/operate")
+def operate(run_id: str, visits: int = Form(...), paid_orders: int = Form(0), feedback: str = Form("")):
+    def go():
+        try:
+            orch.founder_record_launch_results(run_id, visits, paid_orders, feedback.splitlines())
+        except ValueError:
+            pass
+    _bg(run_id, "Comparing launch results with your targets", go)
     return RedirectResponse(f"/runs/{run_id}", status_code=303)
 
 
