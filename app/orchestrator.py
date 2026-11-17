@@ -836,7 +836,8 @@ class Orchestrator:
                                      + [f"check {i} ({c.criterion}): {r['error']}" for i, (c, r) in
                                         enumerate(zip(draft.checks, res.results), 1) if not r["passed"]])
             draft, res = attempts[-1]
-            notes_ok = guard.check_output(draft.notes)
+            notes, removed_rules = guard.scrub_output(draft.notes.replace(". ", ".\n"))
+            notes = " ".join(notes.split("\n")).strip()
             lines = ["# Phase 3, step 4: MVP core code, tested in a sandbox", "",
                      f"Primary user story {story.id}: as {story.as_a}, I want {story.i_want}, so that {story.so_that}.", "",
                      "Written by the coder agent and run by `app/sandbox.py`: static allowlist (pure standard library, "
@@ -857,7 +858,7 @@ class Orchestrator:
                 r = res.results[i] if i < len(res.results) else {"passed": False, "error": "not run"}
                 lines.append(f"| {c.criterion.replace('|', '/')} | check {i + 1} | "
                              f"{'PASS' if r['passed'] else 'FAIL: ' + str(r['error']).replace('|', '/')} |")
-            lines += ["", "## Notes", "", draft.notes if notes_ok.allowed else "[removed by guard]", "",
+            lines += ["", "## Notes", "", (notes or "-") + (f" ({len(removed_rules)} sentence(s) removed by the output guard)" if removed_rules else ""), "",
                       "## core.py", "", "```python", draft.module_code.strip(), "```", "", "## Checks", ""]
             for i, c in enumerate(draft.checks, 1):
                 lines += [f"Check {i} ({c.story_id}): {c.criterion}", "", "```python", c.code.strip(), "```", ""]
