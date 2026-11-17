@@ -20,7 +20,10 @@ services:
         condition: service_healthy
     environment:
       OLLAMA_HOST: ollama:11434
-    entrypoint: ["/bin/sh", "-c", "ollama pull ${MODEL:-qwen3:8b}"]
+      LLM_PROVIDER: ${LLM_PROVIDER:-ollama}
+      PULL_MODEL: ${MODEL:-qwen3:8b}
+    # With a free-tier endpoint in .env (LLM_PROVIDER=openai) there is nothing to pull.
+    entrypoint: ["/bin/sh", "-c", "if [ \"$$LLM_PROVIDER\" = openai ]; then echo 'free-tier endpoint: skipping model pull'; else ollama pull \"$$PULL_MODEL\"; fi"]
     restart: "no"
 
   app:
