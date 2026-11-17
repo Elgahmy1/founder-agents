@@ -27,8 +27,8 @@ class Agent:
         self.ctx = ctx
 
     def system_prompt(self) -> str:
-        policy = (self.ctx.prompts_dir / "policy.md").read_text()
-        own = (self.ctx.prompts_dir / f"{self.role}.md").read_text()
+        policy = (self.ctx.prompts_dir / "policy.md").read_text(encoding="utf-8")
+        own = (self.ctx.prompts_dir / f"{self.role}.md").read_text(encoding="utf-8")
         return f"{own}\n\n{policy}"
 
     def ask(self, action: str, user: str, schema: type[T], sources: list[str] | None = None) -> T:

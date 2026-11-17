@@ -234,7 +234,7 @@ def output(name: str):
     p = (settings.outputs_dir / name).resolve()
     if p.parent != settings.outputs_dir.resolve() or not p.exists():
         raise HTTPException(404)
-    return PlainTextResponse(p.read_text())
+    return PlainTextResponse(p.read_text(encoding="utf-8"))
 
 
 @app.get("/lp/{run_id}", response_class=HTMLResponse)
@@ -242,7 +242,7 @@ def landing(run_id: str):
     p = settings.data_dir / "sites" / Path(run_id).name / "index.html"
     if not p.exists():
         raise HTTPException(404, "Not published: the founder has not approved this page.")
-    return HTMLResponse(p.read_text())
+    return HTMLResponse(p.read_text(encoding="utf-8"))
 
 
 @app.post("/lp/{run_id}/join", response_class=HTMLResponse)

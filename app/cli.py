@@ -31,7 +31,7 @@ def run(path: str) -> None:
         sys.exit(f"Model '{s.model}' is not ready (provider {s.provider}). Ollama: run `ollama pull {s.model}`; "
                  "free-tier endpoint: set OPENAI_API_KEY in .env")
     orch = Orchestrator(s, llm)
-    brief = FounderBrief(**json.loads(open(path).read()))
+    brief = FounderBrief(**json.loads(open(path, encoding="utf-8").read()))
     print(f"Starting run for: {brief.idea}")
     st = orch.start(brief)
     while True:
@@ -111,7 +111,7 @@ def payment_test() -> None:
     ok_all &= d.deliveries == 2 and not issues
     lines.append(f"\n**Overall: {'PASS' if ok_all else 'FAIL'}**")
     s.outputs_dir.mkdir(parents=True, exist_ok=True)
-    (s.outputs_dir / "payment_test_log.md").write_text("\n".join(lines) + "\n")
+    (s.outputs_dir / "payment_test_log.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
     log.append(agent="delivery", action="mock_payment_delivery_test", outcome="pass" if ok_all else "fail")
     print("\n".join(lines))
 

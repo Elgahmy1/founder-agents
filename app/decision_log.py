@@ -32,9 +32,9 @@ class DecisionLog:
         self.path = Path(path)
 
     def read(self) -> list[dict[str, Any]]:
-        if not self.path.exists() or not self.path.read_text().strip():
+        if not self.path.exists() or not self.path.read_text(encoding="utf-8").strip():
             return []
-        return json.loads(self.path.read_text())
+        return json.loads(self.path.read_text(encoding="utf-8"))
 
     def append(
         self,
@@ -65,7 +65,7 @@ class DecisionLog:
             entry["hash"] = _digest(entry)
             entries.append(entry)
             self.path.parent.mkdir(parents=True, exist_ok=True)
-            self.path.write_text(json.dumps(entries, indent=1, ensure_ascii=False) + "\n")
+            self.path.write_text(json.dumps(entries, indent=1, ensure_ascii=False) + "\n", encoding="utf-8")
             return entry
 
 

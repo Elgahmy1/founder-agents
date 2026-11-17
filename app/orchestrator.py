@@ -87,10 +87,10 @@ class Orchestrator:
                     "completion_tokens": self.llm.usage.completion_tokens, "cost_usd": self.llm.usage.cost_usd}
         p = self._path(st.run_id)
         p.parent.mkdir(parents=True, exist_ok=True)
-        p.write_text(json.dumps(st.__dict__, indent=1, ensure_ascii=False))
+        p.write_text(json.dumps(st.__dict__, indent=1, ensure_ascii=False), encoding="utf-8")
 
     def load(self, run_id: str) -> tuple[RunState, ApprovalQueue]:
-        st = RunState(**json.loads(self._path(run_id).read_text()))
+        st = RunState(**json.loads(self._path(run_id).read_text(encoding="utf-8")))
         q = self.queue(st.run_id)
         q.load(st.approvals)
         return st, q
@@ -100,7 +100,7 @@ class Orchestrator:
             return []
         out = []
         for p in sorted(self.runs_dir.glob("*/state.json"), key=lambda p: p.stat().st_mtime, reverse=True):
-            out.append(RunState(**json.loads(p.read_text())))
+            out.append(RunState(**json.loads(p.read_text(encoding="utf-8"))))
         return out
 
     def queue(self, run_id: str) -> ApprovalQueue:
@@ -114,7 +114,7 @@ class Orchestrator:
         run_id = item.title.split(":")[-1].strip()
         d = self.sites_dir / run_id
         d.mkdir(parents=True, exist_ok=True)
-        (d / "index.html").write_text(item.content)
+        (d / "index.html").write_text(item.content, encoding="utf-8")
         return (f"Published locally at {self.settings.public_base_url}/lp/{run_id} "
                 "(public hosting is MOCKED: nothing was deployed to the internet)")
 
@@ -129,7 +129,7 @@ class Orchestrator:
         stem, ext = name.rsplit(".", 1)
         fname = f"{stem}-{st.slug}.{ext}"
         self.settings.outputs_dir.mkdir(parents=True, exist_ok=True)
-        (self.settings.outputs_dir / fname).write_text(content)
+        (self.settings.outputs_dir / fname).write_text(content, encoding="utf-8")
         if fname not in st.outputs:
             st.outputs.append(fname)
         return fname
@@ -348,7 +348,7 @@ class Orchestrator:
 
     def signups(self, run_id: str) -> int:
         p = self.sites_dir / run_id / "waitlist.csv"
-        return max(0, len(p.read_text().splitlines()) - 1) if p.exists() else 0
+        return max(0, len(p.read_text(encoding="utf-8").splitlines()) - 1) if p.exists() else 0
 
     def add_signup(self, run_id: str, email: str) -> None:
         """Called only by the public landing-page form submitted by a real visitor."""
@@ -356,10 +356,10 @@ class Orchestrator:
         if not (self.sites_dir / run_id / "index.html").exists():
             raise PermissionError("landing page is not published")
         if not p.exists():
-            p.write_text("email\n")
-        existing = set(p.read_text().splitlines()[1:])
+            p.write_text("email\n", encoding="utf-8")
+        existing = set(p.read_text(encoding="utf-8").splitlines()[1:])
         if email not in existing:
-            with p.open("a") as f:
+            with p.open("a", encoding="utf-8") as f:
                 f.write(email + "\n")
 
     def founder_record_results(self, run_id: str, interviews_done: int, pain_confirmed: int) -> RunState:
