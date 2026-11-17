@@ -19,7 +19,7 @@ Every **Working** row below has real output from the committed demo run: [docs/d
 | Step | Status |
 |---|---|
 | Founder brief intake + policy screen (excluded products, unsafe requests) | **Working** |
-| Phase 1 Discover: research from free sources (Hacker News, Stack Exchange, DuckDuckGo, founder URLs) | **Working** |
+| Phase 1 Discover: research from free sources (Hacker News, Stack Exchange, Wikipedia, DuckDuckGo, founder URLs), mixed so no single source fills the budget | **Working** |
 | Phase 1 Discover: find and score opportunities | **Working** |
 | Phase 1 Discover: define the market | **Working** |
 | Phase 1 Discover: Mom Test interview plan + outreach draft | **Working** |

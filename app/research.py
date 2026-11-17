@@ -1,7 +1,8 @@
 """Free web research tools (no API keys, no paid services).
 
-Sources: Hacker News (Algolia API), Stack Exchange API, DuckDuckGo HTML,
-and URLs the founder supplies. Every document gets a numbered id so agents
+Sources: Hacker News (Algolia API), Stack Exchange API, Wikipedia API,
+DuckDuckGo HTML, and URLs the founder supplies. Results are interleaved
+across sources so one source cannot fill the whole source budget. Every document gets a numbered id so agents
 can cite it; anything they cannot cite becomes an ASSUMPTION.
 """
 from __future__ import annotations
@@ -9,7 +10,7 @@ from __future__ import annotations
 import html
 import re
 from dataclasses import dataclass
-from urllib.parse import parse_qs, unquote, urlparse
+from urllib.parse import parse_qs, quote, unquote, urlparse
 
 import httpx
 
@@ -73,6 +74,26 @@ def stackexchange_search(query: str, limit: int = 4) -> list[dict]:
     return out[:limit]
 
 
+def wikipedia_search(query: str, limit: int = 2) -> list[dict]:
+    """Wikipedia search API: free, no key. Background facts (market size, population, alternatives)."""
+    r = httpx.get(
+        "https://en.wikipedia.org/w/api.php",
+        params={"action": "query", "list": "search", "srsearch": query, "srlimit": limit,
+                "format": "json", "srprop": "snippet"},
+        headers=UA,
+        timeout=15,
+    )
+    r.raise_for_status()
+    out = []
+    for it in r.json().get("query", {}).get("search", []):
+        title = it.get("title", "")
+        if not title:
+            continue
+        out.append({"url": "https://en.wikipedia.org/wiki/" + quote(title.replace(" ", "_")),
+                    "title": title, "snippet": it.get("snippet", ""), "origin": "wikipedia"})
+    return out
+
+
 def ddg_search(query: str, limit: int = 4) -> list[dict]:
     r = httpx.post("https://html.duckduckgo.com/html/", data={"q": query}, headers=UA, timeout=15)
     r.raise_for_status()
@@ -101,21 +122,31 @@ class Researcher:
         self.max_sources = max_sources
         self.errors: list[str] = []
 
+    SOURCES = (hn_search, stackexchange_search, wikipedia_search, ddg_search)
+
     def gather(self, queries: list[str], founder_urls: list[str] | None = None) -> list[Doc]:
-        raw: list[dict] = [
-            {"url": u, "title": "Founder-supplied source", "snippet": "", "origin": "founder"}
-            for u in (founder_urls or [])
-        ]
+        founder = [{"url": u, "title": "Founder-supplied source", "snippet": "", "origin": "founder"}
+                   for u in (founder_urls or [])]
+        per_source: list[list[dict]] = []
         if self.enabled:
-            for q in queries:
-                for fn in (hn_search, stackexchange_search, ddg_search):
+            for fn in self.SOURCES:
+                found: list[dict] = []
+                for q in queries:
                     try:
-                        raw.extend(fn(q))
+                        found.extend(fn(q))
                     except Exception as e:  # network blocked, rate limited, etc.
                         self.errors.append(f"{fn.__name__}('{q}'): {type(e).__name__}")
+                per_source.append(found)
+        return self._select(founder, per_source)
+
+    def _select(self, founder: list[dict], per_source: list[list[dict]]) -> list[Doc]:
+        """Founder URLs first, then round-robin across sources so the budget mixes origins."""
+        ordered = list(founder)
+        for i in range(max((len(s) for s in per_source), default=0)):
+            ordered += [s[i] for s in per_source if i < len(s)]
         seen: set[str] = set()
         docs: list[Doc] = []
-        for d in raw:
+        for d in ordered:
             if d["url"] in seen or not d["url"].startswith("http"):
                 continue
             seen.add(d["url"])
