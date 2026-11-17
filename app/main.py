@@ -246,7 +246,7 @@ views you open from this dashboard are not counted.</p>
 <input type="number" name="visits" min="0"><label>Paid orders recorded in your own payment provider (checkout is MOCKED here, so usually 0)</label>
 <input type="number" name="paid_orders" min="0" value="0" required>
 <label>Real user feedback, one item per line (optional)</label><textarea name="feedback" rows="4"></textarea>
-<button>Run the learn gate</button></form></div>"""
+<button>Run the learn gate</button></form>{_sales_import_html(st, run_id)}</div>"""
     if st.stage in ("p1_gate_wait", "p2_gate_wait", "p3_gate_wait", "p4_gate_wait", "p5_gate_wait", "p6_gate_wait"):
         g = st.gates[-1]
         rec = g["recommendation"]
@@ -266,7 +266,7 @@ views you open from this dashboard are not counted.</p>
                      if st.stage == "p5_gate_wait" else
                      "<p class=mut>GO needs your approval of the pricing and your sign-off on all three policy drafts.</p>")
         return f"""<div class="card next"><div class="kicker">Your decision is needed: Phase {g['phase']} gate</div>
-<h2>The system recommends <span class="{rec}">{rec.upper()}</span></h2>{_gate_table(g)}{_assumptions_html(st)}{_verdict_html(st) if g['phase'] == 1 else ''}
+<h2>The system recommends <span class="{rec}">{rec.upper()}</span></h2>{_gate_table(g)}{_assumptions_html(st)}{_verdict_html(st) if g['phase'] == 1 else ''}{_fork_html(g, run_id)}
 <form method="post" action="/runs/{run_id}/gate" class="once"><input name="note" placeholder="Why? (required if you overrule the recommendation; saved in the log)">
 <div class="opts">{btns}</div></form><p class=mut>You can overrule the system. If you do, the log records both the recommendation and your decision.</p></div>"""
     if st.stage == "p2_targets_wait" and st.demand_plan:
@@ -407,6 +407,24 @@ def targets(run_id: str, approve: str = Form(...)):
     return RedirectResponse(f"/runs/{run_id}", status_code=303)
 
 
+def _fork_html(g: dict, run_id: str) -> str:
+    if g["recommendation"] not in ("pivot", "repeat", "stop"):
+        return ""
+    return (f"<details><summary>Try a narrower version in a new run (this run stays as it is)</summary>"
+            f"<form method=post action='/runs/{run_id}/fork' class=once><label>Edited idea (leave empty to rerun the same brief "
+            "with the sources already retrieved)</label><input name=idea><button>Fork a new run</button></form></details>")
+
+
+def _sales_import_html(st, run_id: str) -> str:
+    s = st.imported_sales
+    got = (f"<p><b>Imported from {html.escape(s['source'])}:</b> {s['orders']} completed orders, {s['activations']} activations, "
+           f"{s['not_completed']} not completed [FOUNDER-REPORTED METRIC]. Enter the orders above.</p>") if s else ""
+    return (got + f"<details><summary>Import your own order or activation records (CSV)</summary>"
+            f"<form method=post action='/runs/{run_id}/import-sales' enctype='multipart/form-data' class=once>"
+            "<label>CSV with columns type (order or activation), status (paid, completed...), optional order_id. Only counts are read: "
+            "no amounts, card data or logins.</label><input type=file name=file accept='.csv' required><button>Import</button></form></details>")
+
+
 def _assumptions_html(st) -> str:
     from app.evidence import assumption_ids
     ids = assumption_ids(st.ledger or [])
@@ -463,7 +481,15 @@ def _interviews_html(st, run_id: str) -> str:
             "<label>Paste the transcript or your notes of one interview (Arabic or English)</label>"
             "<textarea name=transcript rows=6></textarea>" + audio
             + "<label><input type=checkbox name=consent value=1 required> The interviewee agreed to take part and to be quoted anonymously</label>"
-            "<button>Analyse this interview</button></form></div>")
+            "<button>Analyse this interview</button></form>"
+            + (f"<p><b>Sign-ups imported from your own form:</b> {len(st.imported_waitlist['hashes'])} unique "
+               "[FOUNDER-REPORTED METRIC]</p>" if st.imported_waitlist else "")
+            + f"<details><summary>Collect sign-ups on your own hosting</summary><form method=get action='/runs/{run_id}/landing-export'>"
+            "<label>Your form endpoint (mailto:you@example.com, or an https:// Google Form / Formspree URL you own)</label>"
+            "<input name=action required><button>Download the landing page as one static file</button></form>"
+            f"<form method=post action='/runs/{run_id}/import-waitlist' enctype='multipart/form-data' class=once>"
+            "<label>Then import the sign-ups CSV your form collected (only email hashes are kept, duplicates dropped)</label>"
+            "<input type=file name=file accept='.csv' required><button>Import sign-ups</button></form></details></div>")
 
 
 @app.post("/runs/{run_id}/interview", response_class=HTMLResponse)
@@ -482,6 +508,73 @@ async def interview(run_id: str, transcript: str = Form(""), consent: str = Form
     except (ValueError, transcribe.TranscriptionUnavailable) as e:
         return page("Interview not analysed", f"<div class=card><p>{html.escape(str(e))}</p><a href='/runs/{run_id}'>Back</a></div>")
     return RedirectResponse(f"/runs/{run_id}", status_code=303)
+
+
+@app.post("/runs/{run_id}/import-waitlist", response_class=HTMLResponse)
+async def import_waitlist(run_id: str, file: UploadFile = File(...)):
+    try:
+        orch.founder_import_waitlist(run_id, (await file.read()).decode("utf-8", "replace"), file.filename or "CSV")
+    except ValueError as e:
+        return page("Not imported", f"<div class=card><p>{html.escape(str(e))}</p><a href='/runs/{run_id}'>Back</a></div>")
+    return RedirectResponse(f"/runs/{run_id}", status_code=303)
+
+
+@app.post("/runs/{run_id}/import-sales", response_class=HTMLResponse)
+async def import_sales(run_id: str, file: UploadFile = File(...)):
+    try:
+        orch.founder_import_sales(run_id, (await file.read()).decode("utf-8", "replace"), file.filename or "CSV")
+    except ValueError as e:
+        return page("Not imported", f"<div class=card><p>{html.escape(str(e))}</p><a href='/runs/{run_id}'>Back</a></div>")
+    return RedirectResponse(f"/runs/{run_id}", status_code=303)
+
+
+@app.get("/runs/{run_id}/landing-export")
+def landing_export(run_id: str, action: str):
+    from app.imports import export_landing
+    st, _ = orch.load(run_id)
+    src = settings.outputs_dir / f"phase2_step2_landing_page-{st.slug}.html"
+    if not src.exists():
+        raise HTTPException(404)
+    try:
+        out = export_landing(src.read_text(encoding="utf-8"), run_id, action)
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    orch.log.append(agent="founder", action="export_landing_static", approved_by="founder", run_id=run_id, phase=2,
+                    detail="static landing page downloaded by the founder; the founder hosts it, sign-ups go to their own endpoint")
+    return HTMLResponse(out, headers={"Content-Disposition": f'attachment; filename="landing-{run_id}.html"'})
+
+
+@app.post("/runs/{run_id}/fork")
+def fork(run_id: str, idea: str = Form("")):
+    st = orch.fork(run_id, idea or None)
+    if st.stage == "p1_running":
+        _bg(st.run_id, "Phase 1 agents working (forked run)", orch.advance, st.run_id)
+    return RedirectResponse(f"/runs/{st.run_id}", status_code=303)
+
+
+@app.get("/compare/{a}/{b}", response_class=HTMLResponse)
+def compare(a: str, b: str):
+    """Read-only side by side of two runs (for example a run and its fork)."""
+    try:
+        sa, sb = orch.load(a)[0], orch.load(b)[0]
+    except Exception:
+        raise HTTPException(404)
+
+    def row(st):
+        best = max((o.get("score", 0) for o in st.opportunities), default=0) if st.opportunities else 0
+        v = st.verdict or {}
+        quotes = sum(len(i["analysis"].get("evidence", [])) for i in st.interviews)
+        u = st.usage or {}
+        return [st.brief["idea"][:80], f"{best:.1f}" if best else "-", (st.area or {}).get("fit", "-").upper(),
+                v.get("verdict", "-").replace("_", " ").upper(), v.get("killer_risk", "-"),
+                " → ".join(f"P{g['phase']} {g['recommendation'].upper()}" for g in st.gates) or "-", str(quotes),
+                str(u.get("prompt_tokens", 0) + u.get("completion_tokens", 0)), st.parent_run_id or "-"]
+    labels = ["Idea", "Best opportunity score", "Local fit", "Co-founder verdict", "Killer risk", "Gates",
+              "Verified interview quotes", "Tokens used", "Forked from"]
+    ra, rb = row(sa), row(sb)
+    body = "".join(f"<tr><th>{l}</th><td>{html.escape(x)}</td><td>{html.escape(y)}</td></tr>" for l, x, y in zip(labels, ra, rb))
+    return page("Compare runs", f"<h1>Compare runs</h1><div class=card><table><tr><th></th><th><a href='/runs/{a}'>{a}</a></th>"
+                f"<th><a href='/runs/{b}'>{b}</a></th></tr>{body}</table><p class=mut>Read-only.</p></div>")
 
 
 @app.post("/runs/{run_id}/results")

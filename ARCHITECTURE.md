@@ -159,7 +159,7 @@ Web text, transcripts and model output are untrusted: sources and transcripts ar
 | State machine, agents for six phases, carry-forward, evidence ledger, gates, approvals, guard, hash-chained log, UI, CLI | Built |
 | MVP: core code for every user story tested in the sandbox, MVP app and user guide | Built (served locally) |
 | Replay, export, run metrics, claims and consistency audits, red-team eval | Built |
-| Public hosting of landing page, prototype, MVP app and store | MOCKED |
+| Public hosting (the landing page exports as a static file for your host) | MOCKED |
 | Sending outreach and support replies, posting | MOCKED (the founder does it) |
 | Checkout and payment provider; payment → delivery, refunds, idempotency, reconciliation | MOCKED events, real logic |
 | MVP storage, accounts, and the DEFERRED criteria that need them | STUBBED |

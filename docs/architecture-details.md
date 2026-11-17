@@ -376,3 +376,7 @@ Persistence is plain files (JSON, CSV, Markdown) so runs are inspectable and por
 ## Counter-evidence and assumption IDs
 
 The researcher always adds two disconfirming queries (free alternatives, failed predecessors). The market analyst must fill `counter_evidence`; an empty one is sent back once by the critic, and the output shows "Strongest counter-evidence" resolved through the evidence ledger. `evidence.assumption_ids` numbers every unsourced claim (ASM-01...) in ledger order; every later gate output lists them under "Unproven assumptions before you choose GO", and the gate card shows them.
+
+## Founder-reported numbers, forks and comparison
+
+`app/imports.py` turns the founder's own exports into counts: waitlist CSVs become SHA-256 email hashes (no emails stored, deduplicated against the app's own count) that add to the demand gate's sign-ups, logged as `import_waitlist_csv` with the [FOUNDER-REPORTED METRIC] label; sales CSVs become completed-order and activation counts (`import_sales_csv`) that pre-fill the launch results. `export_landing` rewrites the landing form to a mailto: or https endpoint the founder owns; anything else is refused. `Orchestrator.fork` creates a child run with `parent_run_id`, reusing the parent's retrieved sources when the idea is unchanged, under its own output slug; `/compare/<a>/<b>` is read-only.

@@ -136,6 +136,9 @@ class RunState:
     funding: dict | None = None  # Phase 1: possible funders and sponsors (strong or promising ideas only)
     verdict: dict | None = None  # Phase 1: co-founder verdict (capped by the evidence gate)
     interviews: list = field(default_factory=list)  # Phase 2: analysed customer interviews (transcripts stay in data/)
+    imported_waitlist: dict | None = None  # Phase 2: hashes of sign-ups from the founder's own form (no emails kept)
+    imported_sales: dict | None = None  # Phase 6: counts from the founder's own order/activation records
+    parent_run_id: str | None = None  # set when this run was forked from another (pivot or edited brief)
     gates: list[dict] = field(default_factory=list)
     approvals: list[dict] = field(default_factory=list)
     outputs: list[str] = field(default_factory=list)
@@ -1119,6 +1122,69 @@ class Orchestrator:
             self.save(st, q)
             return st
 
+    def _imported_extra(self, st, run_id: str) -> int:
+        """Imported sign-ups that the app did not already count (deduplicated by email hash)."""
+        from app.imports import email_hash, EMAIL
+        hashes = set((st.imported_waitlist or {}).get("hashes", []))
+        p = self.sites_dir / run_id / "waitlist.csv"
+        own = {email_hash(m.group(0)) for m in EMAIL.finditer(p.read_text(encoding="utf-8"))} if p.exists() else set()
+        return len(hashes - own)
+
+    def founder_import_waitlist(self, run_id: str, csv_text: str, source: str) -> RunState:
+        """Phase 2: sign-ups collected by the founder's own form (exported landing page). Only email hashes are kept."""
+        from app.imports import LABEL, parse_waitlist_csv
+        with self.lock(run_id):
+            st, q = self.load(run_id)
+            if st.stage != "p2_collecting":
+                raise ValueError(f"sign-ups are imported while the demand test runs (stage={st.stage})")
+            new = parse_waitlist_csv(csv_text)
+            if not new:
+                raise ValueError("no email addresses found in the CSV")
+            old = set((st.imported_waitlist or {}).get("hashes", []))
+            st.imported_waitlist = {"hashes": sorted(old | new), "sources": [*(st.imported_waitlist or {}).get("sources", []), source[:80]]}
+            self.log.append(agent="founder", action="import_waitlist_csv", approved_by="founder", run_id=run_id, phase=2,
+                            outcome="imported", detail=f"{LABEL} {len(new)} unique email(s) in the file, "
+                            f"{len(old | new) - len(old)} new; only hashes kept; source: {source[:80]}")
+            self.save(st, q)
+            return st
+
+    def founder_import_sales(self, run_id: str, csv_text: str, source: str) -> RunState:
+        """Phase 6: orders/activations the founder recorded in their own tools. Counts only: no amounts, no card data."""
+        from app.imports import LABEL, parse_sales_csv
+        with self.lock(run_id):
+            st, q = self.load(run_id)
+            if st.stage != "p6_collecting":
+                raise ValueError(f"sales are imported while launch results are collected (stage={st.stage})")
+            c = parse_sales_csv(csv_text)
+            if not c["rows"]:
+                raise ValueError("the CSV has no rows (a header row with type and status columns is expected)")
+            st.imported_sales = c | {"source": source[:80]}
+            self.log.append(agent="founder", action="import_sales_csv", approved_by="founder", run_id=run_id, phase=6,
+                            outcome="imported", detail=f"{LABEL} {c['orders']} completed orders, {c['activations']} "
+                            f"activations, {c['not_completed']} not completed; source: {source[:80]}")
+            self.save(st, q)
+            return st
+
+    def fork(self, run_id: str, idea: str | None = None) -> RunState:
+        """Start a child run (after a pivot/repeat, or with an edited idea). The parent's retrieved sources are reused
+        (no new searches, fewer tokens); everything downstream starts fresh. The parent run is never changed."""
+        parent, _ = self.load(run_id)
+        b = dict(parent.brief)
+        if idea and idea.strip():
+            b["idea"] = idea.strip()[:500]
+        st = self.create(FounderBrief(**b))
+        if st.stage == "stopped":
+            return st
+        q = self.queue(st.run_id)
+        st.slug = f"{parent.slug[:16]}-{st.run_id[:6]}"  # never overwrite the parent's outputs
+        st.parent_run_id = run_id
+        st.docs = list(parent.docs) if b["idea"] == parent.brief["idea"] else []
+        self.log.append(agent="orchestrator", action="fork_run", run_id=st.run_id, parent_run_id=run_id,
+                        fork_from_phase=1, sources=[d["url"] for d in st.docs],
+                        detail=f"forked from {run_id}; {len(st.docs)} retrieved sources reused" + ("; idea edited" if idea else ""))
+        self.save(st, q)
+        return st
+
     def founder_record_results(self, run_id: str, interviews_done: int, pain_confirmed: int) -> RunState:
         with self.lock(run_id):
             return self._founder_record_results(run_id, interviews_done=interviews_done, pain_confirmed=pain_confirmed)
@@ -1129,10 +1195,13 @@ class Orchestrator:
             raise ValueError(f"not collecting evidence (stage={st.stage})")
         if pain_confirmed > interviews_done or interviews_done < 0:
             raise ValueError("pain_confirmed cannot exceed interviews_done")
-        signups = self.signups(run_id)
+        counted = self.signups(run_id)
+        extra = self._imported_extra(st, run_id)
+        signups = counted + extra
         st.results = {"signups": signups, "interviews_done": interviews_done, "pain_confirmed": pain_confirmed}
         self.log.append(agent="founder", action="record_interview_results", approved_by="founder", run_id=run_id,
-                        detail=f"{interviews_done} interviews, {pain_confirmed} confirmed pain; {signups} sign-ups counted by app")
+                        detail=f"{interviews_done} interviews, {pain_confirmed} confirmed pain; {counted} sign-ups counted by app"
+                               + (f" + {extra} unique sign-ups imported [FOUNDER-REPORTED METRIC]" if extra else ""))
         g = demand_gate(DemandTargets(**st.targets), **st.results)
         g.reasons.append(next_step(g.to_dict(), st.brief, st.market))
         st.gates.append(g.to_dict())
