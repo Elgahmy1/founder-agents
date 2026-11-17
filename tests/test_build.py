@@ -100,3 +100,20 @@ def test_run_usage_accumulates_per_run(make_orch, brief):
     assert calls_p1 == other.usage["calls"] > 0
     st = orch.founder_gate_decision(st.run_id, "go")
     assert st.usage["calls"] > calls_p1
+
+
+def test_finished_run_can_start_build_only_after_demand_go(make_orch, brief):
+    import pytest
+    orch = make_orch()
+    st = orch.start(brief)
+    with pytest.raises(ValueError):
+        orch.founder_start_build(st.run_id)  # not finished, no demand gate passed
+    st = _to_build(orch, brief)
+    st, q = orch.load(st.run_id)
+    # simulate a run that finished when phase 3 was still stubbed
+    st.stage, st.mvp = "done", None
+    st.gates = [g for g in st.gates if g["gate"] != "build_gate"]
+    orch.save(st, q)
+    st = orch.founder_start_build(st.run_id)
+    assert st.stage == "p3_gate_wait" and st.gates[-1]["gate"] == "build_gate"
+    assert any(e["action"] == "start_build" and e["approved_by"] == "founder" for e in orch.log.read())

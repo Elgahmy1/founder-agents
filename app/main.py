@@ -243,8 +243,12 @@ Sign-ups so far (counted by the app, never typed in): <b>{orch.signups(run_id)}<
         rest = "4-6" if st.mvp else "3-6"
         proto = (f" <a href='/proto/{run_id}' target='_blank'>Open the prototype</a>."
                  if (settings.data_dir / "sites" / run_id / "prototype.html").exists() else "")
+        can_build = not st.mvp and any(g["gate"] == "demand_gate" and g.get("founder_decision") == "go" for g in st.gates)
+        build_btn = (f"<form method='post' action='/runs/{run_id}/build' class='once'><p>This run finished before Phase 3 Build "
+                     "was available. You passed its demand gate, so it can be built now.</p><button>Run Phase 3 Build</button></form>"
+                     if can_build else "")
         return (f"<div class='card next end'><div class='kicker'>Run finished</div><h2 class='go'>{built} complete</h2>"
-                f"<p>Phases {rest} are STUBBED in this prototype: their reports below describe what would happen next.{proto}</p></div>")
+                f"<p>Phases {rest} are STUBBED in this prototype: their reports below describe what would happen next.{proto}</p>{build_btn}</div>")
     return ""
 
 
@@ -321,6 +325,17 @@ def results(run_id: str, interviews_done: int = Form(...), pain_confirmed: int =
         if "not collecting" in str(e):
             return RedirectResponse(f"/runs/{run_id}", status_code=303)
         raise HTTPException(400, str(e))
+    return RedirectResponse(f"/runs/{run_id}", status_code=303)
+
+
+@app.post("/runs/{run_id}/build")
+def build(run_id: str):
+    def go():
+        try:
+            orch.founder_start_build(run_id)
+        except ValueError:
+            pass  # not eligible; the page shows the current state
+    _bg(run_id, "Building the MVP spec and prototype", go)
     return RedirectResponse(f"/runs/{run_id}", status_code=303)
 
 

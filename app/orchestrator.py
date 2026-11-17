@@ -489,6 +489,20 @@ class Orchestrator:
             return self.advance(run_id)
         return st
 
+    def founder_start_build(self, run_id: str) -> RunState:
+        """Runs finished before Phase 3 was built (phase 3 was STUBBED then) can run Build,
+        but only if the founder chose GO at that run's demand gate."""
+        with self.lock(run_id):
+            st, q = self.load(run_id)
+            go2 = any(g["gate"] == "demand_gate" and g.get("founder_decision") == "go" for g in st.gates)
+            if st.stage != "done" or st.mvp or not go2:
+                raise ValueError("Build can start only on a finished run whose demand gate the founder passed")
+            self.log.append(agent="founder", action="start_build", approved_by="founder", run_id=run_id,
+                            outcome="go", phase=3)
+            st.stage = "p3_running"
+            self.save(st, q)
+            return self._advance(run_id)
+
     def founder_lock_targets(self, run_id: str, approve: bool, note: str | None = None) -> RunState:
         with self.lock(run_id):
             return self._founder_lock_targets(run_id, approve=approve, note=note)
