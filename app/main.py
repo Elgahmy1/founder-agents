@@ -138,7 +138,7 @@ def view_run(run_id: str):
     busy = _busy.get(run_id)
     body = [f"<h1>{html.escape(st.brief['idea'][:120])}</h1><p>Stage: <b>{st.stage}</b>"
             + (f" · <span class='tag repeat'>{html.escape(busy)}… (auto-refreshing)</span>" if busy else "") + "</p>"]
-    if st.error:
+    if st.error and not busy:
         body.append(f"<div class='card'><b class=stop>Error:</b> {html.escape(st.error)}"
                     f"<form method=post action='/runs/{run_id}/retry'><button>Retry step</button></form></div>")
     pend = q.pending()
