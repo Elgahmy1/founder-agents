@@ -142,6 +142,7 @@ flowchart LR
 
 **When the system recommends STOP** (`app/gates.py`):
 - The product is excluded (physical, financial/crypto, health or legal advice), before any agent runs.
+- Every opportunity the scout proposes is screened again in code; excluded ones (for example a wallet or crypto tracker drifting out of an allowed brief) are marked EXCLUDED and never chosen, and if none is left the run stops.
 - Discover: three or more evidence checks fail, or no source shows the pain and the opportunity scores below 3/5.
 - Discover, second pass: after one repeat or pivot, still fewer than 2 independent sources show the pain. One retry is allowed; a second failing pass is a stop, not another retry.
 - Validate: interviews are complete but fewer than half the target share confirm the problem, or sign-ups are under 25% of target and interviews also miss.

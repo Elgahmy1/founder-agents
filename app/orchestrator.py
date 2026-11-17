@@ -252,9 +252,21 @@ class Orchestrator:
             opps = ScoutAgent(ctx).find_opportunities(brief, docs)
             st.opportunities = [o.model_dump() for o in opps.opportunities]
         opps = [Opportunity(**o) for o in st.opportunities]
+        # The model may drift into excluded territory even from an allowed brief:
+        # screen every opportunity in code and never choose an excluded one.
+        excluded_opps: dict[int, str] = {}
+        for i, o in enumerate(opps):
+            v = guard.check_product(f"{o.name} {o.digital_product} {o.problem} {o.customer}")
+            if not v.allowed:
+                excluded_opps[i] = v.reason or "excluded by policy"
+                self.log.append(agent="guard", action="exclude_opportunity", run_id=st.run_id,
+                                outcome="excluded", rule=v.rule, detail=o.name)
         ledger = Ledger()
         md = [f"# Phase 1, step 1: Find opportunities", "", f"Founder brief:\n\n```\n{brief.as_text()}\n```", ""]
         for i, o in enumerate(opps):
+            if i in excluded_opps:
+                md += [f"## {i + 1}. {o.name}: EXCLUDED by policy", "", f"- {excluded_opps[i]} Not scored or pursued.", ""]
+                continue
             claims = ledger.add(resolve(o.claims, docs))
             md += [f"## {i + 1}. {o.name} (score {o.score}/5)", "",
                    f"- Problem: {o.problem}", f"- Customer: {o.customer}", f"- Digital product: {o.digital_product}",
@@ -267,8 +279,19 @@ class Orchestrator:
             md += ["", "Research tools that failed (results may be thinner): " + "; ".join(self.researcher.errors)]
         self.write_output(st, "phase1_step1_opportunities.md", "\n".join(md) + "\n")
 
-        # choose best not yet tried
-        order = sorted(range(len(opps)), key=lambda i: opps[i].score, reverse=True)
+        allowed = [i for i in range(len(opps)) if i not in excluded_opps]
+        if not allowed:
+            reason = next(iter(excluded_opps.values()))
+            g = GateResult("policy_gate", 1, "stop", [f"Every opportunity found falls outside policy. {reason}"])
+            g.founder_decision = "stop"
+            g.founder_note = "Automatic: this product type is outside what the system will help with."
+            st.gates.append(g.to_dict())
+            self.log.append(agent="gate", action="policy_gate", run_id=st.run_id, outcome="stop", phase=1)
+            self.write_output(st, "phase1_gate_policy.md", g.md())
+            st.stage = "stopped"
+            return
+        # choose best allowed opportunity not yet tried
+        order = sorted(allowed, key=lambda i: opps[i].score, reverse=True)
         st.chosen = next((i for i in order if i not in st.tried), order[0])
         opp = opps[st.chosen]
 

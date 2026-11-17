@@ -86,14 +86,18 @@ EXCLUDED_AR: list[tuple[str, str, list[str]]] = [
     ("health_legal_advice", "Health advice and legal advice products are excluded.",
      [r"(تشخيص|استشارة طبية|نصايح طبية|علاج|روشتة|استشارة قانونية|محامي)"]),
     ("physical_goods", "Physical goods are out of scope: this system only builds digital products.",
-     [r"(تيشيرتات|ملابس|منتج ملموس|شحن منتجات|دروب شيبنج)"]),
+     [r"(تيشيرتات|ملابس|منتج ملموس|شحن منتجات|دروب شيبنج|جلد|جلود|هاند ?ميد|مشغولات|اكسسوارات|إكسسوارات|شنط)"]),
+    ("financial_wallet", "Wallets, payment apps and fintech are excluded: a digital wallet is a financial product and a leather wallet is a physical good.",
+     [r"(محفظ[ةه]|محافظ|دفع إلكتروني|دفع الكتروني|تحويل (فلوس|أموال|اموال)|قرض|قروض|بنك|تمويل|تأمين|فلوسك)"]),
 ]
 
 EXCLUDED_PRODUCT_RULES: list[tuple[str, str, list[str]]] = [
     ("physical_goods", "Physical goods are out of scope: this system only builds digital products.",
-     [r"\b(physical (product|goods)|t-?shirts?|merch|hardware device|dropshipping|ship(ping)? boxes|candles|apparel|furniture|food truck|bakery)\b"]),
+     [r"\b(physical (product|goods)|t-?shirts?|merch|hardware device|dropshipping|ship(ping)? boxes|candles|apparel|furniture|food truck|bakery|leather\w*|handmade|handcrafted|jewel(le)?ry|cosmetics|skincare|clothing|sneakers|shoes)\b"]),
     ("financial_crypto", "Financial, investment and crypto products are excluded.",
-     [r"\b(crypto\w*|bitcoin|ethereum|nft|token sale|trading (bot|signals?)|forex|stock (picks|tips|signals)|investment advice|day trading|defi|lending app|loan)\b"]),
+     [r"\b(crypto\w*|bitcoin|ethereum|nft|token sale|trading (bot|signals?)|forex|stock (picks|tips|signals)|investment advice|day trading|defi|lending app|loans?)\b"]),
+    ("financial_wallet", "Wallets, payment apps and fintech are excluded: a digital wallet is a financial product and a leather wallet is a physical good.",
+     [r"\b(wallets?|e-?wallets?|payments? apps?|fintech|neo-?banks?|banking apps?|money transfers?|remittances?|budget(ing)? (app|tracker)s?|personal finance|expense tracker|portfolio trackers?|investing|investments?|insurance|credit scores?|bnpl|buy now,? pay later)\b"]),
     ("health_legal_advice", "Health advice and legal advice products are excluded.",
      [r"\b(medical diagnos\w*|diagnose (patients|illness|disease)|symptom checker|medical advice|treatment plan|prescri\w*|therap(y|ist) bot|mental health advice|diet plan for (diabetes|disease)|legal advice|lawyer bot|contract review for clients|immigration advice)\b"]),
 ]

@@ -61,3 +61,45 @@ def test_second_discovery_pass_without_pain_evidence_stops():
     assert second.recommendation == "stop"
     ok = discover_gate(sourced_claims=4, total_claims=7, pain_sources=2, best_score=3.6, excluded_reason=None, attempt=2)
     assert ok.recommendation == "go"
+
+
+def test_excluded_opportunities_from_model_are_never_chosen(make_orch, brief, settings):
+    """An allowed brief can still drift: the model proposes a crypto tracker and a wallet.
+    Those are dropped in code; the allowed opportunity is the one pursued."""
+    from tests.conftest import opp
+    orch = make_orch()
+    base = orch.llm.structured
+
+    def drifting(system, user, schema):
+        out = base(system, user, schema)
+        if schema.__name__ == "Opportunities":
+            good = out.opportunities[0].model_dump()
+            bad1 = dict(good, name="Crypto Portfolio Tracker", digital_product="app to track crypto holdings",
+                        scores={k: 5 for k in good["scores"]})
+            bad2 = dict(good, name="Digital Personal Wallet App", digital_product="mobile wallet for payments",
+                        scores={k: 5 for k in good["scores"]})
+            return schema.model_validate({"opportunities": [bad1, good, bad2]})
+        return out
+    orch.llm.structured = drifting
+    st = orch.start(brief)
+    assert st.error is None, st.error
+    assert st.opportunities[st.chosen]["name"] == "Note Summaries"
+    text = (settings.outputs_dir / next(n for n in st.outputs if n.startswith("phase1_step1"))).read_text()
+    assert text.count("EXCLUDED by policy") == 2
+    assert any(e["action"] == "exclude_opportunity" for e in orch.log.read())
+
+
+def test_all_opportunities_excluded_stops(make_orch, brief):
+    orch = make_orch()
+    base = orch.llm.structured
+
+    def all_bad(system, user, schema):
+        out = base(system, user, schema)
+        if schema.__name__ == "Opportunities":
+            good = out.opportunities[0].model_dump()
+            return schema.model_validate({"opportunities": [dict(good, name="E-wallet for students")]})
+        return out
+    orch.llm.structured = all_bad
+    st = orch.start(brief)
+    assert st.stage == "stopped"
+    assert st.gates[-1]["gate"] == "policy_gate" and st.gates[-1]["recommendation"] == "stop"
