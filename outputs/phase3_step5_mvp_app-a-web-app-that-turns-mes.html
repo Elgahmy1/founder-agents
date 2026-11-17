@@ -1,0 +1,22 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ExamReady AI</title><style>
+:root{--bg:#f7f7f9;--fg:#1d1d1f;--mut:#666;--card:#fff;--line:#e2e2e8;--acc:#3b3bd6}
+@media (prefers-color-scheme: dark){:root{--bg:#141418;--fg:#ececf1;--mut:#a0a0aa;--card:#1d1d23;--line:#2e2e36;--acc:#8f8fff}}
+body{font-family:system-ui,sans-serif;background:var(--bg);color:var(--fg);max-width:760px;margin:0 auto;padding:16px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:16px;margin:14px 0}
+textarea{width:100%;box-sizing:border-box;padding:8px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--fg);font:inherit}
+button{padding:8px 14px;border:0;border-radius:6px;background:var(--acc);color:#fff;font-weight:600;cursor:pointer;margin-top:8px}
+pre{white-space:pre-wrap;word-wrap:break-word} .mut{color:var(--mut);font-size:.9em}
+</style></head><body>
+<h1>ExamReady AI</h1><p class="mut">Product vision: Upload lecture PDFs/slides and instantly get concise exam‑ready summaries and practice questions.</p>
+<div class="card"><p><b>What this MVP does today:</b> paste text, press Run, and it shows the result of
+<code>generate_summary</code> and <code>generate_questions</code> on your text.</p><p class="mut">As Student who has lecture PDFs, I want to upload the file and receive a concise summary, so that I can study the key points quickly.</p>
+<form method="post" action="/mvp/48fc7649">
+<label for="text">Paste your text</label>
+<textarea id="text" name="text" rows="10" maxlength="20000" required></textarea>
+<button>Run</button></form></div>
+<!--RESULT-->
+<p class="mut">MVP built by Founder Agents from code that passed 2/2 acceptance checks.
+Each request runs <code>generate_summary(text)</code>, <code>generate_questions(text)</code> in an isolated sandbox with no file, network or process access.
+Nothing you paste is stored. Accounts, storage and public hosting are not part of this MVP.</p>
+</body></html>
