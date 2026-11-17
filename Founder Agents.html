@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Founder Agents</title>
+<style>
+:root{--bg:#0d0e16;--panel:#141625;--card:#1a1d2e;--line:#272b40;--fg:#eceef8;--mut:#9aa0b8;--acc:#8b7dff;--acc2:#2dd4bf;--ok:#4cc38a;--bad:#ff7b72}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0}
+body{font-family:Inter,"Segoe UI",system-ui,-apple-system,"Noto Sans Arabic",sans-serif;background:var(--bg);color:var(--fg);display:grid;grid-template-columns:260px 1fr;grid-template-rows:100%}
+aside{background:linear-gradient(180deg,#151831,#10121d);border-right:1px solid var(--line);padding:18px 14px;display:flex;flex-direction:column;gap:14px;overflow:auto}
+.brand{display:flex;align-items:center;gap:10px;font-weight:800;font-size:1.1rem}
+.brand i{width:32px;height:32px;border-radius:10px;background:linear-gradient(135deg,var(--acc),var(--acc2));box-shadow:0 6px 20px rgba(139,125,255,.4)}
+.tag{font-size:.72rem;color:var(--mut);margin-top:-8px}
+.status{display:flex;align-items:center;gap:8px;padding:10px 12px;border-radius:12px;background:var(--card);border:1px solid var(--line);font-size:.85rem}
+.dot{width:10px;height:10px;border-radius:50%;background:var(--mut);box-shadow:0 0 0 3px rgba(154,160,184,.15)}
+.dot.up{background:var(--ok);box-shadow:0 0 0 3px rgba(76,195,138,.2)} .dot.down{background:var(--bad);box-shadow:0 0 0 3px rgba(255,123,114,.2)}
+nav{display:flex;flex-direction:column;gap:4px}
+nav .h{font-size:.7rem;text-transform:uppercase;letter-spacing:.08em;color:var(--mut);margin:10px 8px 4px}
+nav button{all:unset;cursor:pointer;padding:9px 12px;border-radius:10px;color:var(--fg);font-size:.92rem;display:flex;gap:10px;align-items:center}
+nav button:hover{background:rgba(139,125,255,.12)} nav button.on{background:linear-gradient(135deg,rgba(139,125,255,.25),rgba(45,212,191,.12));font-weight:600}
+.row{display:flex;gap:6px}
+input{flex:1;min-width:0;padding:8px 10px;border-radius:10px;border:1px solid var(--line);background:var(--card);color:var(--fg);font:inherit;font-size:.85rem}
+.go{all:unset;cursor:pointer;padding:8px 12px;border-radius:10px;background:linear-gradient(135deg,var(--acc),#6d5dfc);font-weight:600;font-size:.85rem}
+.foot{margin-top:auto;font-size:.75rem;color:var(--mut);line-height:1.5}
+.foot code{color:var(--fg)}
+main{position:relative;display:flex;flex-direction:column;min-width:0}
+.bar{display:flex;align-items:center;gap:10px;padding:10px 16px;border-bottom:1px solid var(--line);background:var(--panel)}
+.bar .url{flex:1;font-size:.82rem;color:var(--mut);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.bar button{all:unset;cursor:pointer;padding:6px 10px;border-radius:8px;border:1px solid var(--line);font-size:.8rem}
+.bar button:hover{border-color:var(--acc)}
+iframe{flex:1;width:100%;border:0;background:#f4f5fb}
+.off{position:absolute;inset:52px 0 0 0;display:none;align-items:center;justify-content:center;padding:30px;background:radial-gradient(800px 400px at 50% 0,rgba(139,125,255,.18),transparent),var(--bg)}
+.off.show{display:flex}
+.box{max-width:620px;background:var(--card);border:1px solid var(--line);border-radius:18px;padding:28px;box-shadow:0 20px 60px rgba(0,0,0,.4)}
+.box h1{margin:0 0 6px;font-size:1.5rem} .box p{color:var(--mut);line-height:1.6}
+.box ol{line-height:1.9;padding-left:20px} .box code{background:#0f1120;padding:2px 6px;border-radius:6px;color:var(--acc2)}
+.box .ar{direction:rtl;text-align:right;border-top:1px solid var(--line);margin-top:16px;padding-top:12px;color:var(--fg)}
+@media (max-width:800px){body{grid-template-columns:1fr;grid-template-rows:auto 1fr}aside{flex-direction:row;flex-wrap:wrap;overflow:visible}nav{flex-direction:row;flex-wrap:wrap}.foot,.tag{display:none}}
+</style>
+</head>
+<body>
+<aside>
+  <div class="brand"><i></i>Founder Agents</div>
+  <div class="tag">Your open-source AI co-founder team · $0 per run</div>
+  <div class="status"><span class="dot" id="dot"></span><span id="st">Checking the app…</span></div>
+  <nav>
+    <div class="h">Work</div>
+    <button data-p="/" class="on">🏠&nbsp; Home · new brief · runs</button>
+    <div class="h">Recorded runs</div>
+    <button data-p="/replay/48fc7649">🧭&nbsp; Full six-phase demo</button>
+    <button data-p="/runs/a8d5c936">🇪🇬&nbsp; Egypt run (co-founder layer)</button>
+    <button data-p="/runs/64844083">🧪&nbsp; Freelance-dev run</button>
+    <button data-p="/mvp/48fc7649">⚙️&nbsp; Working MVP app</button>
+    <button data-p="/mvp/48fc7649/guide">📘&nbsp; MVP user guide</button>
+    <div class="h">Open a run</div>
+  </nav>
+  <div class="row"><input id="rid" placeholder="run id, e.g. 48fc7649"><button class="go" id="open">Open</button></div>
+  <div class="row"><input id="ra" placeholder="run A"><input id="rb" placeholder="run B"><button class="go" id="cmp">⇄</button></div>
+  <div class="foot">App URL<br><input id="base" value="http://localhost:8000"><br><br>
+    Start it with <code>START Founder Agents.bat</code> (or <code>docker compose up</code>). Your model key stays in your own <code>.env</code>.</div>
+</aside>
+<main>
+  <div class="bar"><span class="url" id="url"></span><button id="back">← Back</button><button id="reload">↻ Reload</button><button id="newtab">Open in tab ↗</button></div>
+  <iframe id="app" title="Founder Agents app"></iframe>
+  <div class="off" id="off"><div class="box">
+    <h1>The app is not running yet</h1>
+    <p>This page is the front door. The agents, the sandbox and the decision log run in the local Python server.</p>
+    <ol>
+      <li>Double-click <code>START Founder Agents.bat</code> in the project folder.</li>
+      <li>Wait for “Uvicorn running on http://127.0.0.1:8000”.</li>
+      <li>This page connects by itself.</li>
+    </ol>
+    <p>No Python? <code>docker compose up</code> in the folder does the same. Want your own model? Put your free Groq key in <code>.env</code> as <code>OPENAI_API_KEY=…</code> with <code>LLM_PROVIDER=openai</code>, or use local Ollama.</p>
+    <div class="ar">شغّل <b>START Founder Agents.bat</b> بدبل كليك، واستنى لحد ما يظهر "Uvicorn running"، والصفحة دي هتتوصل لوحدها. لو عايز تستخدم مفتاحك، حطه في ملف <b>.env</b>.</div>
+  </div></div>
+</main>
+<script>
+const $=id=>document.getElementById(id), frame=$('app');
+let up=null, cur='/';
+const base=()=>$('base').value.replace(/\/+$/,'');
+function go(p){cur=p;frame.src=base()+p;$('url').textContent=base()+p;
+  document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('on',b.dataset.p===p));}
+async function ping(){
+  try{await fetch(base()+'/healthz',{mode:'no-cors',cache:'no-store'});set(true);}catch(e){set(false);}
+}
+function set(ok){
+  if(ok===up)return; up=ok;
+  $('dot').className='dot '+(ok?'up':'down');
+  $('st').textContent=ok?'App running · '+base().replace('http://',''):'App not running';
+  $('off').classList.toggle('show',!ok);
+  if(ok)go(cur);
+}
+document.querySelectorAll('nav button').forEach(b=>b.onclick=()=>go(b.dataset.p));
+$('open').onclick=()=>{const v=$('rid').value.trim();if(/^[a-z0-9]{6,12}$/i.test(v))go('/runs/'+v);};
+$('cmp').onclick=()=>{const a=$('ra').value.trim(),b=$('rb').value.trim();if(a&&b)go('/compare/'+a+'/'+b);};
+$('back').onclick=()=>{try{frame.contentWindow.history.back();}catch(e){go(cur);}};
+$('reload').onclick=()=>go(cur);
+$('newtab').onclick=()=>window.open(base()+cur,'_blank');
+$('base').onchange=()=>{up=null;ping();};
+ping();setInterval(ping,3000);
+</script>
+</body>
+</html>
