@@ -63,7 +63,7 @@ About $0.00 per run (open-weight model, local via Ollama or Groq free tier; the 
 
 ## Demo video
 
-Link to be added.
+[Watch the demo (1:57, Google Drive)](https://drive.google.com/file/d/1_zaOqoK2jAYvnqTKnCU149WhFfONbSl3/view?usp=sharing): a captioned screen recording of the real app. It walks the committed demo run through all six phases and their gates, then shows a crypto-signals idea stopped by the policy screen.
 
 ## What our system will NOT do
 
