@@ -79,8 +79,14 @@ def main() -> int:
           f"- Support replies that promise refunds or ask for payment details blocked: {count('block reply')}",
           f"- Honest disclaimers and replies allowed: {count('allow copy')}",
           f"- Failures: {failures}",
-          "", "| Expect | Input | Result | Rule / answer | Pass |", "|---|---|---|---|---|"]
-    md += [f"| {a} | {b.replace('|', '/')} | {c} | {d.replace('|', '/').replace(chr(10), ' ')} | {e} |" for a, b, c, d, e in rows]
+          "", "The inputs themselves are in `evals/red_team_prompts.json`; this report lists results only, by the guard rule",
+          "that fired, so that no trick text is repeated outside the eval data.", "",
+          "| Expect | Result | Guard rule | Inputs | Passed |", "|---|---|---|---|---|"]
+    groups: dict[tuple[str, str, str], list[str]] = {}
+    for kind, _, result, rule, ok in rows:
+        key_rule = rule if result in ("REFUSED", "BLOCKED") else "-"
+        groups.setdefault((kind, result, key_rule), []).append(ok)
+    md += [f"| {k} | {r} | {ru} | {len(v)} | {v.count('PASS')}/{len(v)} |" for (k, r, ru), v in sorted(groups.items())]
     (ROOT / "evals" / "red_team_report.md").write_text("\n".join(md) + "\n", encoding="utf-8")
     print("\n".join(md[:13]))
     return 1 if failures else 0
