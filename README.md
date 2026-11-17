@@ -14,37 +14,39 @@ Without Docker: install [Ollama](https://ollama.com), run `ollama pull qwen3:8b`
 
 ## What works and what is mocked
 
+Every **Working** row below has real output from the committed demo run: [docs/demo-run.md](docs/demo-run.md) maps each step to its file in `outputs/` and its gate decision.
+
 | Step | Status |
 |---|---|
-| Founder brief intake + policy screen (excluded products, unsafe requests) ([STOP example](outputs/phase1_gate_policy-a-paid-telegram-group-th.md)) | **Working** |
+| Founder brief intake + policy screen (excluded products, unsafe requests) | **Working** |
 | Phase 1 Discover: research from free sources (Hacker News, Stack Exchange, DuckDuckGo, founder URLs) | **Working** |
-| Phase 1 Discover: find and score opportunities ([output](outputs/phase1_step1_opportunities-a-web-app-that-turns-mes.md)) | **Working** |
-| Phase 1 Discover: define the market ([output](outputs/phase1_step2_market-a-web-app-that-turns-mes.md)) | **Working** |
-| Phase 1 Discover: Mom Test interview plan + outreach draft ([output](outputs/phase1_step3_interview_plan-a-web-app-that-turns-mes.md)) | **Working** |
+| Phase 1 Discover: find and score opportunities | **Working** |
+| Phase 1 Discover: define the market | **Working** |
+| Phase 1 Discover: Mom Test interview plan + outreach draft | **Working** |
 | Sending the outreach message | **MOCKED** (approved drafts are for the founder to send personally) |
 | Evidence ledger: claims SOURCED or labelled ASSUMPTION, enforced in code | **Working** |
-| Phase 1 evidence gate (go / repeat / pivot / stop) + founder decision ([output](outputs/phase1_gate_decision-a-web-app-that-turns-mes.md)) | **Working** |
-| Phase 2 Validate: Lean Canvas ([output](outputs/phase2_step1_lean_canvas-a-web-app-that-turns-mes.md)) | **Working** |
-| Phase 2 Validate: landing page copy, safe template, guard scrubbing ([output](outputs/phase2_step2_landing_page-a-web-app-that-turns-mes.html)) | **Working** |
+| Phase 1 evidence gate (go / repeat / pivot / stop) + founder decision | **Working** |
+| Phase 2 Validate: Lean Canvas | **Working** |
+| Phase 2 Validate: landing page copy, safe template, guard scrubbing | **Working** |
 | Landing page publishing, after founder approval | **Working** locally at `/lp/<run>`; public hosting **MOCKED** |
 | Waitlist sign-ups counted from real form submissions | **Working** |
 | Demand targets proposed and locked by the founder before the test | **Working** |
-| Phase 2 demand gate (go / repeat / pivot / stop) + founder decision ([output](outputs/phase2_gate_decision-a-web-app-that-turns-mes.md)) | **Working** |
+| Phase 2 demand gate (go / repeat / pivot / stop) + founder decision | **Working** |
 | Approval queue (publish / send / spend / sign) | **Working** |
 | Decision log with required keys + tamper-evident hash chain | **Working** |
 | Red-team guard (fake reviews, urgency, income promises, impersonation, money, credentials, prompt injection; English + Arabic) | **Working** |
 | Red-team evaluation: 70 trick requests, 31 product ideas, 13 generated texts; report in [`evals/red_team_report.md`](evals/red_team_report.md), 0 failures | **Working** |
-| Phase 3 Build: MVP spec (user stories, acceptance criteria, scoped features with hour estimates) ([output](outputs/phase3_step1_mvp_spec-a-web-app-that-turns-mes.md)) | **Working** |
-| Phase 3 Build: clickable prototype from a safe template, published locally after founder approval ([output](outputs/phase3_step2_prototype-a-web-app-that-turns-mes.html)) | **Working** |
-| Phase 3 Build: acceptance tests + build gate (scope vs founder hours, traceability, testability, safety) ([output](outputs/phase3_gate_decision-a-web-app-that-turns-mes.md)) | **Working** |
-| Phase 3 Build: coder agent writes the primary user story's core code plus one check per acceptance criterion; the sandbox (static allowlist + isolated process, no file/network/process access) runs them, with one repair attempt ([output](outputs/phase3_step4_code-a-web-app-that-turns-mes.md)) | **Working** |
+| Phase 3 Build: MVP spec (user stories, acceptance criteria, scoped features with hour estimates) | **Working** |
+| Phase 3 Build: clickable prototype from a safe template, published locally after founder approval | **Working** |
+| Phase 3 Build: acceptance tests + build gate (scope vs founder hours, traceability, testability, safety) | **Working** |
+| Phase 3 Build: coder agent writes the primary user story's core code plus one check per acceptance criterion; the sandbox (static allowlist + isolated process, no file/network/process access) runs them, with one repair attempt | **Working** |
 | Phase 3 Build: full application code (user interface, storage, hosting) and deployment | **STUBBED** |
-| Phase 4 Commercial setup: tiered pricing with the core feature always free; comparable prices SOURCED or labelled ASSUMPTION ([output](outputs/phase4_step1_pricing-a-web-app-that-turns-mes.md)) | **Working** |
-| Phase 4 Commercial setup: terms, privacy and refund policy DRAFTS, each signed off by the founder; commercial gate ([policies](outputs/phase4_step2_policies-a-web-app-that-turns-mes.md), [gate](outputs/phase4_gate_decision-a-web-app-that-turns-mes.md)) | **Working** |
-| Phase 5 Launch: store page rendered from the founder-approved prices, launch post drafts per channel, launch targets locked before launch, launch gate ([store page](outputs/phase5_step1_store_page-a-web-app-that-turns-mes.html), [launch kit](outputs/phase5_step2_launch_kit-a-web-app-that-turns-mes.md), [gate](outputs/phase5_gate_decision-a-web-app-that-turns-mes.md)) | **Working** |
+| Phase 4 Commercial setup: tiered pricing with the core feature always free; comparable prices SOURCED or labelled ASSUMPTION | **Working** |
+| Phase 4 Commercial setup: terms, privacy and refund policy DRAFTS, each signed off by the founder; commercial gate | **Working** |
+| Phase 5 Launch: store page rendered from the founder-approved prices, launch post drafts per channel, launch targets locked before launch, launch gate | **Working** |
 | Phase 5 Launch: public hosting, posting to channels, checkout | **MOCKED** (founder posts personally; store served locally; no checkout) |
-| Phase 5 Launch: payment → delivery, refunds, idempotency, reconciliation ([test log](outputs/payment_test_log.md)) | **MOCKED** (real logic runs on mock events inside the launch gate; no provider) |
-| Phase 6 Operate and learn: launch results vs the targets locked before launch (sign-ups counted by the app), support reply drafts for real feedback, learn gate (persevere / repeat / pivot / stop), learning memo ([metrics](outputs/phase6_step1_metrics-a-web-app-that-turns-mes.md), [replies](outputs/phase6_step2_support_replies-a-web-app-that-turns-mes.md), [gate](outputs/phase6_gate_decision-a-web-app-that-turns-mes.md), [memo](outputs/phase6_step3_learning_memo-a-web-app-that-turns-mes.md)) | **Working** |
+| Phase 5 Launch: payment → delivery, refunds, idempotency, reconciliation | **MOCKED** (real logic runs on mock events inside the launch gate; no provider) |
+| Phase 6 Operate and learn: launch results vs the targets locked before launch (sign-ups counted by the app), support reply drafts for real feedback, learn gate (persevere / repeat / pivot / stop), learning memo | **Working** |
 | Phase 6: sending support replies; usage analytics | **MOCKED** (founder sends replies personally and enters store visits from their own analytics) |
 | Founder export: the whole run (brief, gates, decisions, approvals, decision log, outputs) as one Markdown file, no model call | **Working** |
 
