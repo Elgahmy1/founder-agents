@@ -44,12 +44,13 @@ class ApprovalQueue:
         self.executors = executors
         self.items: list[ApprovalItem] = []
 
-    def submit(self, kind: str, title: str, content: str, executor: str, phase: int) -> ApprovalItem:
+    def submit(self, kind: str, title: str, content: str, executor: str, phase: int,
+               check: Callable[[str], "guard.Verdict"] | None = None) -> ApprovalItem:
         if kind not in KINDS:
             raise ValueError(f"unknown action kind {kind}")
         if executor not in self.executors:
             raise ValueError(f"unknown executor {executor}")
-        v = guard.check_output(content)
+        v = (check or guard.check_output)(content)
         if not v.allowed:
             self.log.append(agent="guard", action="block_artifact", run_id=self.run_id,
                             outcome="blocked", detail=f"{title}: {v.reason}")

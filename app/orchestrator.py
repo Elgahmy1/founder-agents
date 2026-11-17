@@ -450,35 +450,35 @@ class Orchestrator:
         docs = self.docs(st)
         canvas = LeanCanvas(**st.canvas)
         spec = MvpSpec(**st.mvp)
+        primary = spec.user_stories[0].id
+        core = [f.name for f in spec.must_have if primary in f.story_ids] or [spec.must_have[0].name]
         self._step(st, P4_STEPS, 0)
         plan = PricerAgent(ctx).price(brief, canvas, spec, docs, st.commercial_feedback,
-                                      (st.market or {}).get("alternatives", []))
+                                      (st.market or {}).get("alternatives", []), core)
         st.pricing = plan.model_dump()
         led = Ledger.from_list(st.ledger)
         pclaims = led.add(resolve(plan.claims, docs))
         comps = [resolve([RawClaim(text=f"{c.product}: {c.pricing_note}", source_ids=c.source_ids)], docs)[0]
                  for c in plan.comparables]
         st.ledger = led.to_list()
-        self.write_output(st, "phase4_step1_pricing.md", _pricing_md(plan, pclaims, comps))
+        pricing_md = _pricing_md(plan, pclaims, comps, core)
+        self.write_output(st, "phase4_step1_pricing.md", pricing_md)
 
         self._step(st, P4_STEPS, 1)
         pol = PolicyDrafterAgent(ctx).draft(brief, spec, plan)
+        for p in (pol.terms, pol.privacy, pol.refund):  # never invent a contact address for the founder
+            p.sections = [EMAIL.sub("[founder contact email]", x) for x in p.sections]
         st.policies = pol.model_dump()
         self.write_output(st, "phase4_step2_policies.md", _policies_md(pol))
 
         self._step(st, P4_STEPS, 2)
-        flags = []
-        for text in [plan.rationale, plan.price_test, *[t.name + " " + " ".join(t.includes) for t in plan.tiers]]:
-            v = guard.check_output(text)
-            if not v.allowed and v.rule != "payment_in_output":
-                flags.append(v.rule)
-        for p in (pol.terms, pol.privacy, pol.refund):
-            v = guard.check_policy(" ".join(p.sections))
-            if not v.allowed:
-                flags.append(v.rule)
-        core = spec.must_have[0].name.lower()
+        # The same checks the approval queue applies on submit, so the gate and the queue never disagree.
+        items = [("Approve pricing", pricing_md, guard.check_output)] + [
+            (f"Sign off {k} policy draft", _policy_md(getattr(pol, k)), guard.check_policy) for k in ("terms", "privacy", "refund")]
+        flags = [f"{t}: {v.rule}" for t, text, chk in items if not (v := chk(text)).allowed]
         free = [t for t in plan.tiers if t.price_usd_per_month == 0]
-        free_core = any(core in " ".join(t.includes).lower() or _overlap(core, " ".join(t.includes)) for t in free)
+        free_text = " ".join(" ".join(t.includes) for t in free)
+        free_core = bool(free) and all(c.lower() in free_text.lower() or _overlap(c, free_text) for c in core)
         paid = [t for t in plan.tiers if t.price_usd_per_month > 0]
         complete = [k for k, p in (("terms", pol.terms), ("privacy", pol.privacy), ("refund", pol.refund))
                     if len(p.sections) >= 3]
@@ -489,14 +489,13 @@ class Orchestrator:
             policies_complete=complete, policies_missing=[k for k in ("terms", "privacy", "refund") if k not in complete],
             guard_flags=flags, privacy_covers_data=bool(pol.data_collected),
             attempt=1 + sum(1 for x in st.gates if x["gate"] == "commercial_gate"))
+        q.supersede("sign_commercial")
+        if not flags:
+            for t, text, chk in items:
+                q.submit("sign", f"{t}: {st.run_id}", text, "sign_commercial", 4, check=chk)
         st.gates.append(g.to_dict())
         self.log.append(agent="gate", action="commercial_gate", run_id=st.run_id, outcome=g.recommendation, phase=4)
         self.write_output(st, "phase4_gate_decision.md", g.md())
-        q.supersede("sign_commercial")
-        if not flags:
-            q.submit("sign", f"Approve pricing: {st.run_id}", _pricing_md(plan, pclaims, comps), "sign_commercial", 4)
-            for k in ("terms", "privacy", "refund"):
-                q.submit("sign", f"Sign off {k} policy draft: {st.run_id}", _policy_md(getattr(pol, k)), "sign_commercial", 4)
         st.stage = "p4_gate_wait"
 
     def _stubs(self, st: RunState) -> None:
@@ -714,9 +713,13 @@ def _overlap(a: str, b: str) -> bool:
     return bool(words & set(re.findall(r"[a-z]{4,}", b.lower())))
 
 
-def _pricing_md(plan: PricingPlan, claims, comps) -> str:
+EMAIL = re.compile(r"[\w.+-]+@[\w-]+\.[\w.]+")
+
+
+def _pricing_md(plan: PricingPlan, claims, comps, core: list[str]) -> str:
     return "\n".join([
         "# Phase 4, step 1: Pricing proposal (no payment is configured or taken)", "",
+        f"Core features that must stay free (they serve the primary user story): {', '.join(core)}", "",
         "| Tier | USD / month | Includes | For |", "|---|---|---|---|",
         *[f"| {t.name} | {t.price_usd_per_month:g} | {', '.join(t.includes)} | {t.who_for} |" for t in plan.tiers],
         "", "## Comparable products", *[f"- {c.md()}" for c in comps],

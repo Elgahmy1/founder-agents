@@ -191,9 +191,13 @@ def check_policy(text: str) -> Verdict:
     return _check(text, [r for r in OUTPUT_RULES if r[0] not in ("income_claim_in_output", "payment_in_output")])
 
 
+NEGATED_GUARANTEE = re.compile(r"\b(not|no|never|without|cannot|can't|don't|doesn't|won't)\b[^.!?\n]{0,40}?\bguarantee\w*", re.I)
+
+
 def check_output(text: str) -> Verdict:
-    """Generated artifact before it may be queued for publishing or sending."""
-    return _check(text, OUTPUT_RULES)
+    """Generated artifact before it may be queued for publishing or sending.
+    Disclaimers ("results are not guaranteed") are honest and allowed; promises are not."""
+    return _check(NEGATED_GUARANTEE.sub(" ", text), OUTPUT_RULES)
 
 
 def scrub_output(text: str) -> tuple[str, list[str]]:

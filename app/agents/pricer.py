@@ -43,11 +43,13 @@ class PricerAgent(Agent):
     role = "pricer"
 
     def price(self, brief: FounderBrief, canvas: LeanCanvas, spec: MvpSpec, docs: list[Doc],
-              feedback: str | None = None, alternatives: list[str] | None = None) -> PricingPlan:
+              feedback: str | None = None, alternatives: list[str] | None = None,
+              core: list[str] | None = None) -> PricingPlan:
         features = ", ".join(f.name for f in spec.must_have)
         user = (
             f"FOUNDER BRIEF\n{brief.as_text()}\n\nREVENUE STREAMS (Lean Canvas)\n{canvas.revenue_streams}\n\n"
-            f"MVP FEATURES\n{features}\n\nALTERNATIVES PEOPLE USE TODAY\n{', '.join(alternatives or []) or 'unknown'}\n\nSOURCES\n{docs_for_prompt(docs)}"
+            f"MVP FEATURES\n{features}\n\nCORE FEATURES (must all be in the free tier, by these exact names)\n"
+            f"{', '.join(core or [])}\n\nALTERNATIVES PEOPLE USE TODAY\n{', '.join(alternatives or []) or 'unknown'}\n\nSOURCES\n{docs_for_prompt(docs)}"
         )
         if feedback:
             user += f"\n\nFEEDBACK FROM THE LAST COMMERCIAL GATE (fix these)\n{feedback}"

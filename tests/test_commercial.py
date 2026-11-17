@@ -99,3 +99,40 @@ def test_web_hides_go_until_everything_is_signed(monkeypatch, make_orch, brief):
     _sign_all(orch, st.run_id)
     page = c.get(f"/runs/{st.run_id}").text
     assert "Phase 4 gate" in page and "value='go'" not in page and "GO needs your approval" in page
+
+
+def test_disclaimers_pass_but_promises_do_not():
+    from app import guard
+    for ok in ("The service is provided as-is and we do not guarantee any specific results.",
+               "No results are guaranteed.", "Results are not guaranteed."):
+        assert guard.check_output(ok).allowed and guard.check_policy(ok).allowed, ok
+    for bad in ("We guarantee you will pass.", "Guaranteed results in 7 days!"):
+        assert not guard.check_output(bad).allowed, bad
+
+
+def test_real_terms_disclaimer_is_queued_and_email_is_placeholder(make_orch, brief, settings):
+    orch = make_orch()
+    orch.llm.policy_extra = (' The service is provided "as-is" and we do not guarantee any specific results.'
+                             " Contact support@examready.ai.")
+    st = _to_commercial(orch, brief)
+    assert st.error is None, st.error
+    assert st.gates[-1]["recommendation"] == "go"
+    _, q = orch.load(st.run_id)
+    assert len(q.pending()) == 4
+    policies = (settings.outputs_dir / next(o for o in st.outputs if o.startswith("phase4_step2"))).read_text()
+    assert "examready.ai" not in policies and "[founder contact email]" in policies
+
+
+def test_core_is_the_primary_story_features(make_orch, brief):
+    orch = make_orch()
+    base = orch.llm.pricing
+
+    def wrong_core():
+        d = base()
+        d["tiers"][0]["includes"] = ["Key terms"]  # serves US2, not the primary story US1
+        return d
+    orch.llm.pricing = wrong_core
+    st = _to_commercial(orch, brief)
+    g = st.gates[-1]
+    assert g["recommendation"] == "repeat"
+    assert not g["checks"][0]["passed"]
