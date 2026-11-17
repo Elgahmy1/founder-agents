@@ -25,6 +25,7 @@ Every **Working** row has real output from the committed demo runs ([step-to-out
 | Brief intake + policy screen (excluded products, unsafe requests) | **Working** |
 | 1 Discover: research from free sources (Hacker News, Stack Exchange, Wikipedia, DuckDuckGo) and scored opportunities | **Working** |
 | 1 Discover: market definition and Mom Test interview plan with outreach draft | **Working** |
+| 1 Discover: co-founder verdict (strong / promising / weak / do not pursue) with the killer risk and 2-4 concrete improvements, each with the cheapest test this week; capped in code so it is never more positive than the evidence gate | **Working** (added after the committed demo run) |
 | Evidence ledger: every claim SOURCED (a retrieved URL) or labelled ASSUMPTION, enforced in code and audited in CI | **Working** |
 | 2 Validate: Lean Canvas, landing page with real sign-up form, targets locked by the founder before the test | **Working** |
 | 2 Validate: each real customer interview (pasted notes, or a recording in Arabic or English transcribed by open-weight Whisper) analysed by a Mom Test agent; every quote is checked against the transcript in code and the counts feed the demand gate | **Working** (added after the committed demo run; audio needs the free-tier endpoint, STUBBED with local Ollama) |

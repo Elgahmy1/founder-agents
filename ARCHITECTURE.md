@@ -52,6 +52,7 @@ flowchart LR
 - **Agents:** `researcher` (3 queries from the brief), `scout` (up to 3 opportunities scored 1-5 on pain, founder fit, feasibility, reach, differentiation), `market_analyst` (customer, segments, where they gather), `interviewer` (Mom Test script with a "problem confirmed" rule, plus an outreach draft).
 - **Tools:** Hacker News, Stack Exchange, Wikipedia and DuckDuckGo (free, no keys) and founder URLs (`app/research.py`), interleaved so no source fills the budget.
 - **Method:** `app/evidence.py` keeps a citation only if that source was retrieved in this run and supports the claim; otherwise the claim is labelled ASSUMPTION. Excluded opportunities are re-screened in code and never chosen.
+- **Co-founder verdict:** after the gate, `cofounder` judges the opportunity (strong / promising / weak / do not pursue), names the killer risk and proposes 2-4 concrete improvements with the cheapest test for each; `cap_verdict` keeps it no more positive than the gate (repeat → at most promising, pivot → weak, stop → do not pursue). Output: `phase1_step4_cofounder_verdict`.
 - **Gate:** outreach is a `send` approval (the founder sends it personally); the evidence gate needs ≥3 sourced claims, ≥40% sourced, ≥2 independent sources showing the pain and a best score ≥3/5.
 - **Output:** `phase1_step1_opportunities`, `phase1_step2_market`, `phase1_step3_interview_plan`, `phase1_gate_decision`.
 

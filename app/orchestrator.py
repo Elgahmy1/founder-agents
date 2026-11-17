@@ -131,6 +131,7 @@ class RunState:
     mvp_app: dict | None = None
     targets: dict | None = None
     results: dict | None = None
+    verdict: dict | None = None  # Phase 1: co-founder verdict (capped by the evidence gate)
     interviews: list = field(default_factory=list)  # Phase 2: analysed customer interviews (transcripts stay in data/)
     gates: list[dict] = field(default_factory=list)
     approvals: list[dict] = field(default_factory=list)
@@ -413,7 +414,23 @@ class Orchestrator:
         self.log.append(agent="gate", action="evidence_gate", sources=ledger.urls(), run_id=st.run_id,
                         outcome=g.recommendation, phase=1)
         self.write_output(st, "phase1_gate_decision.md", g.md())
+        if excluded.allowed:
+            self._cofounder_verdict(st, ctx, brief, opp, market, ledger, g)
         st.stage = "p1_gate_wait"
+
+    def _cofounder_verdict(self, st, ctx, brief, opp, market, ledger, g) -> None:
+        """End of Phase 1: an honest co-founder verdict and concrete improvements, capped by the evidence gate."""
+        from app.agents import cofounder as cf
+        if g.recommendation == "stop" and any("excluded" in r.lower() for r in g.reasons):
+            return  # excluded products get no advice on how to pursue them
+        claims = "\n".join(c.md() for c in ledger.claims) or "(no claims)"
+        v = cf.CofounderAgent(ctx).verdict(brief, opp.model_dump_json(indent=1), market.model_dump_json(indent=1),
+                                           claims, g.md())
+        v, note = cf.cap_verdict(v, g.recommendation, opp.score)
+        st.verdict = {**v.model_dump(), "cap_note": note}
+        self.log.append(agent="critic", action="cap_cofounder_verdict", run_id=st.run_id, phase=1,
+                        outcome=v.verdict, detail=note or "verdict within what the evidence gate allows")
+        self.write_output(st, "phase1_step4_cofounder_verdict.md", cf.render_md(v, note, opp.name))
 
     # ---------- phase 2: Validate ----------
     def _phase2(self, st: RunState, q: ApprovalQueue) -> None:

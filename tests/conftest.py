@@ -13,6 +13,7 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
 from app.agents.interview_analyst import InterviewAnalysis
+from app.agents.cofounder import CofounderVerdict
 from app.agents.advisor import Advice  # noqa: E402
 from app.agents.analyst import DemandTestPlan, GateMemo  # noqa: E402
 from app.agents.builder import MvpSpec  # noqa: E402
@@ -148,6 +149,13 @@ class FakeLLM:
                              "rationale": "ASSUMPTION: 5% conversion"},
             GateMemo: {"summary": "s", "what_we_learned": [], "next_steps": []},
             Advice: {"answer": "Talk to 10 students this week."},
+            CofounderVerdict: {"verdict": "strong", "one_line": "Strong for engineering students in Egypt if it beats ChatGPT on their own slides.",
+                               "reasons_for": ["S1 shows students rewriting notes", "the founder tutors STEM students"],
+                               "reasons_against": ["ChatGPT is free and already used"], "killer_risk": "students stay with ChatGPT",
+                               "improvements": [{"change": "practice questions in the professor's exam style", "why": "ChatGPT cannot see past exams",
+                                                 "cheapest_test": "5 students, 2 of the founder's 15 weekly hours, $0"},
+                                                {"change": "start with one course", "why": "reach within $100", "cheapest_test": "post in one course group"}],
+                               "change_my_mind": "3 of 5 students say ChatGPT already solves it"},
             InterviewAnalysis: {"language": "English", "problem_confirmed": True,
                                 "why": "She rewrites notes for hours before every exam, which meets the rule.",
                                 "current_workaround": "rewrites slides by hand into a notebook",

@@ -265,7 +265,7 @@ views you open from this dashboard are not counted.</p>
                      if st.stage == "p5_gate_wait" else
                      "<p class=mut>GO needs your approval of the pricing and your sign-off on all three policy drafts.</p>")
         return f"""<div class="card next"><div class="kicker">Your decision is needed: Phase {g['phase']} gate</div>
-<h2>The system recommends <span class="{rec}">{rec.upper()}</span></h2>{_gate_table(g)}
+<h2>The system recommends <span class="{rec}">{rec.upper()}</span></h2>{_gate_table(g)}{_verdict_html(st) if g['phase'] == 1 else ''}
 <form method="post" action="/runs/{run_id}/gate" class="once"><input name="note" placeholder="Why? (required if you overrule the recommendation; saved in the log)">
 <div class="opts">{btns}</div></form><p class=mut>You can overrule the system. If you do, the log records both the recommendation and your decision.</p></div>"""
     if st.stage == "p2_targets_wait" and st.demand_plan:
@@ -405,6 +405,20 @@ def gate(run_id: str, decision: str = Form(...), note: str = Form("")):
 def targets(run_id: str, approve: str = Form(...)):
     _bg(run_id, "Updating targets", orch.founder_lock_targets, run_id, approve == "1")
     return RedirectResponse(f"/runs/{run_id}", status_code=303)
+
+
+def _verdict_html(st) -> str:
+    """Phase 1 gate card: the co-founder's honest verdict and its suggestions."""
+    v = getattr(st, "verdict", None)
+    if not v:
+        return ""
+    cls = {"strong": "go", "promising": "repeat", "weak": "pivot", "do_not_pursue": "stop"}[v["verdict"]]
+    ideas = "".join(f"<li><b>{html.escape(i['change'])}</b>: {html.escape(i['why'])} <i>Test: {html.escape(i['cheapest_test'])}</i></li>"
+                    for i in v["improvements"])
+    return (f"<div class=card><h3>Your co-founder's verdict: <span class='{cls}'>{v['verdict'].replace('_', ' ').upper()}</span></h3>"
+            f"<p>{html.escape(v['one_line'])}</p>" + (f"<p class=mut>{html.escape(v['cap_note'])}</p>" if v.get("cap_note") else "")
+            + f"<p><b>Most likely to kill it:</b> {html.escape(v['killer_risk'])}</p><p><b>How to make it stronger:</b></p><ul>{ideas}</ul>"
+            f"<p class=mut>What would change my mind: {html.escape(v['change_my_mind'])}</p></div>")
 
 
 def _interviews_html(st, run_id: str) -> str:
