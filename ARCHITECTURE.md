@@ -308,6 +308,7 @@ Persistence is plain files (JSON, CSV, Markdown) so runs are inspectable and por
 |---|---|
 | Orchestrator state machine, phases 1-6 agents, evidence ledger, gates 1-6, approval queue, guard, decision log, web UI, CLI | Built |
 | Founder run export (`app/report.py`, `/runs/<id>/export`) and guard-only red-team evaluation (`evals/run_red_team.py --guard-only`, report in `evals/red_team_report.md`) | Built |
+| Run metrics from the decision log (`evals/run_metrics.py`, report in `evals/run_metrics.md`): calls, tokens, cost, time, gate recommendation vs founder decision, approval audit; CI checks the report matches the log and re-runs the committed generated code against its acceptance checks | Built |
 | Landing page publishing | Built locally; public hosting MOCKED |
 | Outreach sending | MOCKED (founder sends personally) |
 | Payment → delivery, refunds, idempotency, reconciliation | MOCKED events, real logic |

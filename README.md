@@ -39,7 +39,7 @@ Every **Working** row below has real output from the committed demo runs: [docs/
 | Phase 3 Build: MVP spec (user stories, acceptance criteria, scoped features with hour estimates) | **Working** |
 | Phase 3 Build: clickable prototype from a safe template, published locally after founder approval | **Working** |
 | Phase 3 Build: acceptance tests + build gate (scope vs founder hours, traceability, testability, safety) | **Working** |
-| Phase 3 Build: coder agent writes the primary user story's core code plus one check per acceptance criterion; the sandbox (static allowlist + isolated process, no file/network/process access) runs them, with one repair attempt | **Working** |
+| Phase 3 Build: coder agent writes the primary user story's core code plus one check per acceptance criterion; the sandbox (static allowlist + isolated process, no file/network/process access) runs them, with one repair attempt; CI re-runs the committed code against its checks on every push | **Working** |
 | Phase 3 Build: full application code (user interface, storage, hosting) and deployment | **STUBBED** |
 | Phase 4 Commercial setup: tiered pricing with the core feature always free; comparable prices SOURCED or labelled ASSUMPTION | **Working** |
 | Phase 4 Commercial setup: terms, privacy and refund policy DRAFTS, each signed off by the founder; commercial gate | **Working** |
@@ -49,6 +49,7 @@ Every **Working** row below has real output from the committed demo runs: [docs/
 | Phase 6 Operate and learn: launch results vs the targets locked before launch (sign-ups counted by the app), support reply drafts for real feedback, learn gate (persevere / repeat / pivot / stop), learning memo | **Working** |
 | Phase 6: sending support replies; usage analytics | **MOCKED** (founder sends replies personally and enters store visits from their own analytics) |
 | Founder export: the whole run (brief, gates, decisions, approvals, decision log, outputs) as one Markdown file, no model call | **Working** |
+| Run metrics from the decision log: calls, tokens, cost, time, gate recommendation vs founder decision, approval audit; [`evals/run_metrics.md`](evals/run_metrics.md), checked against the log in CI | **Working** |
 
 ## Architecture
 
