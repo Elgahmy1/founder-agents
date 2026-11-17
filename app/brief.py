@@ -14,6 +14,12 @@ class FounderBrief(BaseModel):
     values: list[str] = Field(default_factory=list)
     source_urls: list[str] = Field(default_factory=list, description="Optional sources the founder already has")
 
+    @property
+    def signature(self) -> str:
+        """The name agents may sign with: the founder's own, or a placeholder. Never an invented name."""
+        n = (self.founder_name or "").strip()
+        return n if n and n.lower() not in ("founder", "name", "your name") else "[your name]"
+
     def as_text(self) -> str:
         return (
             f"Idea: {self.idea}\n"

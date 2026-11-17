@@ -49,9 +49,11 @@ class LauncherAgent(Agent):
     def launch_kit(self, brief: FounderBrief, spec: MvpSpec, pricing: PricingPlan, market: Market,
                    feedback: str | None = None) -> LaunchKit:
         user = (
-            f"FOUNDER\n{brief.founder_name}\n\nPRODUCT\n{spec.product_name}: {spec.one_line}\n"
-            f"Features: {', '.join(f.name for f in spec.must_have)}\n\n"
-            f"APPROVED PRICING (do not restate prices; the page shows them)\n"
+            f"FOUNDER NAME (sign posts with exactly this; never invent a name)\n{brief.signature}\n\n"
+            f"PRODUCT\n{spec.product_name}: {spec.one_line}\n"
+            f"Features: {'; '.join(f'{f.name}: {f.description}' for f in spec.must_have)}\n"
+            f"Not in this version: {', '.join(spec.out_of_scope)}\n\n"
+            f"PLANS (the page shows them from the approved pricing; never describe plans, limits or prices yourself)\n"
             f"{', '.join(t.name for t in pricing.tiers)}\n\n"
             f"WHERE CUSTOMERS GATHER\n{', '.join(market.where_they_gather)}"
         )

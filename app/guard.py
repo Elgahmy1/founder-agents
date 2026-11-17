@@ -203,6 +203,21 @@ def check_policy(text: str) -> Verdict:
 NEGATED_GUARANTEE = re.compile(r"\b(not|no|never|without|cannot|can't|don't|doesn't|won't)\b[^.!?\n]{0,40}?\bguarantee\w*", re.I)
 
 
+_SELF_INTRO = re.compile(r"\b(?:I'm|I’m|I am|my name is|this is)\s+([A-Z][a-z]+)\b|^[\s]*[—–-]+\s*([A-Z][a-z]+)\s*$", re.M)
+_NOT_NAMES = {"Founder", "Not", "Building", "Researching", "Working", "Looking", "Trying", "A", "An", "The", "Just", "Currently",
+              "Here", "So", "Also", "Still", "Really", "Very", "Excited", "Happy", "Glad", "New", "Curious", "Sharing"}
+
+
+def invented_identity(text: str, signature: str) -> str | None:
+    """Returns a name the text introduces or signs with that is not the founder's own."""
+    own = {w for w in re.findall(r"[A-Za-z]+", signature)}
+    for m in _SELF_INTRO.finditer(text):
+        name = m.group(1) or m.group(2)
+        if name and name not in own and name not in _NOT_NAMES:
+            return name
+    return None
+
+
 def check_output(text: str) -> Verdict:
     """Generated artifact before it may be queued for publishing or sending.
     Disclaimers ("results are not guaranteed") are honest and allowed; promises are not."""

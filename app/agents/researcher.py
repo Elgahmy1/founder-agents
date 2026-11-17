@@ -9,7 +9,8 @@ from app.research import Doc, Researcher
 
 
 class QueryPlan(BaseModel):
-    queries: list[str] = Field(description="3 short web search queries that would surface real people describing this problem")
+    queries: list[str] = Field(description="3 short ENGLISH web search queries that would surface real people describing "
+                                           "this problem; translate if the brief is in another language")
 
 
 class ResearcherAgent(Agent):

@@ -86,3 +86,44 @@ def test_finished_commercial_run_can_continue_into_launch(make_orch, brief):
     orch.save(st, q)
     st = orch.founder_continue(st.run_id)
     assert st.stage == "p5_gate_wait" and st.gates[-1]["gate"] == "launch_gate"
+
+
+def test_post_with_invented_founder_name_is_blocked(make_orch, brief, settings):
+    orch = make_orch()
+    orch.llm.post_text = "Hi r/college, I'm Alex, the founder of a new notes tool. Feedback welcome.\n— Alex"
+    base = orch.llm.launch
+
+    def one_post():
+        d = base()
+        d["posts"] = d["posts"][:1]
+        return d
+    orch.llm.launch = one_post
+    st = _to_launch(orch, brief)  # brief founder is Mohamed
+    kit = (settings.outputs_dir / next(o for o in st.outputs if o.startswith("phase5_step2"))).read_text()
+    assert "BLOCKED by guard" in kit and "is not the founder" in kit and "I'm Alex" not in kit
+    assert st.gates[-1]["recommendation"] == "repeat"
+    _, q = orch.load(st.run_id)
+    assert not [i for i in q.pending() if i.executor == "post_launch_mock"]
+
+
+def test_faq_cannot_invent_plan_terms(make_orch, brief, settings):
+    orch = make_orch()
+    base = orch.llm.launch
+
+    def faq_quota():
+        d = base()
+        d["posts"] = d["posts"][:1]
+        d["faq"].append({"question": "What are the limits?", "answer": "The free tier allows 3 documents per month."})
+        return d
+    orch.llm.launch = faq_quota
+    st = _to_launch(orch, brief)
+    store = (settings.outputs_dir / next(o for o in st.outputs if o.startswith("phase5_step1"))).read_text()
+    assert "3 documents per month" not in store
+    assert "What does each plan include?" in store and "4 USD / month" in store
+
+
+def test_signature_placeholder_when_no_founder_name():
+    from app.brief import FounderBrief
+    b = FounderBrief(idea="x", target_market="y")
+    assert b.signature == "[your name]"
+    assert FounderBrief(founder_name="Mohamed", idea="x", target_market="y").signature == "Mohamed"

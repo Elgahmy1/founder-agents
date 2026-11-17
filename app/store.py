@@ -8,6 +8,7 @@ in Phase 2. Every model line passes the output guard.
 from __future__ import annotations
 
 import html
+import re
 
 from app import guard
 from app.agents.launcher import LaunchKit
@@ -22,6 +23,9 @@ def _safe(text: str, removed: list[str]) -> str:
     return html.escape(text)
 
 
+PLAN_TALK = re.compile(r"\b(free (tier|plan|version)|pro\b|premium|tiers?|plans?|quota|limit\w*|per month|/ ?month|priority|unlimited|upgrade|price\w*|pricing|\$\d)", re.I)
+
+
 def render_store(product: str, kit: LaunchKit, pricing: PricingPlan, run_id: str) -> tuple[str, list[str]]:
     removed: list[str] = []
     gets = "".join(f"<li>{x}</li>" for x in (_safe(g, removed) for g in kit.what_you_get) if x)
@@ -32,8 +36,18 @@ def render_store(product: str, kit: LaunchKit, pricing: PricingPlan, run_id: str
         btn = (f"<a class='btn' href='/lp/{run_id}'>Start free</a>" if t.price_usd_per_month == 0 else
                "<span class='btn off'>Not on sale yet: payments are MOCKED in this prototype</span>")
         tiers.append(f"<div class='tier'><h3>{html.escape(t.name)}</h3><p class='price'>{price}</p><ul>{inc}</ul>{btn}</div>")
-    faq = "".join(f"<dt>{q}</dt><dd>{a}</dd>" for q, a in
-                  ((_safe(f.question, removed), _safe(f.answer, removed)) for f in kit.faq) if q and a)
+    faq_items = []
+    for f in kit.faq:
+        if PLAN_TALK.search(f"{f.question} {f.answer}"):
+            removed.append("faq_described_plans")  # plans come only from the approved pricing below
+            continue
+        q, a = _safe(f.question, removed), _safe(f.answer, removed)
+        if q and a:
+            faq_items.append(f"<dt>{q}</dt><dd>{a}</dd>")
+    plans = "; ".join(f"{html.escape(t.name)}: {'free' if t.price_usd_per_month == 0 else f'{t.price_usd_per_month:g} USD / month'}"
+                      f" ({html.escape(', '.join(t.includes))})" for t in pricing.tiers)
+    faq_items.insert(0, f"<dt>What does each plan include?</dt><dd>{plans}. These are the plans the founder approved.</dd>")
+    faq = "".join(faq_items)
     page = f"""<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>{html.escape(product)}</title>

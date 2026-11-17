@@ -20,6 +20,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from app import guard
+from app.guard import invented_identity
 from app.agents.analyst import AnalystAgent, DemandTestPlan
 from app.agents.base import AgentContext
 from app.agents.interviewer import InterviewerAgent, InterviewPlan
@@ -364,7 +365,7 @@ class Orchestrator:
             *[f"- {u}" for u in market.unknowns]]) + "\n")
 
         self._step(st, P1_STEPS, 3)
-        plan = InterviewerAgent(ctx).plan_interviews(opp, market, brief.founder_name)
+        plan = InterviewerAgent(ctx).plan_interviews(opp, market, brief.signature)
         st.interview_plan = plan.model_dump()
         self.write_output(st, "phase1_step3_interview_plan.md", _interview_md(plan))
         try:
@@ -538,7 +539,14 @@ class Orchestrator:
         st.launch = kit.model_dump()
         page, removed = render_store(spec.product_name, kit, pricing, st.run_id)
         self.write_output(st, "phase5_step1_store_page.html", page)
-        posts = [(p, guard.check_output(p.text)) for p in kit.posts]
+        posts = []
+        for p in kit.posts:
+            v = guard.check_output(p.text)
+            fake = invented_identity(p.text, brief.signature)
+            if v.allowed and fake:
+                v = guard.Verdict(False, "invented_identity",
+                                  f"Post speaks as '{fake}', who is not the founder ({brief.signature}).")
+            posts.append((p, v))
         self.write_output(st, "phase5_step2_launch_kit.md", _launch_md(kit, posts))
         if removed:
             self.log.append(agent="guard", action="scrub_store_page", run_id=st.run_id, outcome="scrubbed",
