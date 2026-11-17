@@ -145,7 +145,8 @@ class SalesBook:
             ledger, d = self._replay(data)
             paid = [e for e in ledger.payments.values() if e.type == "payment_succeeded"]
             refunded = {e.order_id for e in ledger.payments.values() if e.type == "refund_succeeded"}
-            net = sum(e.amount_cents - e.fee_cents for e in paid if e.order_id not in refunded)
+            # MOCKED provider policy, as with most providers: the fee on a refunded order is not returned
+            net = sum(e.amount_cents - e.fee_cents for e in paid) - sum(e.amount_cents for e in paid if e.order_id in refunded)
             data["payouts"] = [{"amount_cents": net, "mocked": True}] if paid else []
             self._write(data)
             ledger.payouts[:] = data["payouts"]
@@ -177,7 +178,7 @@ class SalesBook:
             f"| Events processed (duplicates are not stored) | {r['events']} |",
             f"| Deliveries made | {r['deliveries']} (one per paid order: {r['deliveries'] == r['paid']}) |",
             f"| Gross / MOCKED fees / refunded | {usd(r['gross_cents'])} / {usd(r['fees_cents'])} / {usd(r['refunded_cents'])} |",
-            f"| MOCKED payout (net of fees and refunds) | {usd(r['net_payout_cents'])} |",
+            f"| MOCKED payout = gross - fees - refunded (the fee on a refunded order is not returned) | {usd(r['net_payout_cents'])} |",
             f"| Reconciliation issues | {'; '.join(r['issues']) or 'none'} |",
         ]
         return "\n".join(lines) + "\n"

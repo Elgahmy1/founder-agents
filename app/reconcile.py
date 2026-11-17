@@ -22,7 +22,8 @@ def reconcile(ledger: MockLedger) -> list[str]:
             issues.append(f"{oid}: marked {order['status']} but no payment event")
         if ev and ev.amount_cents != order["amount_cents"]:
             issues.append(f"{oid}: paid {ev.amount_cents} but order is {order['amount_cents']}")
-    expected = sum(e.amount_cents - e.fee_cents for o, e in paid.items() if o not in refunded)
+    # the provider keeps its fee on a refunded order, so a refund costs the full amount
+    expected = sum(e.amount_cents - e.fee_cents for e in paid.values()) - sum(paid[o].amount_cents for o in refunded if o in paid)
     paid_out = sum(p["amount_cents"] for p in ledger.payouts)
     if ledger.payouts and expected != paid_out:
         issues.append(f"payouts {paid_out} != expected net {expected}")

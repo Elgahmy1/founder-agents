@@ -41,7 +41,7 @@ def test_book_is_idempotent_and_reconciles(tmp_path):
     assert key not in b.path.read_text()  # only the hash is stored
     r = b.reconcile()
     assert (r["paid"], r["refunded"], r["deliveries"], r["issues"]) == (2, 1, 2, [])
-    assert r["net_payout_cents"] == 400 - 20
+    assert r["net_payout_cents"] == 2 * (400 - 20) - 400  # the refunded order's fee is not returned
     assert "Reconciliation issues | none" in b.report_md("P")
     # a second, different payment event for a paid order: no second delivery, and reconciliation flags the double charge
     assert b.handle_event(b.mock_provider_event(o1, "payment_succeeded"))[0] == "already_delivered"
