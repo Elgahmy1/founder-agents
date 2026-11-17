@@ -1,0 +1,20 @@
+{
+  "founder_name": "Mohamed",
+  "idea": "An Arabic-first web tool that helps Egyptian freelancers write strong English proposals for Upwork and other international job posts",
+  "skills": [
+    "Python",
+    "AI/LLM apps",
+    "web development",
+    "English-Arabic writing"
+  ],
+  "budget_usd": 150,
+  "hours_per_week": 12,
+  "target_market": "Freelancers",
+  "location": "Egypt",
+  "values": [
+    "honesty",
+    "no fake reviews or inflated claims",
+    "user privacy"
+  ],
+  "source_urls": []
+}
