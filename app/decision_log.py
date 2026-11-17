@@ -65,7 +65,9 @@ class DecisionLog:
             entry["hash"] = _digest(entry)
             entries.append(entry)
             self.path.parent.mkdir(parents=True, exist_ok=True)
-            self.path.write_text(json.dumps(entries, indent=1, ensure_ascii=False) + "\n", encoding="utf-8")
+            tmp = self.path.with_suffix(".tmp")
+            tmp.write_text(json.dumps(entries, indent=1, ensure_ascii=False) + "\n", encoding="utf-8")
+            tmp.replace(self.path)
             return entry
 
 

@@ -87,7 +87,9 @@ class Orchestrator:
                     "completion_tokens": self.llm.usage.completion_tokens, "cost_usd": self.llm.usage.cost_usd}
         p = self._path(st.run_id)
         p.parent.mkdir(parents=True, exist_ok=True)
-        p.write_text(json.dumps(st.__dict__, indent=1, ensure_ascii=False), encoding="utf-8")
+        tmp = p.with_suffix(".tmp")
+        tmp.write_text(json.dumps(st.__dict__, indent=1, ensure_ascii=False), encoding="utf-8")
+        tmp.replace(p)  # atomic: a failed write never leaves an empty state file
 
     def load(self, run_id: str) -> tuple[RunState, ApprovalQueue]:
         st = RunState(**json.loads(self._path(run_id).read_text(encoding="utf-8")))
