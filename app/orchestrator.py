@@ -2,7 +2,8 @@
 
 The orchestrator runs agent steps until it reaches something only the
 founder can decide (a gate decision, demand targets, interview results),
-then stops and waits. Phases 1-2 are built; phases 3-6 are STUBBED.
+then stops and waits. All six phases are built; phase 3 code generation is STUBBED and
+anything that would take money or act on the founder's accounts is MOCKED.
 
 Stages:
   new -> p1_running -> p1_gate_wait -> p2_running -> p2_targets_wait
@@ -211,7 +212,7 @@ class Orchestrator:
 
     def _sign_commercial(self, item: ApprovalItem) -> str:
         return ("Signed off by the founder (recorded in the decision log). Nothing was published: policies and prices "
-                "go live only with the store page in Phase 5 (STUBBED). Review with a lawyer before launch.")
+                "go live only with the store page in Phase 5, after the founder approves it. Review with a lawyer before launch.")
 
     def _publish_store_local(self, item: ApprovalItem) -> str:
         run_id = item.title.split(":")[-1].strip()
