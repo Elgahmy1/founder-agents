@@ -10,92 +10,73 @@ In the committed demo run (`48fc7649`, an exam-summary app for students), the ag
 docker compose up
 ```
 
-Then open http://localhost:8000, fill in a founder brief and press **Start Discover**. The run goes through all six phases (Discover → Validate → Build → Commercial setup → Launch → Operate and learn) and stops at every gate for your decision. The app opens right away; the first start downloads the open-weight model (about 5 GB for `qwen3:8b`) in the background, which takes a few minutes once. Meanwhile, **Recorded runs** on the home page replays the committed demo runs read-only from `decision_log.json` and `outputs/` (every phase, gate, founder decision and logged action), with no model needed: for example http://localhost:8000/replay/48fc7649.
+Open http://localhost:8000, fill in a founder brief and press **Start Discover**. The run goes through all six phases and stops at every gate for your decision. The app opens at once; the open-weight model (`qwen3:8b`, about 5 GB) downloads in the background the first time. Meanwhile **Recorded runs** replays the committed demo runs read-only, with no model: http://localhost:8000/replay/48fc7649.
 
-Without Docker: install [Ollama](https://ollama.com), run `ollama pull qwen3:8b`, then `pip install -r requirements.txt && uvicorn app.main:app`. A terminal version is available with `python -m app.cli run briefs/study-notes.json`.
+Without Docker: install [Ollama](https://ollama.com), `ollama pull qwen3:8b`, then `pip install -r requirements.txt && uvicorn app.main:app`. Terminal version: `python -m app.cli run briefs/study-notes.json`. Smoke tests: `python -m pytest -q` (no model, no network, no keys).
 
 ## What works and what is mocked
 
-Every **Working** row below has real output from the committed demo runs: [docs/demo-run.md](docs/demo-run.md) maps each step to its file in `outputs/` and its gate decision (a full six-phase run, plus a second idea stopped after validation).
+Every **Working** row has real output from the committed demo runs ([step-to-output map](docs/demo-run.md), [full step-by-step table](docs/status.md)).
 
 | Step | Status |
 |---|---|
-| Founder brief intake + policy screen (excluded products, unsafe requests) | **Working** |
-| Phase 1 Discover: research from free sources (Hacker News, Stack Exchange, Wikipedia, DuckDuckGo, founder URLs), mixed so no single source fills the budget | **Working** |
-| Phase 1 Discover: find and score opportunities | **Working** |
-| Phase 1 Discover: define the market | **Working** |
-| Phase 1 Discover: Mom Test interview plan + outreach draft | **Working** |
-| Sending the outreach message | **MOCKED** (approved drafts are for the founder to send personally) |
-| Evidence ledger: claims SOURCED or labelled ASSUMPTION, enforced in code | **Working** |
-| Phase 1 evidence gate (go / repeat / pivot / stop) + founder decision | **Working** |
-| Phase 2 Validate: Lean Canvas | **Working** |
-| Phase 2 Validate: landing page copy, safe template, guard scrubbing | **Working** |
-| Landing page publishing, after founder approval | **Working** locally at `/lp/<run>`; public hosting **MOCKED** |
-| Waitlist sign-ups counted from real form submissions | **Working** |
-| Demand targets proposed and locked by the founder before the test | **Working** |
-| Phase 2 demand gate (go / repeat / pivot / stop) + founder decision | **Working** |
-| Approval queue (publish / send / spend / sign) | **Working** |
-| Decision log with required keys + tamper-evident hash chain | **Working** |
-| Red-team guard (fake reviews, urgency, income promises, impersonation, money, credentials, prompt injection; English + Arabic) | **Working** |
-| Red-team evaluation: 70 trick requests, 31 product ideas, 13 generated texts; report in [`evals/red_team_report.md`](evals/red_team_report.md), 0 failures | **Working** |
-| Phase 3 Build: MVP spec (user stories, acceptance criteria, scoped features with hour estimates) | **Working** |
-| Phase 3 Build: clickable prototype from a safe template, published locally after founder approval | **Working** |
-| Phase 3 Build: acceptance tests + build gate (scope vs founder hours, traceability, testability, safety) | **Working** |
-| Phase 3 Build: coder agent writes core code for every user story in the MVP spec plus one check per acceptance criterion (criteria that need storage, a UI or hosting are listed as deferred, never faked); the sandbox (static allowlist + isolated process, no file/network/process access) runs them, with one repair attempt; CI re-runs the committed code against its checks on every push | **Working** |
-| Phase 3 Build: MVP app: the tested core code wrapped in a working web app at `/mvp/<run>` after founder approval; each request runs the code in the sandbox, nothing is stored | **Working** locally; public hosting **MOCKED** |
-| Phase 3 Build: user docs for the MVP: a user guide (what it does today, how to use it, a real example run, what was tested, what it does not do yet, data handling) written by the pipeline from the spec, the tested code and a sandbox run, no model call; published with the app at `/mvp/<run>/guide` after founder approval | **Working** locally; public hosting **MOCKED** |
-| Phase 3 Build: MVP app storage, accounts, and the acceptance criteria that need them (listed as DEFERRED in `phase3_step4_code`) | **STUBBED** |
-| Phase 4 Commercial setup: tiered pricing with the core feature always free; comparable prices SOURCED or labelled ASSUMPTION | **Working** |
-| Phase 4 Commercial setup: terms, privacy and refund policy DRAFTS, each signed off by the founder; commercial gate | **Working** |
-| Phase 5 Launch: store page rendered from the founder-approved prices, launch post drafts per channel, launch targets locked before launch, launch gate | **Working** |
-| Phase 5 Launch: public hosting, posting to channels, checkout | **MOCKED** (founder posts personally; store served locally; no checkout) |
-| Phase 5 Launch: payment → delivery, refunds, idempotency, reconciliation | **MOCKED** (real logic runs on mock events inside the launch gate; no provider) |
-| Phase 6 Operate and learn: launch results vs the targets locked before launch (sign-ups counted by the app), support reply drafts for real feedback, learn gate (persevere / repeat / pivot / stop), learning memo | **Working** |
-| Phase 6 usage analytics: store visits, landing and MVP app views and MVP app runs since launch, counted by the app itself (page name and date only: no cookies, IPs or user agents; the founder's own dashboard views are skipped) and used by the learn gate | **Working** (counts only visits reaching this server, since public hosting is MOCKED) |
-| Phase 6: sending support replies | **MOCKED** (founder sends replies personally) |
-| Replay of the recorded runs at `/replay/<run>`: phases, gates vs founder decisions, outputs and every logged action, read-only from the committed log, available before any model is downloaded | **Working** |
-| Founder export: the whole run (brief, gates, decisions, approvals, decision log, outputs) as one Markdown file, no model call | **Working** |
-| Run metrics from the decision log: calls, tokens, cost, time, gate recommendation vs founder decision, approval audit; [`evals/run_metrics.md`](evals/run_metrics.md), checked against the log in CI | **Working** |
-| Claims audit: every `[source: URL]` in `outputs/` must be a URL a logged research action actually retrieved, plus SOURCED vs ASSUMPTION counts per output; [`evals/claims_audit.md`](evals/claims_audit.md), checked in CI (38 sourced claims, 24 ASSUMPTION labels, 0 unretrieved URLs) | **Working** |
+| Brief intake + policy screen (excluded products, unsafe requests) | **Working** |
+| 1 Discover: research from free sources (Hacker News, Stack Exchange, Wikipedia, DuckDuckGo) and scored opportunities | **Working** |
+| 1 Discover: market definition and Mom Test interview plan with outreach draft | **Working** |
+| Evidence ledger: every claim SOURCED (a retrieved URL) or labelled ASSUMPTION, enforced in code and audited in CI | **Working** |
+| 2 Validate: Lean Canvas, landing page with real sign-up form, targets locked by the founder before the test | **Working** |
+| 3 Build: MVP spec (user stories, acceptance criteria, hours vs budget), clickable prototype, build gate | **Working** |
+| 3 Build: core code for every user story, tested against its acceptance criteria in a sandbox (CI re-runs the checks) | **Working** |
+| 3 Build: MVP app at `/mvp/<run>` (each request runs the tested code in the sandbox) and its user guide at `/mvp/<run>/guide` | **Working** |
+| 4 Commercial setup: pricing with the core feature always free, terms / privacy / refund DRAFTS signed by the founder | **Working** |
+| 5 Launch: store page from the signed prices, launch posts, launch targets locked before launch | **Working** |
+| 5 Launch: payment → automatic delivery, refund revokes access, idempotency, reconciliation | **MOCKED** (real logic on mock events; no provider, no money) |
+| 6 Operate and learn: results vs locked targets (counted by the app), support reply drafts, learn gate, learning memo | **Working** |
+| Gates after every phase (go / repeat / pivot / stop), recommending STOP on weak evidence | **Working** |
+| Founder approval queue for everything published, sent, spent or signed, enforced in code | **Working** |
+| Decision log (`decision_log.json`): every agent action, required keys, tamper-evident hash chain | **Working** |
+| Red-team guard (fake reviews, urgency, income promises, impersonation, money, credentials, prompt injection; English + Arabic), 0 failures | **Working** |
+| Replay of recorded runs at `/replay/<run>`, founder export, run metrics, claims audit | **Working** |
+| Public hosting (pages are served on the founder's computer); sending outreach and support replies and posting launch posts (the founder does it personally) | **MOCKED** |
+| MVP storage, accounts, and acceptance criteria that need them (listed as DEFERRED) | **STUBBED** |
 
 ## Architecture
 
-An explicit state machine (`app/orchestrator.py`) moves a run through the six phases and stops wherever only the founder can decide. Each agent (`app/agents/`) has one job and one prompt (`prompts/`), and returns schema-checked JSON from a local open-weight model. Every claim passes through the evidence ledger (`app/evidence.py`), which keeps a citation only if the source was actually retrieved and mentions the claim. Gates (`app/gates.py`) compute a recommendation from thresholds fixed in advance, and the founder makes the final call, with any override logged. Full design, including sale to cash: [ARCHITECTURE.md](ARCHITECTURE.md).
+An explicit state machine (`app/orchestrator.py`) moves a run through the six phases and stops wherever only the founder can decide. Each agent (`app/agents/`) has one job and one prompt (`prompts/`) and returns schema-checked JSON from an open-weight model. Every claim passes the evidence ledger (`app/evidence.py`), which keeps a citation only if the source was actually retrieved and supports it. Gates (`app/gates.py`) compute a recommendation from thresholds fixed in advance; the founder decides, and overrides are logged. Details, diagrams and sale to cash: [ARCHITECTURE.md](ARCHITECTURE.md).
 
 ## Models and free resources
 
-- Default model: `qwen3:8b` (open weights) via [Ollama](https://ollama.com), running locally. Set `MODEL=gpt-oss:20b` (or any Ollama model) in `.env` to switch.
-- The committed demo run (`outputs/`, `decision_log.json`) used `openai/gpt-oss-120b` (open weights) on Groq's free tier, from a laptop without a GPU. Every model call in the log names the model it used.
-- Research: Hacker News Algolia API, Stack Exchange API, Wikipedia API, DuckDuckGo HTML results, interleaved so no single source dominates. No keys, no accounts.
-- If the free tier stays rate-limited, calls fall back to the local model (`FALLBACK_MODEL` in `.env.example`); the log records which model answered.
-- No GPU? Set `LLM_PROVIDER=openai` with a free-tier OpenAI-compatible endpoint that serves open-weight models (for example Groq's free tier with `openai/gpt-oss-120b`); see `.env.example`. The key stays in your untracked `.env`.
-- No paid service is used or required. If research sites are unreachable, the run continues and every claim is labelled ASSUMPTION.
+- Default: `qwen3:8b` (open weights) via [Ollama](https://ollama.com), locally. Any Ollama model works (`MODEL=gpt-oss:20b` in `.env`).
+- No GPU: `LLM_PROVIDER=openai` with a free-tier endpoint serving open weights, e.g. Groq's free tier with `openai/gpt-oss-120b` (see `.env.example`; the key stays in your untracked `.env`). When it is rate-limited, calls fall back to the local model and the log records which model answered.
+- The committed demo runs used `openai/gpt-oss-120b` on Groq's free tier from a laptop without a GPU.
+- Research: Hacker News, Stack Exchange, Wikipedia and DuckDuckGo, with no keys or accounts. If they are unreachable, the run continues and claims are labelled ASSUMPTION.
+- No paid service is used or required.
 
 ## Cost per run
 
-About $0.00 per run (open-weight model, local via Ollama or Groq free tier). The demo run (`48fc7649`) used ~52k tokens in 19 model calls on `openai/gpt-oss-120b` via the Groq free tier across all six phases, including one redraft each of the MVP spec, pricing and policies. The Phase 3 core-code step costs 1-2 calls per generation (~10k tokens to write the code for every user story, ~5k for a repair); across the day it ran 7 times on this run (12 calls, ~62k tokens). The MVP app and its user guide need no model call. The second run used ~33k tokens in 9 calls before it stopped. Token counts per call are in `decision_log.json`, totals per run in [`evals/run_metrics.md`](evals/run_metrics.md), and the app shows the token count of each run.
+**About $0.00 per run** (open-weight model, local or free tier). The demo run (`48fc7649`) used ~52k tokens in 19 model calls across all six phases. Generating the Phase 3 core code costs 1-2 more calls (~10k tokens, ~5k per repair); the MVP app and its user guide need no model call. The second run used ~33k tokens in 9 calls before it stopped. Per-call tokens are in `decision_log.json`, per-run totals in [`evals/run_metrics.md`](evals/run_metrics.md).
 
 ## Demo video
 
-[Watch the demo (about 2 minutes, Google Drive)](https://drive.google.com/file/d/1nmll2xgWQJ5ui48mlx0c92nQQqpJg0Ck/view?usp=sharing): a screen recording of the real app at 1080p. It walks the committed demo run through all six phases and their gates, opens the working MVP app, shows the second and third runs, and ends with a crypto-signals idea stopped by the policy screen.
+[Watch the demo (about 2 minutes, Google Drive)](https://drive.google.com/file/d/1nmll2xgWQJ5ui48mlx0c92nQQqpJg0Ck/view?usp=sharing): the real app running the committed demo run through all six phases and gates, the working MVP app, the second and third runs, and a crypto-signals idea stopped by the policy screen.
 
 ## What our system will NOT do
 
 - Promise income or guarantee success.
 - Write fake reviews, testimonials, sign-ups, traction numbers or countdown timers.
-- Pose as the founder, a customer or another brand. Outreach drafts are for the founder to send personally.
+- Pose as the founder, a customer or another brand.
 - Hold, move, charge or refund money, create accounts, or store passwords or card numbers. Payments are mocked.
 - Publish, send, spend or sign anything without the founder's explicit approval.
 - Help with physical goods, financial, investment or crypto products, or health or legal advice products.
-- Hide any of its own features behind a paywall.
-- Spin weak results: gate targets are set before the test, and the system recommends stop when they are missed.
+- Hide core features behind a paywall.
+- Spin weak results: targets are set before the test, and the system recommends stop when they are missed.
 
-Each limit is checked in code by the guard and the approval queue; [`evals/red_team_report.md`](evals/red_team_report.md) shows every trick request, excluded product and unsafe text the guard was tested on, with 0 failures.
+Each limit is enforced in code by the guard and the approval queue; [`evals/red_team_report.md`](evals/red_team_report.md) lists the 70 trick requests, 31 product ideas and 13 unsafe texts it was tested on, with 0 failures.
 
 ## How the project stays alive after the hackathon
 
-- Maintainers: Mohamed (@Elgahmy1) and contributors; MIT licensed.
-- Roadmap: phase 3 full-app code generation in a container sandbox, real payment-provider webhooks in the founder's own account, and product analytics for phase 6, in the order of [ARCHITECTURE.md](ARCHITECTURE.md#roadmap).
-- Quality: every push to `main` runs the smoke tests, the guard-only red-team evaluation and the decision-log check in GitHub Actions (`.github/workflows/tests.yml`), on free runners with no keys.
-- Community: [CONTRIBUTING.md](CONTRIBUTING.md), [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) and [SECURITY.md](SECURITY.md); CONTRIBUTING lists first contributions (guard rules, research tools, new agents, translations); red-team prompts in `evals/` run in `tests/` and live via `python evals/run_red_team.py`.
-- Funding: runs on free local models, so there is no hosting bill to cover; grants or sponsorship would pay for maintainer time, never for paywalling features.
+- Maintainers: Mohamed (@Elgahmy1) and contributors; MIT licence.
+- Roadmap: [ARCHITECTURE.md](ARCHITECTURE.md#roadmap) (MVP storage in a container sandbox, more SOURCED prices, provider webhooks in the founder's own account, product analytics).
+- Quality: every push to `main` runs the smoke tests, the red-team evaluation and the decision-log check in GitHub Actions, on free runners with no keys.
+- Community: [CONTRIBUTING.md](CONTRIBUTING.md) (first contributions: guard rules, research tools, agents, translations), [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md), [SECURITY.md](SECURITY.md).
+- Funding: it runs on free local models, so there is no hosting bill; grants or sponsorship would pay for maintainer time, never for paywalled features.
