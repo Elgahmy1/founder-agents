@@ -9,7 +9,8 @@ from pathlib import Path
 from fastapi import FastAPI, Form, HTTPException
 from fastapi.responses import HTMLResponse, PlainTextResponse, RedirectResponse
 
-from app import guard
+from app import guard, mvp_app, sandbox
+import json
 from app.agents.advisor import AdvisorAgent
 from app.brief import FounderBrief
 from app.config import load_settings
@@ -29,7 +30,8 @@ STATUS = [
     ("Landing page public hosting (served locally only)", "MOCKED"),
     ("Sending outreach messages (founder sends personally)", "MOCKED"),
     ("Phase 3 Build: MVP spec, clickable prototype, acceptance tests, build gate", "Working"),
-    ("Phase 3 code generation in a sandbox", "STUBBED"),
+    ("Phase 3 core code generated and tested in a sandbox; MVP app served locally", "Working"),
+    ("Phase 3 MVP app: storage, accounts and public hosting", "STUBBED"),
     ("Phase 4 Commercial setup: pricing with a free core tier, policy drafts, founder sign-off, commercial gate", "Working"),
     ("Phase 5 Launch: store page, launch post drafts, launch targets, launch gate", "Working"),
     ("Phase 5 checkout, public hosting and posting", "MOCKED"),
@@ -214,9 +216,16 @@ def _next_step(st: RunState, q, run_id: str) -> str:
         if i.kind == "publish" and "prototype" in i.title:
             why = (f"Approving lets you click through the prototype at <a href='/proto/{run_id}' target='_blank'>/proto/{run_id}</a>"
                    " on this computer. Nothing is deployed (public hosting is MOCKED).")
+        shown = i.content
+        if i.executor == "publish_mvp_local":
+            b = json.loads(i.content)
+            why = (f"Approving runs the MVP app at <a href='/mvp/{run_id}' target='_blank'>/mvp/{run_id}</a> on this computer. "
+                   f"Each request runs <code>{html.escape(b['func'])}</code> below in the sandbox; nothing is stored. "
+                   "Public hosting is MOCKED.")
+            shown = b["code"]
         return f"""<div class="card next"><div class="kicker">Your approval is needed ({len(pend)} waiting)</div>
 <h2>Do you want to {verb} this? {html.escape(i.title.split(':')[0])}</h2><p class=mut>{why}</p>
-<pre>{html.escape(i.content[:3000])}</pre><form method="post" action="/runs/{run_id}/approvals/{i.id}" class="once">
+<pre>{html.escape(shown[:3000])}</pre><form method="post" action="/runs/{run_id}/approvals/{i.id}" class="once">
 <input name="note" placeholder="Note (optional)"><div class="row"><button name="approve" value="1">Approve</button>
 <button class="rej" name="approve" value="0">Reject</button></div></form></div>"""
     if st.stage == "p6_collecting":
@@ -340,6 +349,18 @@ def view_run(run_id: str):
                     "and your gates and decisions do not change. Uses 1-2 model calls.</p>"
                     f"<form method=post action='/runs/{run_id}/code' class='once'><button>"
                     f"{'Generate again' if c else 'Generate and test the core code'}</button></form></div>")
+        if c and c.get("ok"):
+            live = (settings.data_dir / "sites" / run_id / "mvp.json").exists()
+            m = st.mvp_app
+            body.append("<div class='card'><h2>MVP app (Phase 3)</h2>"
+                        + (f"<p><b class='go'>Running:</b> <a href='/mvp/{run_id}' target='_blank'>open the MVP app</a>. "
+                           f"Each request runs <code>{html.escape(m['func'])}</code> in the sandbox.</p>" if live and m else
+                           "<p>Waiting for your approval above to publish it on this computer.</p>" if m else "")
+                        + "<p>Wraps the core code that passed all its acceptance checks in a small working web app: our "
+                        "template with one form, and each request runs the tested code in the sandbox. The checks are re-run "
+                        "first. No model call. Publishing it on this computer needs your approval.</p>"
+                        f"<form method=post action='/runs/{run_id}/mvp' class='once'><button>"
+                        f"{'Rebuild the MVP app' if m else 'Build the MVP app'}</button></form></div>")
     body.append(f"<p><a href='/runs/{run_id}/export'>Download the full run report (Markdown)</a>: brief, gates, your "
                 "decisions, approvals, decision log and outputs in one file.</p>")
     body.append(f"""<div class="card"><h2>Ask the team</h2><form method="post" action="/runs/{run_id}/ask" class="once">
@@ -413,6 +434,36 @@ def generate_code(run_id: str):
             pass
     _bg(run_id, "Writing the core code and running its acceptance checks in the sandbox", go)
     return RedirectResponse(f"/runs/{run_id}", status_code=303)
+
+
+@app.post("/runs/{run_id}/mvp")
+def build_mvp(run_id: str):
+    def go():
+        try:
+            orch.founder_build_mvp(run_id)
+        except (ValueError, FileNotFoundError, PermissionError):
+            pass
+    _bg(run_id, "Re-running the acceptance checks and building the MVP app", go)
+    return RedirectResponse(f"/runs/{run_id}", status_code=303)
+
+
+def _mvp_bundle(run_id: str) -> dict:
+    p = settings.data_dir / "sites" / Path(run_id).name / "mvp.json"
+    if not p.exists():
+        raise HTTPException(404, "Not published: the founder has not approved this MVP app.")
+    return json.loads(p.read_text(encoding="utf-8"))
+
+
+@app.get("/mvp/{run_id}", response_class=HTMLResponse)
+def mvp_page(run_id: str):
+    return HTMLResponse(_mvp_bundle(run_id)["page"])
+
+
+@app.post("/mvp/{run_id}", response_class=HTMLResponse)
+def mvp_run(run_id: str, text: str = Form(...)):
+    b = _mvp_bundle(run_id)
+    res = sandbox.call(b["code"], b["func"], text)
+    return HTMLResponse(b["page"].replace(mvp_app.RESULT_MARK, mvp_app.result_html(res), 1))
 
 
 @app.post("/runs/{run_id}/retry")

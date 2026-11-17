@@ -14,6 +14,7 @@ from __future__ import annotations
 import ast
 import json
 import os
+import re
 import subprocess
 import sys
 import tempfile
@@ -158,3 +159,47 @@ def run(code: str, checks: list[str]) -> SandboxResult:
         except (ValueError, IndexError):
             return SandboxResult(load_error=(p.stderr or "no output")[-300:])
         return SandboxResult(load_error=out["load_error"], results=out["results"])
+
+
+_CALL_HARNESS = r'''
+import json, sys
+src = open("core.py", encoding="utf-8").read()
+req = json.load(open("call.json", encoding="utf-8"))
+ns = {"__name__": "core"}
+try:
+    exec(compile(src, "core.py", "exec"), ns)
+    out = ns[req["func"]](req["arg"])
+    print(json.dumps({"ok": True, "result": out}, default=str, ensure_ascii=False))
+except Exception as e:
+    print(json.dumps({"ok": False, "error": f"{type(e).__name__}: {e}"[:300]}))
+'''
+
+MAX_INPUT_CHARS = 20000
+
+
+def call(code: str, func: str, arg: str) -> dict:
+    """Runs one public function of already-checked generated code on one text input, with the same
+    static allowlist, isolated process, empty environment, time limit and resource limits as the checks."""
+    problems = static_problems(code)
+    if problems:
+        return {"ok": False, "error": "static check refused the code: " + "; ".join(problems)}
+    if not re.fullmatch(r"[A-Za-z][A-Za-z0-9_]*", func):
+        return {"ok": False, "error": "invalid function name"}
+    with tempfile.TemporaryDirectory(prefix="fa-sandbox-") as d:
+        Path(d, "core.py").write_text(code, encoding="utf-8")
+        Path(d, "call.json").write_text(json.dumps({"func": func, "arg": arg[:MAX_INPUT_CHARS]}), encoding="utf-8")
+        Path(d, "harness.py").write_text(_CALL_HARNESS, encoding="utf-8")
+        env = {"PYTHONIOENCODING": "utf-8"}
+        if os.name == "nt":
+            env.update({k: os.environ[k] for k in ("SYSTEMROOT", "TEMP", "TMP") if k in os.environ})
+        try:
+            p = subprocess.run([sys.executable, "-I", "harness.py"], cwd=d, env=env, capture_output=True, text=True,
+                               timeout=TIMEOUT_S, preexec_fn=_limits if os.name == "posix" else None)
+        except subprocess.TimeoutExpired:
+            return {"ok": False, "error": f"stopped after the {TIMEOUT_S}-second limit"}
+        if p.returncode and p.returncode < 0:
+            return {"ok": False, "error": "stopped by the sandbox limits (CPU, memory or file size)"}
+        try:
+            return json.loads(p.stdout.strip().splitlines()[-1])
+        except (ValueError, IndexError):
+            return {"ok": False, "error": (p.stderr or "no output")[-300:]}

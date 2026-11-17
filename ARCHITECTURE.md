@@ -130,7 +130,7 @@ flowchart LR
 - **Method:** the Lean Canvas orders the riskiest assumptions. The marketer writes copy only; our template renders the page, so it cannot carry scripts, timers, testimonials, traction numbers or payment fields, and each line is re-checked by the guard. Publishing is a `publish` item; after approval the page is served at `/lp/<run>` and its form counts real sign-ups. The analyst proposes targets (sign-ups in N days, interviews, share confirming the problem); the founder locks them **before** results exist. The founder then enters real interview results; sign-ups come only from the form.
 - **Output:** `phase2_step1_lean_canvas-*.md`, `phase2_step2_landing_page-*.html`, `phase2_step3_demand_test-*.md`, `phase2_gate_decision-*.md`.
 
-### Phase 3: Build (built through core code tested in a sandbox; full-app code STUBBED)
+### Phase 3: Build (built through a working MVP app; storage, accounts and public hosting STUBBED)
 
 ```mermaid
 flowchart LR
@@ -149,6 +149,9 @@ flowchart LR
     CO --> SB{sandbox: static allowlist, isolated process, time limit}
     SB -- checks fail --> CO
     SB --> CR[core code + check results]
+    CR -- all checks pass --> RR{re-run checks}
+    RR --> MV[MVP app: our template + one form]
+    MV --> AQ2[approval queue: publish] -- founder approves --> MX["/mvp/&lt;run&gt;: each request runs the code in the sandbox"]
 ```
 
 - **Core step:** Build the product.
@@ -157,7 +160,8 @@ flowchart LR
 - **Build gate (`app/gates.py: build_gate`, thresholds fixed before the builder runs):** ≥2 user stories; every story has a testable criterion; every feature traces to a story; ≤6 must-have features; estimated hours ≤ budget; prototype passes structural safety checks; the guard removed nothing. Safety failure → **repeat**; over scope → **pivot** to a smaller MVP (failed checks are fed back to the builder); still over scope on the second attempt → **stop**; all pass → **go**.
 - **Output:** `phase3_step1_mvp_spec-*.md`, `phase3_step2_prototype-*.html`, `phase3_step3_acceptance_tests-*.md`, `phase3_gate_decision-*.md`.
 - **Step 4, core code (started by the founder from the run page; does not change gates or stage):** `coder` (`app/agents/coder.py`, prompt `prompts/coder.md`) writes small pure functions for the primary user story and one executable check per acceptance criterion. `app/sandbox.py` first parses the code (AST) and refuses anything outside an allowlist of pure standard-library modules, and any file, network, process or introspection call (`open`, `exec`, `eval`, `__import__`, `getattr`, dunder attributes); then it runs the module and checks in a separate `python -I` process with an empty environment, a temporary directory, a 10-second limit and, on POSIX, CPU, memory and file-size limits. Failing checks are fed back for one repair. Output: `phase3_step4_code-*.md` with the code and each criterion's PASS/FAIL. Nothing is published or deployed. It is a process sandbox, not a virtual machine, which is why it only runs pure functions.
-- **STUBBED:** generating the full application (user interface, storage, hosting) and deploying it, which needs a container sandbox (roadmap item 1).
+- **Step 5, MVP app (started by the founder; no model call):** once every acceptance check passes, `founder_build_mvp` re-runs the checks, picks the first public function that takes one text input, and wraps it in our template (`app/mvp_app.py`: one form, no scripts, no external resources, model text escaped and guarded). Publishing is a `publish` approval item that shows the founder the exact code; after approval the app is served at `/mvp/<run>` and each request runs that function through `sandbox.call` (same allowlist, isolated process, time and resource limits). Nothing the user pastes is stored. Output: `phase3_step5_mvp_app-*.html`.
+- **STUBBED:** storage, accounts and public hosting for the MVP app, and code beyond the primary story, which need a container sandbox (roadmap item 1).
 
 ### Phase 4: Commercial setup (built)
 
@@ -314,14 +318,15 @@ Persistence is plain files (JSON, CSV, Markdown) so runs are inspectable and por
 | Payment → delivery, refunds, idempotency, reconciliation | MOCKED events, real logic |
 | Phase 3 Build: MVP spec, clickable prototype, acceptance tests, build gate | Built |
 | Phase 3 core code for the primary story, tested against its acceptance criteria in a process sandbox | Built |
-| Phase 3 full-application code and deployment | STUBBED |
+| Phase 3 MVP app: the tested core code in a working web app at `/mvp/<run>`, published after founder approval, each request run in the sandbox | Built (served locally; public hosting MOCKED) |
+| Phase 3 MVP app storage, accounts and code beyond the primary story | STUBBED |
 | Phase 4 Commercial setup: pricing, policy drafts, founder sign-off, commercial gate | Built |
 | Phase 5 Launch: store page, launch posts, launch targets, launch gate | Built (hosting, posting, checkout MOCKED) |
 | Phase 6 Operate and learn: results vs targets, support drafts, learn gate, memo | Built (sending replies and analytics MOCKED) |
 
 ## Roadmap
 
-1. Phase 3: grow the core-code step into the full application (UI, storage) in a no-network container sandbox, with the acceptance checks gating it.
+1. Phase 3: grow the MVP app beyond the primary story (more stories, storage) in a no-network container sandbox, with the acceptance checks gating each addition.
 2. Phase 4: a targeted price lookup tool so more comparable prices are SOURCED instead of ASSUMPTION.
 3. Phase 5: webhook handler for a real provider in the founder's own account (founder-configured, never our keys), replacing the MOCKED events.
 4. Phase 6: read visits and activation from privacy-friendly analytics instead of founder entry.

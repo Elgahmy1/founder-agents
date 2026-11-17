@@ -40,7 +40,8 @@ Every **Working** row below has real output from the committed demo runs: [docs/
 | Phase 3 Build: clickable prototype from a safe template, published locally after founder approval | **Working** |
 | Phase 3 Build: acceptance tests + build gate (scope vs founder hours, traceability, testability, safety) | **Working** |
 | Phase 3 Build: coder agent writes the primary user story's core code plus one check per acceptance criterion; the sandbox (static allowlist + isolated process, no file/network/process access) runs them, with one repair attempt; CI re-runs the committed code against its checks on every push | **Working** |
-| Phase 3 Build: full application code (user interface, storage, hosting) and deployment | **STUBBED** |
+| Phase 3 Build: MVP app: the tested core code wrapped in a working web app at `/mvp/<run>` after founder approval; each request runs the code in the sandbox, nothing is stored | **Working** locally; public hosting **MOCKED** |
+| Phase 3 Build: MVP app storage, accounts and code beyond the primary user story | **STUBBED** |
 | Phase 4 Commercial setup: tiered pricing with the core feature always free; comparable prices SOURCED or labelled ASSUMPTION | **Working** |
 | Phase 4 Commercial setup: terms, privacy and refund policy DRAFTS, each signed off by the founder; commercial gate | **Working** |
 | Phase 5 Launch: store page rendered from the founder-approved prices, launch post drafts per channel, launch targets locked before launch, launch gate | **Working** |

@@ -2,7 +2,7 @@
 
 The orchestrator runs agent steps until it reaches something only the
 founder can decide (a gate decision, demand targets, interview results),
-then stops and waits. All six phases are built; phase 3 code generation is STUBBED and
+then stops and waits. All six phases are built (phase 3 ends in a working MVP app run in a sandbox);
 anything that would take money or act on the founder's accounts is MOCKED.
 
 Stages:
@@ -48,6 +48,7 @@ from app.gates import (OUTCOMES, problem_mentions, DemandTargets, GateResult, bu
 from app.sale_to_cash import run_payment_test
 from app.store import render_store
 from app.prototype import prototype_is_safe, render_prototype
+from app import mvp_app
 from app.landing import render_landing
 from app.llm import LLM
 from app.research import Doc, Researcher
@@ -125,6 +126,7 @@ class RunState:
     launch_feedback: str | None = None
     operate: dict | None = None
     code: dict | None = None
+    mvp_app: dict | None = None
     targets: dict | None = None
     results: dict | None = None
     gates: list[dict] = field(default_factory=list)
@@ -189,6 +191,7 @@ class Orchestrator:
             "publish_landing_local": self._publish_landing_local,
             "send_outreach_mock": self._send_outreach_mock,
             "publish_prototype_local": self._publish_prototype_local,
+            "publish_mvp_local": self._publish_mvp_local,
             "sign_commercial": self._sign_commercial,
             "publish_store_local": self._publish_store_local,
             "post_launch_mock": self._post_launch_mock,
@@ -212,6 +215,14 @@ class Orchestrator:
         (d / "prototype.html").write_text(item.content, encoding="utf-8")
         return (f"Prototype available at {self.settings.public_base_url}/proto/{run_id} on this computer "
                 "(public hosting is MOCKED)")
+
+    def _publish_mvp_local(self, item: ApprovalItem) -> str:
+        run_id = item.title.split(":")[-1].strip()
+        d = self.sites_dir / run_id
+        d.mkdir(parents=True, exist_ok=True)
+        (d / "mvp.json").write_text(item.content, encoding="utf-8")
+        return (f"MVP app running at {self.settings.public_base_url}/mvp/{run_id} on this computer: each request runs "
+                "the tested code in the sandbox (public hosting is MOCKED)")
 
     def _sign_commercial(self, item: ApprovalItem) -> str:
         return ("Signed off by the founder (recorded in the decision log). Nothing was published: policies and prices "
@@ -842,8 +853,8 @@ class Orchestrator:
                      f"Primary user story {story.id}: as {story.as_a}, I want {story.i_want}, so that {story.so_that}.", "",
                      "Written by the coder agent and run by `app/sandbox.py`: static allowlist (pure standard library, "
                      "no file, network or process access) and a separate isolated Python process with a time limit. "
-                     "Nothing here is published or deployed. User interface, storage, hosting and the real model call "
-                     "are not generated (STUBBED for this step).", "",
+                     "Nothing here is published or deployed. The founder can wrap passing code in a working web app "
+                     "(phase3_step5_mvp_app); storage, accounts and public hosting are not generated.", "",
                      f"**Result: {res.passed}/{len(draft.checks)} acceptance checks passed"
                      f"{' after one repair' if len(attempts) == 2 and res.ok else ''}"
                      f"{'' if res.ok else ' (not all checks pass: the founder should not rely on this code yet)'}.**", ""]
@@ -864,6 +875,42 @@ class Orchestrator:
                 lines += [f"Check {i} ({c.story_id}): {c.criterion}", "", "```python", c.code.strip(), "```", ""]
             self.write_output(st, "phase3_step4_code.md", "\n".join(lines))
             st.code = {"passed": res.passed, "total": len(draft.checks), "ok": res.ok, "attempts": len(attempts)}
+            self.save(st, q)
+            return st
+
+    def founder_build_mvp(self, run_id: str) -> RunState:
+        """Phase 3, step 5, started by the founder: wraps the core code that passed all its acceptance checks
+        in a small working web app (our template, one form; each request runs the code in the sandbox).
+        No model call. The checks are re-run first; publishing waits for the founder's approval."""
+        with self.lock(run_id):
+            st, q = self.load(run_id)
+            if not (st.code and st.code.get("ok")):
+                raise ValueError("the core code has not passed all its acceptance checks yet")
+            src = self.settings.outputs_dir / f"phase3_step4_code-{st.slug}.md"
+            code, checks, ok = mvp_app.parse_code_output(src.read_text(encoding="utf-8"))
+            res = sandbox.run(code, checks)
+            self.log.append(agent="sandbox", action="rerun_acceptance_checks", run_id=run_id, phase=3,
+                            outcome="pass" if res.ok else "fail",
+                            detail=f"before building the MVP app: {res.passed}/{len(checks)} checks passed")
+            if not (ok and res.ok):
+                raise ValueError("the committed core code no longer passes its acceptance checks")
+            entry = mvp_app.entry_function(code)
+            if not entry:
+                raise ValueError("the core code has no public function that takes one text input")
+            mvp = MvpSpec(**st.mvp)
+            passed = f"{res.passed}/{len(checks)}"
+            page, removed = mvp_app.render_mvp_page(run_id=run_id, product_name=mvp.product_name, one_line=mvp.one_line,
+                                                    story=mvp.user_stories[0].model_dump(), func=entry[0],
+                                                    params=entry[1], checks_passed=passed)
+            self.write_output(st, "phase3_step5_mvp_app.html", page)
+            self.log.append(agent="builder", action="build_mvp_app", run_id=run_id, phase=3, outcome="built",
+                            detail=f"entry function {entry[0]}({entry[1][0]}); acceptance checks {passed}"
+                                   + (f"; guard removed {len(removed)} line(s)" if removed else ""))
+            q.supersede("publish_mvp_local")
+            bundle = json.dumps({"page": page, "code": code, "func": entry[0]}, ensure_ascii=False)
+            q.submit("publish", f"Publish the MVP app on this computer: {run_id}", bundle, "publish_mvp_local", 3,
+                     check=lambda c: guard.check_output(json.loads(c)["page"]))
+            st.mvp_app = {"func": entry[0], "checks": passed}
             self.save(st, q)
             return st
 
@@ -969,7 +1016,7 @@ def _mvp_md(spec: MvpSpec, brief: FounderBrief) -> str:
         "", "## Out of scope for the MVP", *[f"- {x}" for x in spec.out_of_scope],
         "", "## Tech stack (free, open source)", *[f"- {x}" for x in spec.tech_stack],
         "", "## Risks", *[f"- {x}" for x in spec.risks],
-        "", "Code generation in a sandbox is STUBBED: this phase produces the spec, a clickable prototype and acceptance tests."]) + "\n"
+        "", "Next in this phase: a clickable prototype, acceptance tests, then the primary story's core code tested in a sandbox and wrapped in a working MVP app."]) + "\n"
 
 
 def _acceptance_md(spec: MvpSpec, untestable: list[str], untraced: list[str], safety: list[str]) -> str:
