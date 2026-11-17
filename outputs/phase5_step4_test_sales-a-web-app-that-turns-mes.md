@@ -6,14 +6,15 @@ Product: ExamReady AI. Every order below was placed through the app's test-mode 
 |---|---|---|---|---|---|
 | ord_test_132328bb | Pro | 9.99 | refunded | revoked | evt_test_57cfe80711 payment_succeeded -> delivered; evt_test_036e21e1e5 refund_succeeded -> access_revoked |
 | ord_test_f344d9b0 | Pro | 9.99 | paid | active | evt_test_52a41bb416 payment_succeeded -> delivered |
+| ord_test_b46331ca | Pro | 9.99 | paid | active | evt_test_dcdb264f14 payment_succeeded -> delivered |
 
 ## Reconciliation
 
 | Check | Value |
 |---|---|
-| Orders / paid / refunded / open | 2 / 2 / 1 / 0 |
-| Events processed (duplicates are not stored) | 3 |
-| Deliveries made | 2 (one per paid order: True) |
-| Gross / MOCKED fees / refunded | 19.98 / 1.00 / 9.99 |
-| MOCKED payout (net of fees and refunds) | 9.49 |
+| Orders / paid / refunded / open | 3 / 3 / 1 / 0 |
+| Events processed (duplicates are not stored) | 4 |
+| Deliveries made | 3 (one per paid order: True) |
+| Gross / MOCKED fees / refunded | 29.97 / 1.50 / 9.99 |
+| MOCKED payout = gross - fees - refunded (the fee on a refunded order is not returned) | 18.48 |
 | Reconciliation issues | none |
