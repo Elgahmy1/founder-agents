@@ -838,18 +838,19 @@ class Orchestrator:
     founder_start_build = founder_continue
 
     def founder_generate_code(self, run_id: str) -> RunState:
-        """Phase 3, step 4, started by the founder: the coder writes the primary story's core functions and one
-        check per acceptance criterion; the sandbox runs them (one repair attempt). Nothing is published or
+        """Phase 3, step 4, started by the founder: the coder writes core functions for every user story and one
+        check per acceptance criterion (criteria that need storage, UI or hosting are listed as deferred); the
+        sandbox runs them (one repair attempt). Nothing is published or
         deployed, and the run's stage and gates do not change."""
         with self.lock(run_id):
             st, q = self.load(run_id)
             if not st.mvp:
                 raise ValueError("no MVP spec yet: Phase 3 has not run")
             mvp = MvpSpec(**st.mvp)
-            story = mvp.user_stories[0]
+            stories = mvp.user_stories
             spec = json.dumps({"product_name": mvp.product_name, "one_line": mvp.one_line,
-                               "primary_story": story.model_dump(),
-                               "features_for_this_story": [f.name for f in mvp.must_have if story.id in f.story_ids],
+                               "user_stories": [dict(s.model_dump(), features=[f.name for f in mvp.must_have
+                                                                                if s.id in f.story_ids]) for s in stories],
                                "out_of_scope": mvp.out_of_scope}, indent=1, ensure_ascii=False)
             coder = CoderAgent(self.ctx(st))
             feedback, attempts = None, []
@@ -860,6 +861,7 @@ class Orchestrator:
                 self.log.append(agent="sandbox", action="run_acceptance_checks", run_id=run_id, phase=3,
                                 outcome="pass" if res.ok else "fail",
                                 detail=f"attempt {attempt}: {res.passed}/{len(draft.checks)} checks passed"
+                                   + f" across {len({c.story_id for c in draft.checks})} stories"
                                        + (f"; static: {'; '.join(res.static_problems)}" if res.static_problems else "")
                                        + (f"; load error: {res.load_error}" if res.load_error else "")
                                        + ("; timed out" if res.timed_out else ""))
@@ -872,8 +874,13 @@ class Orchestrator:
             draft, res = attempts[-1]
             notes, removed_rules = guard.scrub_output(draft.notes.replace(". ", ".\n"))
             notes = " ".join(notes.split("\n")).strip()
-            lines = ["# Phase 3, step 4: MVP core code, tested in a sandbox", "",
-                     f"Primary user story {story.id}: as {story.as_a}, I want {story.i_want}, so that {story.so_that}.", "",
+            known = {s.id for s in stories}
+            covered = sorted({c.story_id for c in draft.checks if c.story_id in known})
+            lines = ["# Phase 3, step 4: MVP core code for every user story, tested in a sandbox", "",
+                     *[f"- {s.id}: as {s.as_a}, I want {s.i_want}, so that {s.so_that}." for s in stories], "",
+                     f"Stories with at least one executable check: {len(covered)} of {len(stories)} ({', '.join(covered) or 'none'}). "
+                     f"Acceptance criteria: {sum(len(s.acceptance) for s in stories)} in the spec, {len(draft.checks)} checked "
+                     f"in the sandbox, {len(draft.deferred)} deferred because they need storage, a user interface or hosting.", "",
                      "Written by the coder agent and run by `app/sandbox.py`: static allowlist (pure standard library, "
                      "no file, network or process access) and a separate isolated Python process with a time limit. "
                      "Nothing here is published or deployed. The founder can wrap passing code in a working web app "
@@ -887,17 +894,21 @@ class Orchestrator:
                 lines += [f"Module failed to load: `{res.load_error}`", ""]
             if res.timed_out:
                 lines += ["Run stopped after the 10-second limit.", ""]
-            lines += ["| Acceptance criterion | Check | Result |", "|---|---|---|"]
+            lines += ["| Story | Acceptance criterion | Check | Result |", "|---|---|---|---|"]
             for i, c in enumerate(draft.checks):
                 r = res.results[i] if i < len(res.results) else {"passed": False, "error": "not run"}
-                lines.append(f"| {c.criterion.replace('|', '/')} | check {i + 1} | "
+                lines.append(f"| {c.story_id} | {c.criterion.replace('|', '/')} | check {i + 1} | "
                              f"{'PASS' if r['passed'] else 'FAIL: ' + str(r['error']).replace('|', '/')} |")
+            for d in draft.deferred:
+                lines.append(f"| {d.story_id} | {d.criterion.replace('|', '/')} | - | DEFERRED (STUBBED): "
+                             f"{d.reason.replace('|', '/')} |")
             lines += ["", "## Notes", "", (notes or "-") + (f" ({len(removed_rules)} sentence(s) removed by the output guard)" if removed_rules else ""), "",
                       "## core.py", "", "```python", draft.module_code.strip(), "```", "", "## Checks", ""]
             for i, c in enumerate(draft.checks, 1):
                 lines += [f"Check {i} ({c.story_id}): {c.criterion}", "", "```python", c.code.strip(), "```", ""]
             self.write_output(st, "phase3_step4_code.md", "\n".join(lines))
-            st.code = {"passed": res.passed, "total": len(draft.checks), "ok": res.ok, "attempts": len(attempts)}
+            st.code = {"passed": res.passed, "total": len(draft.checks), "ok": res.ok, "attempts": len(attempts),
+                       "stories": f"{len(covered)}/{len(stories)}", "deferred": len(draft.deferred)}
             self.save(st, q)
             return st
 
@@ -1040,7 +1051,7 @@ def _mvp_md(spec: MvpSpec, brief: FounderBrief) -> str:
         "", "## Out of scope for the MVP", *[f"- {x}" for x in spec.out_of_scope],
         "", "## Tech stack (free, open source)", *[f"- {x}" for x in spec.tech_stack],
         "", "## Risks", *[f"- {x}" for x in spec.risks],
-        "", "Next in this phase: a clickable prototype, acceptance tests, then the primary story's core code tested in a sandbox and wrapped in a working MVP app."]) + "\n"
+        "", "Next in this phase: a clickable prototype, acceptance tests, then the core code for every user story tested in a sandbox and wrapped in a working MVP app."]) + "\n"
 
 
 def _acceptance_md(spec: MvpSpec, untestable: list[str], untraced: list[str], safety: list[str]) -> str:

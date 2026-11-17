@@ -37,7 +37,7 @@ def entry_function(code: str) -> tuple[str, list[str]] | None:
     return found[0] if found else None
 
 
-def entry_functions(code: str, limit: int = 3) -> list[tuple[str, list[str]]]:
+def entry_functions(code: str, limit: int = 6) -> list[tuple[str, list[str]]]:
     """Every public top-level function callable with one text argument, in file order (at most `limit`)."""
     out: list[tuple[str, list[str]]] = []
     for node in ast.parse(code).body:

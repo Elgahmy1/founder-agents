@@ -32,7 +32,7 @@ def test_codegen_writes_output_and_never_changes_the_run(make_orch, brief, setti
     stage, gates = st.stage, list(st.gates)
     st = orch.founder_generate_code(st.run_id)
     assert st.stage == stage and st.gates == gates
-    assert st.code == {"passed": 1, "total": 1, "ok": True, "attempts": 1}
+    assert st.code == {"passed": 1, "total": 1, "ok": True, "attempts": 1, "stories": "1/2", "deferred": 0}
     out = (settings.outputs_dir / next(o for o in st.outputs if o.startswith("phase3_step4_code"))).read_text()
     assert "1/1 acceptance checks passed" in out and "def summarize" in out and "Nothing here is published" in out
     log = orch.log.read()
@@ -88,3 +88,20 @@ def test_checks_that_import_the_module_by_an_invented_name_still_run():
     assert any("'os'" in p for p in res.static_problems)
     res = sandbox.run(code, checks[:1])
     assert res.ok and res.passed == 1
+
+
+def test_code_covers_every_story_and_lists_deferred_criteria(make_orch, brief, settings):
+    from tests.conftest import GOOD_CODE
+    from tests.test_build import _to_build
+    orch = make_orch()
+    two = dict(GOOD_CODE,
+               module_code=GOOD_CODE["module_code"] + "\n\ndef key_terms(notes: str) -> list:\n    return sorted({w for w in notes.split() if w.istitle()})\n",
+               checks=GOOD_CODE["checks"] + [{"story_id": "US2", "criterion": "terms", "code": "assert key_terms('Cells and DNA') == ['Cells']"}],
+               deferred=[{"story_id": "US2", "criterion": "appears within 30 seconds", "reason": "needs hosting and timing"}])
+    orch.llm.code_drafts = [two]
+    st = _to_build(orch, brief)
+    st = orch.founder_generate_code(st.run_id)
+    assert st.code["stories"] == "2/2" and st.code["deferred"] == 1 and st.code["ok"]
+    out = (settings.outputs_dir / next(o for o in st.outputs if o.startswith("phase3_step4_code"))).read_text()
+    assert "Stories with at least one executable check: 2 of 2" in out and "DEFERRED (STUBBED): needs hosting" in out
+    assert "2/2 acceptance checks passed" in out

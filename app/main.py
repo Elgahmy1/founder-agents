@@ -348,7 +348,7 @@ def view_run(run_id: str):
         res = (f"Last run: <b class='{'go' if c['ok'] else 'stop'}'>{c['passed']}/{c['total']} acceptance checks passed</b> "
                "(see phase3_step4_code above). " if c else "")
         body.append("<div class='card'><h2>MVP core code (Phase 3, sandbox)</h2>"
-                    f"<p>{res}The coder agent writes the primary user story's core functions and one check per acceptance "
+                    f"<p>{res}The coder agent writes core functions for every user story and one check per acceptance "
                     "criterion; the sandbox runs them with no file, network or process access. Nothing is published, "
                     "and your gates and decisions do not change. Uses 1-2 model calls.</p>"
                     f"<form method=post action='/runs/{run_id}/code' class='once'><button>"
