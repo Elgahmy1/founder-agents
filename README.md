@@ -51,6 +51,7 @@ Every **Working** row below has real output from the committed demo runs: [docs/
 | Phase 6: sending support replies; usage analytics | **MOCKED** (founder sends replies personally and enters store visits from their own analytics) |
 | Founder export: the whole run (brief, gates, decisions, approvals, decision log, outputs) as one Markdown file, no model call | **Working** |
 | Run metrics from the decision log: calls, tokens, cost, time, gate recommendation vs founder decision, approval audit; [`evals/run_metrics.md`](evals/run_metrics.md), checked against the log in CI | **Working** |
+| Claims audit: every `[source: URL]` in `outputs/` must be a URL a logged research action actually retrieved, plus SOURCED vs ASSUMPTION counts per output; [`evals/claims_audit.md`](evals/claims_audit.md), checked in CI (38 sourced claims, 24 ASSUMPTION labels, 0 unretrieved URLs) | **Working** |
 
 ## Architecture
 
