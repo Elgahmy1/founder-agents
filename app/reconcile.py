@@ -9,6 +9,13 @@ def reconcile(ledger: MockLedger) -> list[str]:
     issues: list[str] = []
     paid = {e.order_id: e for e in ledger.payments.values() if e.type == "payment_succeeded"}
     refunded = {e.order_id for e in ledger.payments.values() if e.type == "refund_succeeded"}
+    charges: dict[str, int] = {}
+    for e in ledger.payments.values():
+        if e.type == "payment_succeeded":
+            charges[e.order_id] = charges.get(e.order_id, 0) + 1
+    for oid, n in charges.items():
+        if n > 1:
+            issues.append(f"{oid}: {n} successful payments for one order (charged twice; refund the extra one)")
     for oid, order in ledger.orders.items():
         ev = paid.get(oid)
         if order["status"] in ("paid", "refunded") and ev is None:

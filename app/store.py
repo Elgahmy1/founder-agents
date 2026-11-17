@@ -1,9 +1,9 @@
 """Renders the store page from the launcher's copy and the founder-approved pricing.
 
 Our template: no scripts, external resources or payment fields. Prices come
-from Phase 4 data, not the model. The paid plan button is disabled because
-checkout is MOCKED; the free plan links to the waitlist form already approved
-in Phase 2. Every model line passes the output guard.
+from Phase 4 data, not the model. The paid plan button opens the test-mode
+order page (payments MOCKED, no money); the free plan links to the waitlist form
+already approved in Phase 2. Every model line passes the output guard.
 """
 from __future__ import annotations
 
@@ -34,7 +34,7 @@ def render_store(product: str, kit: LaunchKit, pricing: PricingPlan, run_id: str
         price = "Free" if t.price_usd_per_month == 0 else f"{t.price_usd_per_month:g} USD / month"
         inc = "".join(f"<li>{html.escape(i)}</li>" for i in t.includes)
         btn = (f"<a class='btn' href='/lp/{run_id}'>Start free</a>" if t.price_usd_per_month == 0 else
-               "<span class='btn off'>Not on sale yet: payments are MOCKED in this prototype</span>")
+               f"<a class='btn' href='/order/{run_id}'>Buy {html.escape(t.name)} (test mode, payments MOCKED)</a>")
         tiers.append(f"<div class='tier'><h3>{html.escape(t.name)}</h3><p class='price'>{price}</p><ul>{inc}</ul>{btn}</div>")
     faq_items = []
     for f in kit.faq:
@@ -66,7 +66,7 @@ h1{{font-size:2rem;line-height:1.2}} .sub{{font-size:1.1rem;color:#444}}
 <div class="tiers">{''.join(tiers)}</div>
 <h2>Questions</h2><dl>{faq}</dl>
 <p class="note">New product, early version. The core is free. Terms, privacy and refund policies are drafts signed off by the founder.
-No payment is taken on this page.</p>
+No payment is taken on this page; orders run in test mode with MOCKED payments.</p>
 </body></html>
 """
     return page, removed
