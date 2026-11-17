@@ -211,7 +211,7 @@ flowchart LR
 - **Output:** `phase5_step1_store_page-*.html`, `phase5_step2_launch_kit-*.md`, `phase5_step3_payment_test-*.md`, `phase5_gate_decision-*.md`, `payment_test_log.md`.
 - **MOCKED:** public hosting, posting to channels (the founder posts personally), checkout and the payment provider. The system never creates accounts or takes money.
 
-### Phase 6: Operate and learn (built; sending and analytics MOCKED)
+### Phase 6: Operate and learn (built; sending replies MOCKED)
 
 ```mermaid
 flowchart LR
@@ -229,7 +229,7 @@ flowchart LR
 
 - **Core step:** none (ongoing).
 - **Agents:** `support` (`app/agents/operator.py`) drafts an honest reply to each piece of real feedback, signed with the founder's name or a placeholder; `analyst` writes the learning memo after the gate.
-- **Method:** free sign-ups are counted by the app from real form posts since the launch decision (never typed in); the founder enters store visits from their own analytics and paid orders from their own provider (checkout is MOCKED, so usually 0). Replies are `send` items the founder sends personally. A reply that promises a refund or asks for transaction, card or account details is removed by the guard (`guard.check_support_reply`), because the system takes no money. "Feedback naming the core problem" is counted in code by matching word stems of the primary user story against each item and the support agent's English rendering of it, so plurals and Arabic feedback count.
+- **Method:** free sign-ups are counted by the app from real form posts since the launch decision (never typed in); store visits, landing and MVP app views and MVP app runs are counted by the app itself (`app/analytics.py`: a page name and a UTC date per view in `data/analytics/<run>.json`, no cookies, IP addresses or user agents; views opened from the founder's dashboard are skipped) since a snapshot taken at the launch decision, and the founder may override visits with a figure from their own analytics, which the output labels; the founder enters paid orders from their own provider (checkout is MOCKED, so usually 0). Replies are `send` items the founder sends personally. A reply that promises a refund or asks for transaction, card or account details is removed by the guard (`guard.check_support_reply`), because the system takes no money. "Feedback naming the core problem" is counted in code by matching word stems of the primary user story against each item and the support agent's English rendering of it, so plurals and Arabic feedback count.
 - **Learn gate (`app/gates.py: learn_gate`):** visits and sign-ups against the targets locked before launch, plus at least 3 users giving feedback. All met → **go** (persevere); sign-ups ≥ 50% of target → **repeat** for another window; ≥ 25% or feedback that names the core problem → **pivot** back to Discover; otherwise → **stop**. Paid orders are reported but cannot drive the recommendation while checkout is MOCKED.
 - **Output:** `phase6_step1_metrics-*.md`, `phase6_step2_support_replies-*.md`, `phase6_gate_decision-*.md`, `phase6_step3_learning_memo-*.md`.
 
@@ -323,12 +323,12 @@ Persistence is plain files (JSON, CSV, Markdown) so runs are inspectable and por
 | Phase 3 MVP app storage, accounts and code beyond the primary story | STUBBED |
 | Phase 4 Commercial setup: pricing, policy drafts, founder sign-off, commercial gate | Built |
 | Phase 5 Launch: store page, launch posts, launch targets, launch gate | Built (hosting, posting, checkout MOCKED) |
-| Phase 6 Operate and learn: results vs targets, support drafts, learn gate, memo | Built (sending replies and analytics MOCKED) |
+| Phase 6 Operate and learn: results vs targets, support drafts, usage analytics counted by the app, learn gate, memo | Built (sending replies MOCKED) |
 
 ## Roadmap
 
 1. Phase 3: grow the MVP app beyond the primary story (more stories, storage) in a no-network container sandbox, with the acceptance checks gating each addition.
 2. Phase 4: a targeted price lookup tool so more comparable prices are SOURCED instead of ASSUMPTION.
 3. Phase 5: webhook handler for a real provider in the founder's own account (founder-configured, never our keys), replacing the MOCKED events.
-4. Phase 6: read visits and activation from privacy-friendly analytics instead of founder entry.
+4. Phase 6: activation and retention per MVP feature from the app's own counts, once the app is hosted publicly.
 5. Community: more free research tools, more red-team prompts in `evals/` (runner: `python evals/run_red_team.py`), translations (Arabic first). See [CONTRIBUTING.md](CONTRIBUTING.md).

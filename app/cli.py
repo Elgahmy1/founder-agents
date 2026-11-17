@@ -76,7 +76,10 @@ def run(path: str) -> None:
             if ask("Record launch results now and run the learn gate?", ("y", "n")) == "n":
                 print(f"Paused. Resume in the web UI: {s.public_base_url}/runs/{st.run_id}")
                 break
-            visits = int(input("Store page visits (from your own analytics): "))
+            u = orch.launch_usage(st)
+            print(f"Counted by the app since launch: {u['store']} store visits, {u['mvp_run']} MVP app runs")
+            raw = input("Store visits from your own analytics (empty: use the app's count): ").strip()
+            visits = int(raw) if raw.isdigit() else None
             paid = int(input("Paid orders (from your own payment provider; 0 while checkout is MOCKED): "))
             print("Paste real user feedback, one item per line; empty line to finish:")
             fb = []
