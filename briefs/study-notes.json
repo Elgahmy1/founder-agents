@@ -1,0 +1,10 @@
+{
+  "founder_name": "Mohamed",
+  "idea": "A web app that turns messy university lecture notes and slides into exam-ready summaries and practice questions",
+  "skills": ["Python", "AI/LLM apps", "web development", "tutoring STEM students"],
+  "budget_usd": 150,
+  "hours_per_week": 15,
+  "target_market": "University STEM students in Egypt preparing for exams",
+  "values": ["honesty", "accessible education", "student privacy"],
+  "source_urls": []
+}

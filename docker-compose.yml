@@ -1,0 +1,46 @@
+# One-command setup: docker compose up
+# Starts a local Ollama server, pulls the open-weight model once, then the app on http://localhost:8000
+services:
+  ollama:
+    image: ollama/ollama:latest
+    volumes:
+      - ollama:/root/.ollama
+    ports:
+      - "11434:11434"
+    healthcheck:
+      test: ["CMD", "ollama", "list"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+
+  model-pull:
+    image: ollama/ollama:latest
+    depends_on:
+      ollama:
+        condition: service_healthy
+    environment:
+      OLLAMA_HOST: ollama:11434
+    entrypoint: ["/bin/sh", "-c", "ollama pull ${MODEL:-qwen3:8b}"]
+    restart: "no"
+
+  app:
+    build: .
+    depends_on:
+      model-pull:
+        condition: service_completed_successfully
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      OLLAMA_URL: http://ollama:11434
+      MODEL: ${MODEL:-qwen3:8b}
+      DATA_DIR: /app/data
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./outputs:/app/outputs
+      - ./data:/app/data
+      - ./decision_log.json:/app/decision_log.json
+
+volumes:
+  ollama:
