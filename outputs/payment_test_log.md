@@ -1,6 +1,6 @@
 # Payment and delivery test log (MOCKED)
 
-Run at 2026-11-17T09:44:50+00:00. All events are MOCKED: no payment provider, sandbox, card data or money is involved.
+Run at 2026-11-17T11:02:33+00:00 for product 'ExamReady AI' at 9.99 USD. All events are MOCKED: no payment provider, sandbox, card data or money is involved.
 
 | Step | Event | Expected | Got | Result |
 |---|---|---|---|---|
