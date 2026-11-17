@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TypeVar
 
@@ -18,6 +18,7 @@ class AgentContext:
     log: DecisionLog
     prompts_dir: Path
     run_id: str
+    usage: dict = field(default_factory=dict)  # this run's running totals, saved with the run
 
 
 class Agent:
@@ -32,8 +33,12 @@ class Agent:
         return f"{own}\n\n{policy}"
 
     def ask(self, action: str, user: str, schema: type[T], sources: list[str] | None = None) -> T:
-        before = self.ctx.llm.usage.total_tokens
+        u = self.ctx.llm.usage
+        before = (u.calls, u.prompt_tokens, u.completion_tokens, u.cost_usd)
         out = self.ctx.llm.structured(self.system_prompt(), user, schema)
+        for k, b, now in zip(("calls", "prompt_tokens", "completion_tokens", "cost_usd"), before,
+                             (u.calls, u.prompt_tokens, u.completion_tokens, u.cost_usd)):
+            self.ctx.usage[k] = (self.ctx.usage.get(k) or 0) + now - b
         self.ctx.log.append(
             agent=self.role,
             action=action,
@@ -41,6 +46,6 @@ class Agent:
             model=self.ctx.llm.model,
             cost=0,
             run_id=self.ctx.run_id,
-            tokens=self.ctx.llm.usage.total_tokens - before,
+            tokens=u.prompt_tokens + u.completion_tokens - before[1] - before[2],
         )
         return out

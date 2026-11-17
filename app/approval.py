@@ -29,7 +29,7 @@ class ApprovalItem:
     content: str
     executor: str  # name of a registered executor
     phase: int
-    status: str = "pending"  # pending | approved | rejected | executed
+    status: str = "pending"  # pending | approved | rejected | executed | superseded
     id: str = field(default_factory=lambda: uuid.uuid4().hex[:8])
     created_at: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat(timespec="seconds"))
     decided_at: str | None = None
@@ -68,6 +68,14 @@ class ApprovalQueue:
 
     def pending(self) -> list[ApprovalItem]:
         return [i for i in self.items if i.status == "pending"]
+
+    def supersede(self, executor: str) -> None:
+        """A newer draft replaces older pending ones, so the founder cannot approve a stale version."""
+        for i in self.items:
+            if i.status == "pending" and i.executor == executor:
+                i.status = "superseded"
+                self.log.append(agent="approval_queue", action="supersede", run_id=self.run_id,
+                                outcome="superseded", detail=i.title, item_id=i.id)
 
     def decide(self, item_id: str, approve: bool, note: str | None = None) -> ApprovalItem:
         """Only the founder calls this, from the UI or the CLI prompt."""

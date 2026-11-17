@@ -137,8 +137,7 @@ class Orchestrator:
 
     def save(self, st: RunState, q: ApprovalQueue) -> None:
         st.approvals = q.to_list()
-        st.usage = {"calls": self.llm.usage.calls, "prompt_tokens": self.llm.usage.prompt_tokens,
-                    "completion_tokens": self.llm.usage.completion_tokens, "cost_usd": self.llm.usage.cost_usd}
+        st.usage.setdefault("cost_usd", 0.0)  # per-run totals are added by each agent call (Agent.ask)
         p = self._path(st.run_id)
         p.parent.mkdir(parents=True, exist_ok=True)
         with _io_lock:
@@ -190,7 +189,7 @@ class Orchestrator:
 
     # ---------- helpers ----------
     def ctx(self, st: RunState) -> AgentContext:
-        return AgentContext(self.llm, self.log, self.settings.prompts_dir, st.run_id)
+        return AgentContext(self.llm, self.log, self.settings.prompts_dir, st.run_id, st.usage)
 
     def write_output(self, st: RunState, name: str, content: str) -> str:
         stem, ext = name.rsplit(".", 1)
@@ -424,6 +423,7 @@ class Orchestrator:
         st.gates.append(g.to_dict())
         self.log.append(agent="gate", action="build_gate", run_id=st.run_id, outcome=g.recommendation, phase=3)
         self.write_output(st, "phase3_gate_decision.md", g.md())
+        q.supersede("publish_prototype_local")
         if not safety:
             q.submit("publish", f"Publish clickable prototype for review: {st.run_id}", page, "publish_prototype_local", 3)
         st.stage = "p3_gate_wait"

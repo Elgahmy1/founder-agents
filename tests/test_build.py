@@ -50,6 +50,9 @@ def test_build_over_budget_pivots_then_stops(make_orch, brief):
     assert st.stage == "p3_gate_wait"
     assert st.build_feedback and "smaller MVP" in st.build_feedback
     assert st.gates[-1]["recommendation"] == "stop"
+    _, q = orch.load(st.run_id)
+    assert len(q.pending()) == 1, "the oversized prototype must be superseded, not left approvable"
+    assert any(i.status == "superseded" for i in q.items)
 
 
 def test_prototype_drops_password_and_payment_fields(make_orch, brief, settings):
@@ -87,3 +90,13 @@ def test_prototype_safety_check_and_escaping():
     assert prototype_is_safe(page) == []
     for bad in ("<script>x</script>", "<div onclick='x()'>", "<form action=/x>", "<img src='https://x.example/a.png'>"):
         assert prototype_is_safe(page + bad), bad
+
+
+def test_run_usage_accumulates_per_run(make_orch, brief):
+    orch = make_orch()
+    st = orch.start(brief)
+    other = orch.start(brief)  # a second run on the same model client must not leak into the first
+    calls_p1 = orch.load(st.run_id)[0].usage["calls"]
+    assert calls_p1 == other.usage["calls"] > 0
+    st = orch.founder_gate_decision(st.run_id, "go")
+    assert st.usage["calls"] > calls_p1
