@@ -380,6 +380,9 @@ def view_run(run_id: str):
                 "decisions, approvals, decision log and outputs in one file.</p>")
     tech.append(f"<p class=mut>Model calls: {u.get('calls', 0)} · tokens: {u.get('prompt_tokens', 0) + u.get('completion_tokens', 0)} · cost: $0.00 ({'free tier, no billing' if settings.provider == 'openai' else 'local model'})</p>")
     body.append("<details class='card'><summary><b>Details</b> (files, approvals, report, cost)</summary>" + "".join(tech) + "</details>")
+    from app import support
+    if support.finished(st) and not busy:
+        body.append(SUPPORT_WIDGET.replace("__RUN__", json.dumps(run_id)))
     return page(st.brief["idea"][:40], "".join(body), refresh=bool(busy))
 
 
@@ -707,6 +710,70 @@ def ask(run_id: str, request: str = Form(...)):
                           f"<pre>{html.escape(answer)}</pre><a href='/runs/{run_id}'>Back to run</a></div>")
 
 
+@app.get("/runs/{run_id}/support")
+def support_history(run_id: str):
+    from app import support
+    st, _ = orch.load(run_id)
+    if not support.finished(st):
+        raise HTTPException(409, "AI support opens when the run has its final result")
+    return {"messages": support.History(settings.data_dir).load(run_id), "chips": support.chips(st)}
+
+
+@app.post("/runs/{run_id}/support")
+def support_send(run_id: str, message: str = Form(...)):
+    from app import support
+    st, _ = orch.load(run_id)
+    if not support.finished(st):
+        raise HTTPException(409, "AI support opens when the run has its final result")
+    try:
+        return support.answer(orch, st, support.History(settings.data_dir), message)
+    except Exception as e:  # model unreachable or rate-limited: say so, never crash the page
+        return {"reply": f"The model could not answer right now ({type(e).__name__}). Your run is unchanged; try again shortly.",
+                "refused": False, "rule": None, "error": True}
+
+
+@app.post("/runs/{run_id}/support/clear")
+def support_clear(run_id: str):
+    from app import support
+    support.History(settings.data_dir).clear(run_id)
+    return {"ok": True}
+
+
+SUPPORT_WIDGET = """<style>
+#sw-btn{position:fixed;right:20px;bottom:20px;width:56px;height:56px;border-radius:50%;border:0;background:#3b3bd6;color:#fff;
+font-size:24px;cursor:pointer;box-shadow:0 4px 14px rgba(0,0,0,.25);z-index:50}
+#sw{position:fixed;right:20px;bottom:86px;width:min(380px,92vw);height:min(520px,70vh);display:none;flex-direction:column;
+background:var(--card,#fff);border:1px solid #ccd;border-radius:12px;box-shadow:0 8px 30px rgba(0,0,0,.25);z-index:50;overflow:hidden}
+#sw header{padding:10px 12px;font-weight:600;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #dde}
+#sw-log{flex:1;overflow-y:auto;padding:10px;display:flex;flex-direction:column;gap:8px}
+.sw-m{padding:8px 10px;border-radius:10px;max-width:88%;white-space:pre-wrap;unicode-bidi:plaintext}
+.sw-f{align-self:flex-end;background:#3b3bd6;color:#fff}.sw-a{align-self:flex-start;background:rgba(127,127,127,.15)}
+.sw-r{border:1px solid #c33}#sw-chips{display:flex;flex-wrap:wrap;gap:6px;padding:0 10px 6px}
+#sw-chips button{font-size:12px;padding:4px 8px;border-radius:12px;border:1px solid #99a;background:transparent;color:inherit;cursor:pointer}
+#sw form{display:flex;gap:6px;padding:8px;border-top:1px solid #dde}#sw textarea{flex:1;resize:none;height:40px}
+</style>
+<button id="sw-btn" title="AI co-founder support" aria-label="AI co-founder support">&#128172;</button>
+<div id="sw" role="dialog" aria-label="AI co-founder support"><header><span>AI co-founder support</span>
+<span><button type="button" id="sw-clear" style="font-size:12px">Clear chat</button></span></header>
+<div class="mut" style="padding:6px 10px;font-size:12px">Knows this run only. Labels facts from your run, assumptions and suggestions.
+Read-only: it cannot change gates or approvals.</div>
+<div id="sw-log"></div><div id="sw-chips"></div>
+<form id="sw-form"><textarea id="sw-in" dir="auto" placeholder="Ask about your result (Arabic or English)"></textarea><button>Send</button></form></div>
+<script>(()=>{const R=__RUN__,log=document.getElementById('sw-log'),box=document.getElementById('sw'),inp=document.getElementById('sw-in');
+const add=(m)=>{const d=document.createElement('div');d.className='sw-m '+(m.role==='founder'?'sw-f':'sw-a')+(m.refused?' sw-r':'');
+d.dir='auto';d.textContent=m.text;log.appendChild(d);log.scrollTop=log.scrollHeight;return d;};
+const load=()=>fetch(`/runs/${R}/support`).then(r=>r.json()).then(j=>{log.innerHTML='';j.messages.forEach(add);
+const c=document.getElementById('sw-chips');c.innerHTML='';j.chips.forEach(t=>{const b=document.createElement('button');b.type='button';
+b.textContent=t;b.onclick=()=>send(t);c.appendChild(b);});});
+const send=(t)=>{t=(t||'').trim();if(!t)return;add({role:'founder',text:t});inp.value='';const w=add({role:'assistant',text:'…'});
+const f=new FormData();f.append('message',t);fetch(`/runs/${R}/support`,{method:'POST',body:f}).then(r=>r.json())
+.then(j=>{w.textContent=j.reply;if(j.refused)w.classList.add('sw-r');}).catch(()=>{w.textContent='Could not reach the server.';});};
+document.getElementById('sw-btn').onclick=()=>{const o=box.style.display==='flex';box.style.display=o?'none':'flex';if(!o){load();inp.focus();}};
+document.getElementById('sw-form').onsubmit=(e)=>{e.preventDefault();send(inp.value);};
+inp.addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();send(inp.value);}});
+document.getElementById('sw-clear').onclick=()=>fetch(`/runs/${R}/support/clear`,{method:'POST'}).then(load);})();</script>"""
+
+
 @app.get("/runs/{run_id}/export")
 def export_run(run_id: str):
     """The founder's own copy of the run as one Markdown file. Built from saved state; no model call."""
@@ -772,8 +839,10 @@ def replay_run(run_id: str):
     r = replay.runs(entries).get(run_id)
     if r is None:
         raise HTTPException(404, "No such run in decision_log.json.")
-    return page(f"Replay {run_id}", replay.render_run(run_id, r, replay.run_outputs(r["slug"], settings.outputs_dir),
-                                                       not validate(entries)))
+    note = ("<p class=mut>AI co-founder support is not available in replay: replay needs no model and changes nothing. "
+            "Open a finished run in a live install to chat about it.</p>")
+    return page(f"Replay {run_id}", note + replay.render_run(run_id, r, replay.run_outputs(r["slug"], settings.outputs_dir),
+                                                              not validate(entries)))
 
 
 @app.get("/api/decision-log/validate")

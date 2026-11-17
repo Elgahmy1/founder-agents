@@ -18,6 +18,7 @@ from app.agents.area_analyst import AreaCheck
 from app.agents.funding_scout import FundingPlan
 from app.agents.team_planner import TeamPlan
 from app.agents.growth import GrowthPlan
+from app.support import SupportReply
 from app.agents.advisor import Advice  # noqa: E402
 from app.agents.analyst import DemandTestPlan, GateMemo  # noqa: E402
 from app.agents.builder import MvpSpec  # noqa: E402
@@ -156,6 +157,7 @@ class FakeLLM:
                              "rationale": "ASSUMPTION: 5% conversion"},
             GateMemo: {"summary": "s", "what_we_learned": [], "next_steps": []},
             Advice: {"answer": "Talk to 10 students this week."},
+            SupportReply: {"answer": "From your run: the learn gate said STOP. Suggestion: test one course first."},
             GrowthPlan: {"positioning_line": "Exam-format summaries from your own lecture notes, which ChatGPT does not give",
                          "tactics": [
                 {"channel": "Facebook group", "where": "the faculty's student group (search the faculty name + students)",
