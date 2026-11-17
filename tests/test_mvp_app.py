@@ -102,3 +102,11 @@ def test_mvp_ships_with_a_user_guide_built_from_its_own_artifacts(monkeypatch, m
     r = c.get(f"/mvp/{st.run_id}/guide")
     assert r.status_code == 200 and "How to use it" in r.text and "<script" not in r.text
     assert "write_user_guide" in [e["action"] for e in orch.log.read()]
+
+
+def test_sandbox_results_with_non_ascii_text_come_back_intact():
+    # the sandbox runs `python -I`, which ignores PYTHONIOENCODING; results must not depend on the console encoding
+    from app import sandbox
+    code = "def echo(text: str) -> str:\n    return text.upper()\n"
+    res = sandbox.call(code, "echo", "exam‑ready ملخص")
+    assert res == {"ok": True, "result": "EXAM‑READY ملخص"}

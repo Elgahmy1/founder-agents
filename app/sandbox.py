@@ -169,7 +169,7 @@ ns = {"__name__": "core"}
 try:
     exec(compile(src, "core.py", "exec"), ns)
     out = ns[req["func"]](req["arg"])
-    print(json.dumps({"ok": True, "result": out}, default=str, ensure_ascii=False))
+    print(json.dumps({"ok": True, "result": out}, default=str))
 except Exception as e:
     print(json.dumps({"ok": False, "error": f"{type(e).__name__}: {e}"[:300]}))
 '''
