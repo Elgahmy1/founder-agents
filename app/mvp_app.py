@@ -38,7 +38,9 @@ def entry_function(code: str) -> tuple[str, list[str]] | None:
 
 
 def entry_functions(code: str, limit: int = 6) -> list[tuple[str, list[str]]]:
-    """Every public top-level function callable with one text argument, in file order (at most `limit`)."""
+    """Every public top-level function callable with one text argument, in file order (at most `limit`).
+    A function whose input is an identifier (`file_id`, `id`, ...) is internal plumbing, not something a user
+    pastes text into, so it is not offered in the app."""
     out: list[tuple[str, list[str]]] = []
     for node in ast.parse(code).body:
         if not isinstance(node, ast.FunctionDef) or node.name.startswith("_"):
@@ -47,7 +49,7 @@ def entry_functions(code: str, limit: int = 6) -> list[tuple[str, list[str]]]:
         params = [p.arg for p in a.posonlyargs + a.args]
         required = len(params) - len(a.defaults)
         kw_required = [p.arg for p, d in zip(a.kwonlyargs, a.kw_defaults) if d is None]
-        if params and required <= 1 and not kw_required:
+        if params and required <= 1 and not kw_required and not re.search(r"(^|_)ids?$", params[0]):
             out.append((node.name, params))
     return out[:limit]
 
@@ -106,8 +108,11 @@ def run_functions(code: str, names: list[str], text: str, call) -> list[tuple[st
         arg = prev if (results and prev is not None and own != first) else text
         res = call(code, name, arg)
         results.append((name, res))
-        if res.get("ok") and isinstance(res.get("result"), str):
-            prev = res["result"]
+        out = res.get("result") if res.get("ok") else None
+        if isinstance(out, str):
+            prev = out
+        elif isinstance(out, list) and out and all(isinstance(x, str) for x in out):
+            prev = "\n".join(f"- {x}" for x in out)  # a bullet list is passed on as text
     return results
 
 

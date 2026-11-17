@@ -110,3 +110,14 @@ def test_sandbox_results_with_non_ascii_text_come_back_intact():
     code = "def echo(text: str) -> str:\n    return text.upper()\n"
     res = sandbox.call(code, "echo", "exam‑ready ملخص")
     assert res == {"ok": True, "result": "EXAM‑READY ملخص"}
+
+
+def test_list_results_are_chained_and_id_functions_are_not_offered():
+    from app import sandbox
+    from app.mvp_app import entry_functions, run_functions
+    code = ("def summarize(text: str) -> list:\n    return [s.strip() + '.' for s in text.split('.') if s.strip()][:2]\n\n"
+            "def questions(summary_text: str) -> list:\n    return ['Q: ' + l[2:] for l in summary_text.splitlines() if l.startswith('- ')]\n\n"
+            "def log_file_deletion(file_id: str) -> str:\n    return 'deleted ' + file_id\n")
+    assert [f for f, _ in entry_functions(code)] == ["summarize", "questions"]
+    res = dict(run_functions(code, ["summarize", "questions"], "Cells divide. They grow. They die.", sandbox.call))
+    assert res["questions"]["result"] == ["Q: Cells divide.", "Q: They grow."]
