@@ -31,6 +31,7 @@ from app.agents.researcher import ResearcherAgent
 from app.agents.builder import BuilderAgent, MvpSpec
 from app.agents.coder import CoderAgent
 from app import sandbox
+from app.analytics import PageCounter
 from app.agents.launcher import LaunchKit, LauncherAgent
 from app.agents.operator import SupportAgent, SupportDrafts
 from app.agents.policy_drafter import PolicyDrafterAgent, PolicyDrafts
@@ -633,13 +634,17 @@ class Orchestrator:
         self.write_output(st, "phase6_step1_metrics.md", "\n".join([
             "# Phase 6, step 1: Launch results vs targets locked before launch", "",
             "| Metric | Target | Actual | Source |", "|---|---|---|---|",
-            f"| Store visits | {targets['store_visits']} | {op['visits']} | entered by the founder |",
+            f"| Store visits | {targets['store_visits']} | {op['visits']} | {op.get('visits_source', 'entered by the founder')} |",
             f"| Free sign-ups since launch | {targets['free_signups']} | {op['signups']} | counted by the app from real form posts |",
             f"| Paid orders | {targets['paid_orders']} | {op['paid_orders']} | entered by the founder (checkout is MOCKED) |",
+            *([f"| Landing page views / MVP app page views / MVP app runs since launch | - | {op['usage']['landing']} / "
+               f"{op['usage']['mvp_view']} / {op['usage']['mvp_run']} | counted by the app |"] if op.get("usage") else []),
             f"| Users who wrote feedback | 3 | {len(op['feedback'])} | pasted by the founder |",
             f"| Feedback mentioning the core problem | - | {mentions} | computed in code: stems of the primary user story "
             f"('{story.i_want}') matched in each item or its English rendering |",
-            "", f"Window: {targets['window_days']} days."]) + "\n")
+            "", f"Window: {targets['window_days']} days. Counts by the app store only a page name and a date (no cookies, "
+            "IP addresses or user agents), skip views opened from the founder's dashboard, and include only visits that "
+            "reached this server while public hosting is MOCKED."]) + "\n")
 
         lines = ["# Phase 6, step 2: Support reply drafts (the founder sends them personally; sending is MOCKED)", ""]
         q.supersede("send_support_reply_mock")
@@ -674,19 +679,35 @@ class Orchestrator:
                                                               if r.product_change.lower() != "none"]]) + "\n")
         st.stage = "p6_gate_wait"
 
-    def founder_record_launch_results(self, run_id: str, visits: int, paid_orders: int, feedback: list[str]) -> RunState:
+    def analytics(self, run_id: str) -> PageCounter:
+        return PageCounter(self.settings.data_dir, run_id)
+
+    def launch_usage(self, st: RunState) -> dict[str, int]:
+        """Page views and MVP app runs counted by the app since the launch decision."""
+        return self.analytics(st.run_id).since((st.launch or {}).get("analytics_at_launch"))
+
+    def founder_record_launch_results(self, run_id: str, visits: int | None, paid_orders: int,
+                                      feedback: list[str]) -> RunState:
+        """Store visits default to the app's own count since launch; the founder may enter a figure from their own
+        analytics instead (for example once the page is hosted elsewhere), and the output says which was used."""
         with self.lock(run_id):
             st, q = self.load(run_id)
             if st.stage != "p6_collecting":
                 raise ValueError(f"not collecting launch results (stage={st.stage})")
-            if visits < 0 or paid_orders < 0:
+            if (visits is not None and visits < 0) or paid_orders < 0:
                 raise ValueError("numbers cannot be negative")
             fb = [f.strip()[:500] for f in feedback if f.strip()][:20]
             since = self.signups(run_id) - st.launch.get("signups_at_launch", 0)
-            st.operate = {"visits": visits, "paid_orders": paid_orders, "signups": max(0, since), "feedback": fb}
+            usage = self.launch_usage(st)
+            counted = visits is None
+            st.operate = {"visits": usage["store"] if counted else visits,
+                          "visits_source": "counted by the app" if counted else "entered by the founder",
+                          "usage": usage, "paid_orders": paid_orders, "signups": max(0, since), "feedback": fb}
+            self.log.append(agent="analytics", action="count_launch_usage", run_id=run_id, phase=6, outcome="counted",
+                            detail=", ".join(f"{k} {v}" for k, v in usage.items()) + " since the launch decision")
             self.log.append(agent="founder", action="record_launch_results", approved_by="founder", run_id=run_id,
-                            detail=f"{visits} visits, {paid_orders} paid orders, {len(fb)} feedback items; "
-                                   f"{st.operate['signups']} sign-ups counted by app")
+                            detail=f"{st.operate['visits']} visits ({st.operate['visits_source']}), {paid_orders} paid "
+                                   f"orders, {len(fb)} feedback items; {st.operate['signups']} sign-ups counted by app")
             st.stage = "p6_running"
             self.save(st, q)
             return self._advance(run_id)
@@ -752,6 +773,7 @@ class Orchestrator:
                 if len(need) < 2 or any(i.status != "executed" for i in need):
                     raise ValueError("GO needs the founder to approve the store page and lock the launch targets first")
                 st.launch["signups_at_launch"] = self.signups(run_id)  # launch sign-ups are counted from here
+                st.launch["analytics_at_launch"] = self.analytics(run_id).totals()  # and page views
                 st.stage = "p6_collecting"
             else:
                 failed = [c for c in gr.checks if not c.passed]
@@ -802,6 +824,7 @@ class Orchestrator:
                 self.log.append(agent="founder", action="start_phase6", approved_by="founder", run_id=run_id,
                                 outcome="go", phase=6)
                 st.launch["signups_at_launch"] = self.signups(run_id)
+                st.launch["analytics_at_launch"] = self.analytics(run_id).totals()
                 st.stage = "p6_collecting"
                 self.save(st, q)
                 return st

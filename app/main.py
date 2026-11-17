@@ -6,10 +6,10 @@ import html
 import threading
 from pathlib import Path
 
-from fastapi import FastAPI, Form, HTTPException
+from fastapi import FastAPI, Form, HTTPException, Request
 from fastapi.responses import HTMLResponse, PlainTextResponse, RedirectResponse
 
-from app import guard, mvp_app, sandbox
+from app import analytics, guard, mvp_app, sandbox
 import json
 from app.agents.advisor import AdvisorAgent
 from app.brief import FounderBrief
@@ -36,6 +36,7 @@ STATUS = [
     ("Phase 5 Launch: store page, launch post drafts, launch targets, launch gate", "Working"),
     ("Phase 5 checkout, public hosting and posting", "MOCKED"),
     ("Phase 6 Operate and learn: results vs locked targets, support reply drafts, learn gate, learning memo", "Working"),
+    ("Phase 6 usage analytics: store visits, landing and MVP app views and MVP app runs counted by the app (no cookies or IPs)", "Working"),
 ]
 
 CSS = """
@@ -230,12 +231,15 @@ def _next_step(st: RunState, q, run_id: str) -> str:
 <button class="rej" name="approve" value="0">Reject</button></div></form></div>"""
     if st.stage == "p6_collecting":
         t = st.launch["targets"]
+        u = orch.launch_usage(st)
         return f"""<div class="card next"><div class="kicker">Your input is needed: real launch results</div>
 <h2>Enter what really happened in the {t['window_days']}-day launch window</h2>
 <p>Targets you locked before launch: {t['store_visits']} store visits, {t['free_signups']} free sign-ups, {t['paid_orders']} paid orders.
-Free sign-ups since launch are counted by the app (never typed in): <b>{max(0, orch.signups(run_id) - st.launch.get('signups_at_launch', 0))}</b>.</p>
-<form method="post" action="/runs/{run_id}/operate" class="once"><label>Store visits (from your analytics)</label>
-<input type="number" name="visits" min="0" required><label>Paid orders recorded in your own payment provider (checkout is MOCKED here, so usually 0)</label>
+These are counted by the app since launch (never typed in): <b>{max(0, orch.signups(run_id) - st.launch.get('signups_at_launch', 0))}</b> free sign-ups,
+<b>{u['store']}</b> store visits, <b>{u['mvp_run']}</b> MVP app runs. Only a page name and a date are stored: no cookies or IP addresses;
+views you open from this dashboard are not counted.</p>
+<form method="post" action="/runs/{run_id}/operate" class="once"><label>Store visits from your own analytics (optional; leave empty to use the app's count)</label>
+<input type="number" name="visits" min="0"><label>Paid orders recorded in your own payment provider (checkout is MOCKED here, so usually 0)</label>
 <input type="number" name="paid_orders" min="0" value="0" required>
 <label>Real user feedback, one item per line (optional)</label><textarea name="feedback" rows="4"></textarea>
 <button>Run the learn gate</button></form></div>"""
@@ -415,10 +419,12 @@ def build(run_id: str):
 
 
 @app.post("/runs/{run_id}/operate")
-def operate(run_id: str, visits: int = Form(...), paid_orders: int = Form(0), feedback: str = Form("")):
+def operate(run_id: str, visits: str = Form(""), paid_orders: int = Form(0), feedback: str = Form("")):
+    entered = int(visits) if visits.strip().isdigit() else None  # empty: use the app's own count
+
     def go():
         try:
-            orch.founder_record_launch_results(run_id, visits, paid_orders, feedback.splitlines())
+            orch.founder_record_launch_results(run_id, entered, paid_orders, feedback.splitlines())
         except ValueError:
             pass
     _bg(run_id, "Comparing launch results with your targets", go)
@@ -447,6 +453,12 @@ def build_mvp(run_id: str):
     return RedirectResponse(f"/runs/{run_id}", status_code=303)
 
 
+def _count(request: Request, run_id: str, page_name: str) -> None:
+    """Counts a view of a published page: page name and date only (no cookies, IPs or user agents)."""
+    if not analytics.from_dashboard(request.headers.get("referer")):
+        orch.analytics(run_id).hit(page_name)
+
+
 def _mvp_bundle(run_id: str) -> dict:
     p = settings.data_dir / "sites" / Path(run_id).name / "mvp.json"
     if not p.exists():
@@ -455,13 +467,16 @@ def _mvp_bundle(run_id: str) -> dict:
 
 
 @app.get("/mvp/{run_id}", response_class=HTMLResponse)
-def mvp_page(run_id: str):
-    return HTMLResponse(_mvp_bundle(run_id)["page"])
+def mvp_page(request: Request, run_id: str):
+    b = _mvp_bundle(run_id)
+    _count(request, run_id, "mvp_view")
+    return HTMLResponse(b["page"])
 
 
 @app.post("/mvp/{run_id}", response_class=HTMLResponse)
-def mvp_run(run_id: str, text: str = Form(...)):
+def mvp_run(request: Request, run_id: str, text: str = Form(...)):
     b = _mvp_bundle(run_id)
+    _count(request, run_id, "mvp_run")
     results = [(f, sandbox.call(b["code"], f, text)) for f in b.get("funcs") or [b["func"]]]
     return HTMLResponse(b["page"].replace(mvp_app.RESULT_MARK, mvp_app.result_html(results), 1))
 
@@ -510,10 +525,11 @@ def output(name: str):
 
 
 @app.get("/lp/{run_id}", response_class=HTMLResponse)
-def landing(run_id: str):
+def landing(request: Request, run_id: str):
     p = settings.data_dir / "sites" / Path(run_id).name / "index.html"
     if not p.exists():
         raise HTTPException(404, "Not published: the founder has not approved this page.")
+    _count(request, run_id, "landing")
     return HTMLResponse(p.read_text(encoding="utf-8"))
 
 
@@ -526,10 +542,11 @@ def prototype(run_id: str):
 
 
 @app.get("/store/{run_id}", response_class=HTMLResponse)
-def store(run_id: str):
+def store(request: Request, run_id: str):
     p = settings.data_dir / "sites" / Path(run_id).name / "store.html"
     if not p.exists():
         raise HTTPException(404, "Not published: the founder has not approved this store page.")
+    _count(request, run_id, "store")
     return HTMLResponse(p.read_text(encoding="utf-8"))
 
 

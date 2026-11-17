@@ -48,7 +48,8 @@ Every **Working** row below has real output from the committed demo runs: [docs/
 | Phase 5 Launch: public hosting, posting to channels, checkout | **MOCKED** (founder posts personally; store served locally; no checkout) |
 | Phase 5 Launch: payment → delivery, refunds, idempotency, reconciliation | **MOCKED** (real logic runs on mock events inside the launch gate; no provider) |
 | Phase 6 Operate and learn: launch results vs the targets locked before launch (sign-ups counted by the app), support reply drafts for real feedback, learn gate (persevere / repeat / pivot / stop), learning memo | **Working** |
-| Phase 6: sending support replies; usage analytics | **MOCKED** (founder sends replies personally and enters store visits from their own analytics) |
+| Phase 6 usage analytics: store visits, landing and MVP app views and MVP app runs since launch, counted by the app itself (page name and date only: no cookies, IPs or user agents; the founder's own dashboard views are skipped) and used by the learn gate | **Working** (counts only visits reaching this server, since public hosting is MOCKED) |
+| Phase 6: sending support replies | **MOCKED** (founder sends replies personally) |
 | Founder export: the whole run (brief, gates, decisions, approvals, decision log, outputs) as one Markdown file, no model call | **Working** |
 | Run metrics from the decision log: calls, tokens, cost, time, gate recommendation vs founder decision, approval audit; [`evals/run_metrics.md`](evals/run_metrics.md), checked against the log in CI | **Working** |
 
