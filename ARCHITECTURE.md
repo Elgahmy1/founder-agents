@@ -92,7 +92,7 @@ stateDiagram-v2
 ```mermaid
 flowchart LR
     BR[brief] --> R[researcher: 3 queries]
-    R --> SRC[(HN / Stack Exchange / DDG / founder URLs<br/>sanitized, ids S1..Sn)]
+    R --> SRC[(HN / Stack Exchange / Wikipedia / DDG / founder URLs<br/>sanitized, ids S1..Sn)]
     SRC --> SC[scout: opportunities + scores]
     SRC --> MA[market_analyst: ICP, segments]
     SC --> LED[evidence ledger]
@@ -300,7 +300,7 @@ brief ──> guard ──> researcher ──> [S1..Sn sources] ──> scout / 
    artifacts ──> outputs/phase<N>_step<M>_<name>-<run>.<ext>       run state ──> data/runs/<id>/state.json
 ```
 
-Persistence is plain files (JSON, CSV, Markdown) so runs are inspectable and portable. The model is reached only through `app/llm.py` (Ollama HTTP, JSON-schema output, token counting).
+Persistence is plain files (JSON, CSV, Markdown) so runs are inspectable and portable. The model is reached only through `app/llm.py`: local Ollama by default, or a free-tier OpenAI-compatible endpoint serving open weights, with JSON-schema output and token counting. If the free tier stays rate-limited, the call falls back to the local model and the log records which model answered.
 
 ## Built vs. stubbed
 

@@ -65,7 +65,7 @@ An explicit state machine (`app/orchestrator.py`) moves a run through the six ph
 
 ## Cost per run
 
-About $0.00 per run (open-weight model, local via Ollama or Groq free tier; the demo run used ~50k tokens in 18 model calls on `openai/gpt-oss-120b` via the Groq free tier, across all six phases, including one redraft each of the MVP spec, pricing and policies; token counts per call are in `decision_log.json`). The app shows the token count of each run.
+About $0.00 per run (open-weight model, local via Ollama or Groq free tier). The demo run used ~50k tokens in 18 model calls on `openai/gpt-oss-120b` via the Groq free tier across all six phases, including one redraft each of the MVP spec, pricing and policies; the optional Phase 3 core-code step added ~16k tokens in 5 calls (three generations and two repairs). The second run used ~33k tokens in 9 calls before it stopped. Token counts per call are in `decision_log.json`, and the app shows the token count of each run.
 
 ## Demo video
 
