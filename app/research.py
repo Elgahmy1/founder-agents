@@ -14,7 +14,7 @@ from urllib.parse import parse_qs, quote, unquote, urlparse
 
 import httpx
 
-UA = {"User-Agent": "founder-agents/0.1 (open-source research bot)"}
+UA = {"User-Agent": "founder-agents/0.1 (open-source research bot; +https://github.com/Elgahmy1/founder-agents)"}
 
 
 @dataclass

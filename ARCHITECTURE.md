@@ -234,7 +234,7 @@ flowchart LR
 | Gate | Checks (targets fixed before evidence) | Outcomes |
 |---|---|---|
 | Policy screen | Excluded product types; unsafe requests | stop |
-| Phase 1 evidence gate | ≥3 sourced claims; ≥40% of claims sourced; ≥2 independent sources showing the pain; best opportunity score ≥3/5 | go / repeat / pivot / stop |
+| Phase 1 evidence gate | ≥3 sourced claims (a claim repeated with the same source counts once); ≥40% of claims sourced; ≥2 independent sources showing the pain; best opportunity score ≥3/5 | go / repeat / pivot / stop |
 | Phase 2 demand gate | Waitlist sign-ups ≥ target in window; interviews ≥ target; share confirming the problem ≥ target | go / repeat / pivot / stop |
 | Phase 3 build gate | ≥2 stories; all stories testable; all features traced; ≤6 must-haves; hours ≤ founder budget; prototype safe | go / repeat / pivot / stop |
 | Phase 4 commercial gate | Core feature free; ≥2 comparables; price basis disclosed; 3 policy drafts; privacy lists data; 0 guard flags; founder signed pricing + 3 policies | go / repeat / stop |

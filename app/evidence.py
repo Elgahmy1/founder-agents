@@ -64,8 +64,18 @@ class Ledger:
     def __init__(self) -> None:
         self.claims: list[Claim] = []
 
+    @staticmethod
+    def _key(c: Claim) -> tuple:
+        return (" ".join(re.findall(r"[a-z0-9]+", c.text.lower())), c.status, tuple(sorted(c.sources)))
+
     def add(self, claims: list[Claim]) -> list[Claim]:
-        self.claims.extend(claims)
+        """The same claim with the same sources counts once, however often agents repeat it
+        (for example once per opportunity), so the gates cannot pass on repetition."""
+        seen = {self._key(c) for c in self.claims}
+        for c in claims:
+            if self._key(c) not in seen:
+                seen.add(self._key(c))
+                self.claims.append(c)
         return claims
 
     @property
