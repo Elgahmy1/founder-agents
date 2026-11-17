@@ -89,7 +89,7 @@ def discover_gate(*, sourced_claims: int, total_claims: int, pain_sources: int,
     if not fails:
         rec, why = "go", ["All evidence thresholds met; proceed to Validate with the top opportunity."]
     elif attempt >= t.max_attempts and pain_sources < t.min_pain_sources:
-        rec, why = "stop", [f"Discovery attempt {attempt}: still no independent evidence that people feel this problem. "
+        rec, why = "stop", [f"Discovery attempt {attempt}: still fewer than {t.min_pain_sources} independent sources show people feel this problem. "
                             "One repeat is allowed; spending more of the founder's time on this idea is not justified."]
     elif len(fails) >= 3 or (pain_sources == 0 and best_score < t.min_opportunity_score):
         rec, why = "stop", ["Evidence is too weak to justify spending the founder's time and budget on validation."]
