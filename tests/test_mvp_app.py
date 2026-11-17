@@ -65,3 +65,15 @@ def test_rejected_mvp_app_is_never_served(make_orch, brief, monkeypatch):
     for i in q.pending():
         orch.approve(st.run_id, i.id, False)
     assert c.get(f"/mvp/{st.run_id}").status_code == 404
+
+
+def test_a_later_step_gets_the_previous_steps_text_result():
+    from app import sandbox
+    from app.mvp_app import run_functions
+    code = ("def summarize_text(text: str) -> str:\n    return '- ' + text.split('.')[0]\n\n"
+            "def generate_questions(summary: str) -> list:\n    return ['Q: ' + l[2:] for l in summary.splitlines() if l.startswith('- ')]\n\n"
+            "def word_count(text: str) -> int:\n    return len(text.split())\n")
+    res = dict(run_functions(code, ["summarize_text", "generate_questions", "word_count"], "Cells divide. They grow.", sandbox.call))
+    assert res["summarize_text"]["result"] == "- Cells divide"
+    assert res["generate_questions"]["result"] == ["Q: Cells divide"]
+    assert res["word_count"]["result"] == 4

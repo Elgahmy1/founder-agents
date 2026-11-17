@@ -477,7 +477,7 @@ def mvp_page(request: Request, run_id: str):
 def mvp_run(request: Request, run_id: str, text: str = Form(...)):
     b = _mvp_bundle(run_id)
     _count(request, run_id, "mvp_run")
-    results = [(f, sandbox.call(b["code"], f, text)) for f in b.get("funcs") or [b["func"]]]
+    results = mvp_app.run_functions(b["code"], b.get("funcs") or [b["func"]], text, sandbox.call)
     return HTMLResponse(b["page"].replace(mvp_app.RESULT_MARK, mvp_app.result_html(results), 1))
 
 

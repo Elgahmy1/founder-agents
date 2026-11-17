@@ -32,7 +32,7 @@ def test_codegen_writes_output_and_never_changes_the_run(make_orch, brief, setti
     stage, gates = st.stage, list(st.gates)
     st = orch.founder_generate_code(st.run_id)
     assert st.stage == stage and st.gates == gates
-    assert st.code == {"passed": 1, "total": 1, "ok": True, "attempts": 1, "stories": "1/2", "deferred": 0}
+    assert st.code == {"passed": 1, "total": 1, "ok": True, "attempts": 1, "stories": "1/2", "deferred": 1}
     out = (settings.outputs_dir / next(o for o in st.outputs if o.startswith("phase3_step4_code"))).read_text()
     assert "1/1 acceptance checks passed" in out and "def summarize" in out and "Nothing here is published" in out
     log = orch.log.read()
@@ -105,3 +105,15 @@ def test_code_covers_every_story_and_lists_deferred_criteria(make_orch, brief, s
     out = (settings.outputs_dir / next(o for o in st.outputs if o.startswith("phase3_step4_code"))).read_text()
     assert "Stories with at least one executable check: 2 of 2" in out and "DEFERRED (STUBBED): needs hosting" in out
     assert "2/2 acceptance checks passed" in out
+
+
+def test_criteria_the_coder_leaves_out_are_listed_as_deferred_not_dropped(make_orch, brief, settings):
+    from tests.conftest import GOOD_CODE
+    orch = make_orch()
+    orch.llm.code_drafts = [dict(GOOD_CODE, deferred=[])]
+    st = _to_build(orch, brief)
+    st = orch.founder_generate_code(st.run_id)
+    out = (settings.outputs_dir / next(o for o in st.outputs if o.startswith("phase3_step4_code"))).read_text()
+    assert st.code["deferred"] == 1
+    assert "| US2 | Given a summary, the page lists at least 5 key terms | - | DEFERRED (STUBBED): no executable check" in out
+    assert "2 in the spec, 1 checked in the sandbox, 1 deferred" in out

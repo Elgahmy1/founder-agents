@@ -92,6 +92,24 @@ Nothing you paste is stored. Accounts, storage and public hosting are not part o
     return page, removed
 
 
+def run_functions(code: str, names: list[str], text: str, call) -> list[tuple[str, dict]]:
+    """Runs the published functions in order. The first gets the founder's text. A later function whose input
+    has a different name than the first one's (for example `summary` after `text`) gets the previous function's
+    text result, so a step that works on a summary receives the summary, not the raw input."""
+    params = {name: p for name, p in entry_functions(code)}
+    first = params.get(names[0], [""])[0] if names else ""
+    results: list[tuple[str, dict]] = []
+    prev: str | None = None
+    for name in names:
+        own = params.get(name, [""])[0]
+        arg = prev if (results and prev is not None and own != first) else text
+        res = call(code, name, arg)
+        results.append((name, res))
+        if res.get("ok") and isinstance(res.get("result"), str):
+            prev = res["result"]
+    return results
+
+
 def result_html(results: list[tuple[str, dict]]) -> str:
     parts = []
     for func, res in results:

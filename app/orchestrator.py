@@ -872,6 +872,7 @@ class Orchestrator:
                                      + [f"check {i} ({c.criterion}): {r['error']}" for i, (c, r) in
                                         enumerate(zip(draft.checks, res.results), 1) if not r["passed"]])
             draft, res = attempts[-1]
+            draft.deferred += _uncovered_criteria(stories, draft)
             notes, removed_rules = guard.scrub_output(draft.notes.replace(". ", ".\n"))
             notes = " ".join(notes.split("\n")).strip()
             known = {s.id for s in stories}
@@ -1123,3 +1124,26 @@ def _canvas_md(name: str, c: LeanCanvas, claims) -> str:
         f"| Unfair advantage | {c.unfair_advantage} |", "",
         "## Riskiest assumptions (tested in Validate)", *[f"{i + 1}. {a}" for i, a in enumerate(c.riskiest_assumptions)],
         "", "## Claims", *[f"- {x.md()}" for x in claims]]) + "\n"
+
+
+def _norm_criterion(text: str) -> str:
+    return " ".join(re.sub(r"[^a-z0-9 ]", " ", text.lower()).split())
+
+
+def _uncovered_criteria(stories, draft) -> list:
+    """Every acceptance criterion in the spec must end up either checked in the sandbox or listed as deferred.
+    Criteria the coder left out are listed as deferred here, so none disappears from the output silently."""
+    from app.agents.coder import DeferredCriterion
+    listed: dict[str, list[str]] = {}
+    for item in [*draft.checks, *draft.deferred]:
+        listed.setdefault(item.story_id, []).append(_norm_criterion(item.criterion))
+    missing = []
+    for s in stories:
+        for a in s.acceptance:
+            full = _norm_criterion(a)
+            if not any(x and (x in full or full in x) for x in listed.get(s.id, [])):
+                missing.append(DeferredCriterion(
+                    story_id=s.id, criterion=a,
+                    reason="no executable check was written for it (needs a user interface, storage, hosting or a real "
+                           "model call); listed by the orchestrator, not by the coder"))
+    return missing

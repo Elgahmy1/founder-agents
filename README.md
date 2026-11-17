@@ -73,7 +73,7 @@ About $0.00 per run (open-weight model, local via Ollama or Groq free tier). The
 
 ## Demo video
 
-[Watch the demo (1:57, Google Drive)](https://drive.google.com/file/d/1_zaOqoK2jAYvnqTKnCU149WhFfONbSl3/view?usp=sharing): a captioned screen recording of the real app. It walks the committed demo run through all six phases and their gates, then shows a crypto-signals idea stopped by the policy screen.
+[Watch the demo (about 2 minutes, Google Drive)](https://drive.google.com/file/d/1nmll2xgWQJ5ui48mlx0c92nQQqpJg0Ck/view?usp=sharing): a screen recording of the real app at 1080p. It walks the committed demo run through all six phases and their gates, opens the working MVP app, shows the second and third runs, and ends with a crypto-signals idea stopped by the policy screen.
 
 ## What our system will NOT do
 
