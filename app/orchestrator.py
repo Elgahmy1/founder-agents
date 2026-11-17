@@ -281,7 +281,8 @@ class Orchestrator:
         excluded = guard.check_product(f"{opp.name} {opp.digital_product} {opp.problem}")
         g = discover_gate(sourced_claims=len(ledger.sourced), total_claims=len(ledger.claims),
                           pain_sources=len(pain_urls), best_score=opp.score,
-                          excluded_reason=None if excluded.allowed else excluded.reason)
+                          excluded_reason=None if excluded.allowed else excluded.reason,
+                          attempt=1 + sum(1 for x in st.gates if x["gate"] == "evidence_gate"))
         st.gates.append(g.to_dict())
         self.log.append(agent="gate", action="evidence_gate", sources=ledger.urls(), run_id=st.run_id,
                         outcome=g.recommendation, phase=1)

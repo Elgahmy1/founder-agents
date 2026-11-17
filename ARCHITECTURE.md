@@ -91,6 +91,7 @@ flowchart LR
 **When the system recommends STOP** (`app/gates.py`):
 - The product is excluded (physical, financial/crypto, health or legal advice), before any agent runs.
 - Discover: three or more evidence checks fail, or no source shows the pain and the opportunity scores below 3/5.
+- Discover, second pass: after one repeat or pivot, still fewer than 2 independent sources show the pain. One retry is allowed; a second failing pass is a stop, not another retry.
 - Validate: interviews are complete but fewer than half the target share confirm the problem, or sign-ups are under 25% of target and interviews also miss.
 - Example: target 100 sign-ups in 14 days, 12 arrive and interviews miss → **stop**, not "promising early traction".
 

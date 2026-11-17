@@ -69,10 +69,11 @@ class DiscoverThresholds:
     min_sourced_ratio: float = 0.4
     min_pain_sources: int = 2
     min_opportunity_score: float = 3.0  # out of 5
+    max_attempts: int = 2  # one repeat/pivot is allowed; a second failing pass means stop
 
 
 def discover_gate(*, sourced_claims: int, total_claims: int, pain_sources: int,
-                  best_score: float, excluded_reason: str | None,
+                  best_score: float, excluded_reason: str | None, attempt: int = 1,
                   t: DiscoverThresholds = DiscoverThresholds()) -> GateResult:
     ratio = sourced_claims / total_claims if total_claims else 0.0
     checks = [
@@ -87,6 +88,9 @@ def discover_gate(*, sourced_claims: int, total_claims: int, pain_sources: int,
     evidence_fails = [c for c in fails if c.name != "Best opportunity score"]
     if not fails:
         rec, why = "go", ["All evidence thresholds met; proceed to Validate with the top opportunity."]
+    elif attempt >= t.max_attempts and pain_sources < t.min_pain_sources:
+        rec, why = "stop", [f"Discovery attempt {attempt}: still no independent evidence that people feel this problem. "
+                            "One repeat is allowed; spending more of the founder's time on this idea is not justified."]
     elif len(fails) >= 3 or (pain_sources == 0 and best_score < t.min_opportunity_score):
         rec, why = "stop", ["Evidence is too weak to justify spending the founder's time and budget on validation."]
     elif not evidence_fails:

@@ -51,3 +51,13 @@ def test_pivot_moves_back_to_discover(make_orch, brief):
     st = orch.founder_gate_decision(st.run_id, "pivot")
     assert st.stage == "p1_gate_wait"
     assert st.tried == [0]
+
+
+def test_second_discovery_pass_without_pain_evidence_stops():
+    from app.gates import discover_gate
+    first = discover_gate(sourced_claims=4, total_claims=7, pain_sources=0, best_score=3.6, excluded_reason=None, attempt=1)
+    assert first.recommendation == "repeat"
+    second = discover_gate(sourced_claims=4, total_claims=7, pain_sources=0, best_score=3.6, excluded_reason=None, attempt=2)
+    assert second.recommendation == "stop"
+    ok = discover_gate(sourced_claims=4, total_claims=7, pain_sources=2, best_score=3.6, excluded_reason=None, attempt=2)
+    assert ok.recommendation == "go"
