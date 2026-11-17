@@ -240,7 +240,11 @@ def check_product(idea_text: str) -> Verdict:
 
 INJECTION_IN_SOURCE = re.compile(
     r"(ignore|disregard|forget)\s+(all\s+|any\s+)?(previous|prior|above|earlier)?\s*(instructions|rules|prompts?)"
-    r"|you are (now )?(an? )?(ai|assistant|chatbot)|system prompt|<\s*/?\s*system\s*>|assistant:|###\s*instruction",
+    r"|you are (now )?(an? )?(ai|assistant|chatbot)|system prompt|<\s*/?\s*system\s*>|assistant:|###\s*instruction"
+    r"|\b(mark|set|rate|score|label|classify)\s+(this|it|the (idea|gate|interview|problem|run))\s+(as\s+)?"
+    r"(go|confirmed|strong|approved|5/5|10/10)\b"
+    r"|\b(you must|always) (approve|confirm|recommend go|say go)\b"
+    r"|تجاهل\s+(كل\s+)?(التعليمات|الأوامر|القواعد)|اعتبر\s+(الفكرة|المشكلة)\s+(مؤكدة|ناجحة)",
     re.I)
 
 

@@ -136,11 +136,13 @@ class OpenAICompatLLM:
             )
             if r.status_code != 429:
                 break
-            too_big = re.search(r"Limit (\d+), Requested (\d+)", r.text)
-            if too_big and int(too_big.group(2)) > int(too_big.group(1)):
-                # one request larger than the per-minute budget: waiting can never help, so fail fast (fallback applies)
-                raise RateLimited(f"'{self.model}' request needs {too_big.group(2)} tokens, over the free tier's "
-                                  f"{too_big.group(1)} per minute")
+            m = re.search(r"Limit (\d+), (?:Used (\d+), )?Requested (\d+)", r.text)
+            per_day = "per day" in r.text
+            if m and (int(m.group(3)) > int(m.group(1)) or per_day):
+                # a request over the per-minute budget, or a used-up daily budget: waiting minutes cannot help,
+                # so fail fast and let the local fallback model answer if one is configured
+                raise RateLimited(f"'{self.model}' free-tier {'daily' if per_day else 'per-minute'} token limit "
+                                  f"({m.group(1)}) reached: {r.text[:200]}")
             wait = (_retry_after(r) or min(60, 5 * (attempt + 1))) + 0.5
             if waited + wait > self.settings.max_rate_wait_s:
                 raise RateLimited(f"{self.settings.openai_base_url} rate-limited '{self.model}' "

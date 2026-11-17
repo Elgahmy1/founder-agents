@@ -361,3 +361,14 @@ Persistence is plain files (JSON, CSV, Markdown) so runs are inspectable and por
 3. Phase 5: webhook handler for a real provider in the founder's own account (founder-configured, never our keys), replacing the MOCKED events.
 4. Phase 6: activation and retention per MVP feature from the app's own counts, once the app is hosted publicly.
 5. Community: more free research tools, more red-team prompts in `evals/` (runner: `python evals/run_red_team.py`), translations (Arabic first). See [CONTRIBUTING.md](../CONTRIBUTING.md).
+
+
+## Co-founder layer
+
+- **Area check first:** if the founder says where they will sell, the researcher adds 2 searches about that place and `area_analyst` judges local fit, whether what the product needs is available there (language, content, access, channels) and where the idea would stand among local and global competitors; `cap_fit` keeps the fit UNKNOWN unless a retrieved source supports a claim about the place. Output: `phase1_step0_area_check`; the opportunities and the co-founder verdict read it.
+- **Co-founder verdict:** after the gate, `cofounder` judges the opportunity (strong / promising / weak / do not pursue), names the killer risk and proposes 2-4 concrete improvements with the cheapest test for each; `cap_verdict` keeps it no more positive than the gate (repeat → at most promising, pivot → weak, stop → do not pursue). It also gives the best launch window (concrete dates after today, from the customers' calendar and the founder's hours) and what to avoid. Output: `phase1_step4_cofounder_verdict`.
+- **Funding scout (strong or promising only):** 3 searches about grants, accelerators and competitions near the founder; `funding_scout` lists funders with their criteria met and missed; code computes fit % = met / checked (a match score, never a probability), marks names absent from the sources UNVERIFIED, shows an apply link only if it appears in a source, and drops banks and loans. The outreach email is a draft only. Output: `phase1_step5_funding`.
+
+## Carry-forward between phases
+
+`app/carry.py` collects the co-founder's killer risk and first two suggested changes, the area check's positioning and, once interviews exist, each interview's first red flag and current workaround. The Lean Canvas (Phase 2) and the MVP spec (Phase 3) get them in their prompt and must answer each in `carried_forward`; `carry.check` sends the draft back once when an item has no concrete answer, and the output's "Risk and evidence carried forward" table shows each answer or **not addressed**.

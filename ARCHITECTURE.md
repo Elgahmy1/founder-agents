@@ -4,7 +4,7 @@ The key facts for each part come first; every threshold, per-phase diagram and t
 
 ## Overview
 
-Founder Agents is a team of single-purpose agents run by an explicit state machine (`app/orchestrator.py`). A run starts from a founder brief, passes a policy screen, then moves through six phases. Every step ends in a gate: a pre-set threshold, tests that must pass, or a founder approval. Every phase ends in a gate that recommends **go**, **repeat**, **pivot** or **stop** from thresholds fixed before the evidence, and the founder decides. Agents only draft; anything that leaves the system (publish, send, spend, sign) becomes an item in the approval queue (`app/approval.py`), whose executor refuses anything the founder did not approve. Every action is appended to `decision_log.json`. Key drafts pass a specificity critic in code (`app/specificity.py`): stock advice, or a draft that ignores the founder's budget, hours, skills and market, is sent back once with the problems listed, and each gate ends with a next step built from the run's own numbers (`app/next_steps.py`). Checkout, public hosting, posting and sending are MOCKED: the system never takes money or acts on the founder's accounts.
+Founder Agents is a team of single-purpose agents run by an explicit state machine (`app/orchestrator.py`). A run starts from a founder brief, passes a policy screen, then moves through six phases; every step ends in a gate (a pre-set threshold, passing tests, or a founder approval) and every phase in a go / repeat / pivot / stop recommendation the founder decides on. Agents only draft; anything that leaves the system (publish, send, spend, sign) is an approval item whose executor refuses what the founder did not approve. Every action goes to `decision_log.json`. What one phase learns shapes the next: the co-founder's killer risk and interview objections are carried into the Lean Canvas and MVP spec (`app/carry.py`), and a critic in code (`app/specificity.py`) sends back stock advice. Checkout, hosting, posting and sending are MOCKED.
 
 ```mermaid
 flowchart LR
@@ -49,19 +49,17 @@ flowchart LR
 
 ### Phase 1: Discover
 - **Core step:** Find opportunities.
-- **Area check first:** if the founder says where they will sell, the researcher adds 2 searches about that place and `area_analyst` judges local fit, whether what the product needs is available there (language, content, access, channels) and where the idea would stand among local and global competitors; `cap_fit` keeps the fit UNKNOWN unless a retrieved source supports a claim about the place. Output: `phase1_step0_area_check`; the opportunities and the co-founder verdict read it.
+- **Co-founder layer:** an area check before the scout (local fit, resources, competitors; UNKNOWN without a source about the place), a verdict after the gate capped by it (killer risk, fixes with the cheapest test, launch window), and for strong or promising ideas a funding scout (fit % computed in code, unverified names flagged, no loans). Outputs `phase1_step0_area_check`, `phase1_step4_cofounder_verdict`, `phase1_step5_funding`; details in [docs/architecture-details.md](docs/architecture-details.md#co-founder-layer).
 - **Agents:** `researcher` (3 queries from the brief), `scout` (up to 3 opportunities scored 1-5 on pain, founder fit, feasibility, reach, differentiation), `market_analyst` (customer, segments, where they gather), `interviewer` (Mom Test script with a "problem confirmed" rule, plus an outreach draft).
-- **Tools:** Hacker News, Stack Exchange, Wikipedia and DuckDuckGo (free, no keys) and founder URLs (`app/research.py`), interleaved so no source fills the budget. A result must share at least two content words with its query (one for short queries), so pages that only mention the country or one keyword never reach the agents.
+- **Tools:** Hacker News, Stack Exchange, Wikipedia, DuckDuckGo (free, no keys) and founder URLs (`app/research.py`), interleaved; a result must share two content words with its query or it is dropped.
 - **Method:** `app/evidence.py` keeps a citation only if that source was retrieved in this run and supports the claim; otherwise the claim is labelled ASSUMPTION. Excluded opportunities are re-screened in code and never chosen.
-- **Co-founder verdict:** after the gate, `cofounder` judges the opportunity (strong / promising / weak / do not pursue), names the killer risk and proposes 2-4 concrete improvements with the cheapest test for each; `cap_verdict` keeps it no more positive than the gate (repeat → at most promising, pivot → weak, stop → do not pursue). It also gives the best launch window (concrete dates after today, from the customers' calendar and the founder's hours) and what to avoid. Output: `phase1_step4_cofounder_verdict`.
-- **Funding scout (strong or promising only):** 3 searches about grants, accelerators and competitions near the founder; `funding_scout` lists funders with their criteria met and missed; code computes fit % = met / checked (a match score, never a probability), marks names absent from the sources UNVERIFIED, shows an apply link only if it appears in a source, and drops banks and loans. The outreach email is a draft only. Output: `phase1_step5_funding`.
 - **Gate:** outreach is a `send` approval (the founder sends it personally); the evidence gate needs ≥3 sourced claims, ≥40% sourced, ≥2 independent sources showing the pain and a best score ≥3/5.
 - **Output:** `phase1_step1_opportunities`, `phase1_step2_market`, `phase1_step3_interview_plan`, `phase1_gate_decision`.
 
 ### Phase 2: Validate
 - **Core step:** Design the business.
 - **Agents:** `strategist` (Lean Canvas, riskiest assumptions first), `marketer` (landing copy only), `analyst` (demand targets), `interview_analyst` (Mom Test analysis of each real interview).
-- **Method:** our template renders the landing page, so it cannot carry scripts, timers, testimonials or payment fields; every line passes the guard. After a `publish` approval the page runs at `/lp/<run>` and counts real sign-ups. The founder locks the targets **before** any result exists. Each real interview (pasted notes, or a recording transcribed by open-weight Whisper) goes to `interview_analyst`, which applies the plan's "problem confirmed if" rule, separates evidence from compliments and hypotheticals, and suggests the next questions; code keeps only quotes found in the transcript and overturns a confirmation without one (`app/interviews.py`). The counts pre-fill the demand gate; the founder can still edit them.
+- **Method:** the Lean Canvas must answer the carried-forward killer risk. Our template renders the landing page (no scripts, timers, testimonials or payment fields); after a `publish` approval it runs at `/lp/<run>` and counts real sign-ups. The founder locks targets **before** any result. Each real interview (notes, or a recording via open-weight Whisper) is screened for hidden instructions and analysed by `interview_analyst` against the "problem confirmed if" rule; code keeps only quotes found in the transcript (`app/interviews.py`), and the counts pre-fill the demand gate.
 - **Gate:** demand gate on sign-ups, interviews and the share confirming the problem, against the locked targets.
 - **Output:** `phase2_step1_lean_canvas`, `phase2_step2_landing_page`, `phase2_step3_demand_test`, `phase2_step4_interviews`, `phase2_gate_decision`.
 
@@ -69,7 +67,7 @@ flowchart LR
 - **Core step:** Build the product: a tested MVP with user docs.
 - **Agents:** `builder` (MVP spec: 2-5 user stories with Given/when/then criteria, must-have features traced to stories, hours against the founder's budget, screens), `coder` (core functions for every user story plus one check per criterion); QA is code.
 - **Tools:** `app/sandbox.py`: static allowlist (pure standard library; no file, network, process or introspection calls), then a separate isolated process with time and resource limits.
-- **Method:** a clickable prototype from our template (`/proto/<run>`); the coder's checks run in the sandbox with one repair; a criterion that needs storage, a UI or hosting is listed as DEFERRED, never faked (the orchestrator lists any criterion the coder left out). When every check passes, the founder builds the MVP app (`app/mvp_app.py`, `/mvp/<run>`): each request runs the tested functions in the sandbox, nothing is stored. The same build writes the **user guide** in code from the spec, the tested code and a real sandbox run (no model call), served at `/mvp/<run>/guide`.
+- **Method:** a clickable prototype from our template (`/proto/<run>`); the coder's checks run in the sandbox with one repair; a criterion that needs storage, a UI or hosting is listed as DEFERRED, never faked. When every check passes, the MVP app (`/mvp/<run>`) runs the tested functions in the sandbox, and a user guide is written in code from the spec, the code and a real sandbox run (`/mvp/<run>/guide`).
 - **Gate:** build gate (≥2 stories, all testable, features traced, ≤6 must-haves, hours ≤ budget, prototype safe); sandbox checks must pass; one `publish` approval for app and guide.
 - **Output:** `phase3_step1_mvp_spec`, `phase3_step2_prototype`, `phase3_step3_acceptance_tests`, `phase3_step4_code`, `phase3_step5_mvp_app`, `phase3_step6_user_guide`, `phase3_gate_decision`.
 
@@ -106,7 +104,7 @@ flowchart LR
 | 5 Launch | Store safe, prices = signed plan, posts pass, targets locked, sale-to-cash test PASS | go / repeat / stop |
 | 6 Learn | Visits and sign-ups vs locked targets; ≥3 users gave feedback | go / repeat / pivot / stop |
 
-**Every step ends with a gate:** a pre-set threshold (evidence ledger, guard, gate checks), passing tests (sandbox acceptance checks, the sale-to-cash test), or a founder approval (outreach, landing page, prototype, MVP app and guide, pricing and policy sign-off, store page, each post, launch targets, each support reply). The step-by-step table is in [docs/architecture-details.md](docs/architecture-details.md#gates).
+**Every step ends with a gate:** a pre-set threshold, passing tests, or a founder approval; the step-by-step table is in [docs/architecture-details.md](docs/architecture-details.md#gates).
 
 **When the system recommends STOP:**
 - The product is excluded, before any agent runs.
@@ -115,7 +113,7 @@ flowchart LR
 - Build, Commercial or Launch still fail after one redraft.
 - Operate: sign-ups under 25% of the locked target and feedback does not name the core problem.
 
-The gate memo is written after the recommendation and cannot change it. The founder may overrule a recommendation, but only with a written reason: the decision is refused in code without one, and the log and the gate output keep the recommendation, the decision and the reason (`founder_override: true`).
+The gate memo cannot change the recommendation. The founder may overrule it only with a written reason (refused in code without one); the log keeps both (`founder_override: true`).
 
 ## Sale to cash
 
@@ -152,24 +150,24 @@ every action ─> decision_log.json (timestamp, agent, action, sources, model, c
 artifacts ─> outputs/phase<N>_step<M>_<name>-<run>.<ext>      run state ─> data/runs/<id>/state.json
 ```
 
-Web text and model output are untrusted: sources are sanitized, model output is schema-checked and guarded. The model is reached only through `app/llm.py` (local Ollama, or a free-tier endpoint serving open weights, falling back to the local model when rate-limited; the log names the model that answered).
+Web text, transcripts and model output are untrusted: sources and transcripts are sanitized, output is schema-checked and guarded. Models are reached only through `app/llm.py` (local Ollama or a free tier, falling back to the local model; the log names the model).
 
 ## Built vs. stubbed
 
 | Component | Status |
 |---|---|
-| State machine, agents for all six phases, evidence ledger, gates, approval queue, guard, decision log with hash chain, web UI, CLI | Built |
+| State machine, agents for six phases, carry-forward, evidence ledger, gates, approvals, guard, hash-chained log, UI, CLI | Built |
 | MVP: core code for every user story tested in the sandbox, MVP app and user guide | Built (served locally) |
-| Replay of recorded runs (`/replay/<run>`), founder export, run metrics, claims audit, red-team evaluation | Built |
+| Replay (`/replay/<run>`), export, run metrics, claims audit, red-team eval | Built |
 | Public hosting of landing page, prototype, MVP app and store | MOCKED |
-| Sending outreach and support replies, posting launch posts | MOCKED (the founder does it personally) |
+| Sending outreach and support replies, posting | MOCKED (the founder does it) |
 | Checkout and payment provider; payment → delivery, refunds, idempotency, reconciliation | MOCKED events, real logic |
 | MVP storage, accounts, and the DEFERRED criteria that need them | STUBBED |
 
 ## Roadmap
 
-1. MVP storage and file handling in a no-network container sandbox, so DEFERRED criteria get executable checks.
+1. MVP storage in a no-network container sandbox, so DEFERRED criteria get checks.
 2. A price lookup tool so more comparable prices are SOURCED.
-3. After the hackathon: a webhook handler for a provider in the founder's own account (founder's keys, never ours) to replace the MOCKED events.
-4. Activation and retention per MVP feature once the app is hosted publicly.
-5. Community: more free research tools, red-team prompts in `evals/`, translations (Arabic first); see [CONTRIBUTING.md](CONTRIBUTING.md).
+3. A webhook handler for a provider in the founder's own account (their keys, never ours) to replace the MOCKED events.
+4. Activation and retention per MVP feature once hosted.
+5. Community: research tools, red-team prompts, translations ([CONTRIBUTING.md](CONTRIBUTING.md)).

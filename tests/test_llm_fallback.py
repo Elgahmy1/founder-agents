@@ -97,3 +97,18 @@ def test_request_larger_than_the_per_minute_limit_fails_fast(monkeypatch):
     except RateLimited as e:
         assert "9512" in str(e)
     assert slept == []  # no pointless waiting
+
+
+def test_used_up_daily_budget_fails_fast(monkeypatch):
+    slept = []
+    monkeypatch.setattr(llm_mod.time, "sleep", slept.append)
+    r = Resp(429)
+    r.text = ("Rate limit reached for model on tokens per day (TPD): Limit 200000, Used 198763, Requested 3376. "
+              "Please try again in 15m24.048s.")
+    monkeypatch.setattr(llm_mod.httpx, "post", lambda *a, **k: r)
+    try:
+        OpenAICompatLLM(_settings(max_rate_wait_s=400)).structured("s", "u", Out)
+        raise AssertionError("expected RateLimited")
+    except RateLimited as e:
+        assert "daily" in str(e)
+    assert slept == []

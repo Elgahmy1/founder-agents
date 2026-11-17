@@ -8,6 +8,8 @@ template renders the prototype (app/prototype.py) and code checks it
 """
 from __future__ import annotations
 
+from app import carry as carry_mod
+from app.carry import CarryAnswer
 from pydantic import BaseModel, Field
 
 from app.agents.base import Agent
@@ -49,12 +51,14 @@ class MvpSpec(BaseModel):
     screens: list[Screen] = Field(min_length=1, max_length=4)
     tech_stack: list[str] = Field(description="Free, open-source tools only")
     risks: list[str]
+    carried_forward: list[CarryAnswer] = Field(default_factory=list, description="One answer per carried-forward item, if any")
 
 
 class BuilderAgent(Agent):
     role = "builder"
 
-    def mvp_spec(self, brief: FounderBrief, opp: Opportunity, canvas: LeanCanvas, feedback: str | None = None) -> MvpSpec:
+    def mvp_spec(self, brief: FounderBrief, opp: Opportunity, canvas: LeanCanvas, feedback: str | None = None,
+                 carry: list[dict] | None = None) -> MvpSpec:
         user = (
             f"FOUNDER BRIEF\n{brief.as_text()}\n\nOPPORTUNITY\n{opp.model_dump_json(indent=1)}\n\n"
             f"LEAN CANVAS\n{canvas.model_dump_json(indent=1, exclude={'claims'})}\n\n"
@@ -63,4 +67,6 @@ class BuilderAgent(Agent):
         )
         if feedback:
             user += f"\n\nFEEDBACK FROM THE LAST BUILD GATE (fix these)\n{feedback}"
-        return self.ask("write_mvp_spec", user, MvpSpec, critique=lambda d: problems(d, brief))
+        user += carry_mod.prompt_block(carry or [])
+        return self.ask("write_mvp_spec", user, MvpSpec,
+                        critique=lambda d: problems(d, brief) + carry_mod.check(d, carry or []))

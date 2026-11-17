@@ -2,9 +2,9 @@
 
 An open-source team of AI agents that takes a founder's brief (idea, skills, budget, time, target market, values) toward a validated digital product. It gathers real sources, labels everything else as an ASSUMPTION, sets evidence targets before testing, and recommends **stop** when the evidence is weak. The founder approves everything that is published, sent, spent or signed, and that rule lives in code (`app/approval.py`).
 
-In the committed demo run (`48fc7649`, an exam-summary app for students), the agents took one idea through all six phases on an open-weight model at $0.00: sourced research, a waitlist demand test (0 of 120 sign-ups: the system recommended PIVOT and the founder overrode it to GO to carry the demo through all six phases; the log keeps both, and overrides now require a written reason), a tested MVP with a user guide, pricing and policy drafts signed by the founder, a store page and launch kit, and a learn gate that recommended **stop** on real launch numbers (0 visits, 0 sign-ups). Three other ideas were stopped earlier on weak evidence, and a crypto-signals idea was refused by the policy screen. You can replay every recorded run without a model at `/replay/<run>` ([demo-run map](docs/demo-run.md), [run metrics](evals/run_metrics.md)).
+In the committed demo run (`48fc7649`, an exam-summary app), the agents took one idea through all six phases at $0.00: sourced research, a demand test (0 of 120 sign-ups: PIVOT recommended, overruled to GO by the founder with both logged), a tested MVP with a user guide, signed pricing and policy drafts, a store page, and a learn gate that recommended **stop** on real numbers. Three other ideas stopped on weak evidence and a crypto idea was refused. Replay any recorded run without a model at `/replay/<run>` ([demo-run map](docs/demo-run.md)).
 
-Every figure above is checked by CI on each push, not typed by hand: run metrics are recomputed from `decision_log.json` ([run_metrics.md](evals/run_metrics.md)), every cited URL in `outputs/` must have been retrieved by a logged action ([claims_audit.md](evals/claims_audit.md)), the generated MVP code is re-run against its acceptance checks, and the guard must refuse all 90 trick requests in English and Arabic while still allowing 24 normal ones ([red_team_report.md](evals/red_team_report.md)). In the app, any request typed into **Ask the team** that breaks a rule is refused with the rule and the reason, before a model is called.
+CI recomputes these figures on every push: run metrics from `decision_log.json` ([run_metrics.md](evals/run_metrics.md)), every cited URL must have been retrieved ([claims_audit.md](evals/claims_audit.md)), the MVP code re-runs its checks, and the guard must refuse 90 trick requests (English and Arabic) and allow 24 normal ones ([red_team_report.md](evals/red_team_report.md)).
 
 ## Quickstart
 
@@ -12,25 +12,23 @@ Every figure above is checked by CI on each push, not typed by hand: run metrics
 docker compose up
 ```
 
-Open http://localhost:8000, fill in a founder brief and press **Start Discover**. The run goes through all six phases and stops at every gate for your decision. The app opens at once; the open-weight model (`qwen3:8b`, about 5 GB) downloads in the background the first time. Meanwhile **Recorded runs** replays the committed demo runs read-only, with no model: http://localhost:8000/replay/48fc7649.
+Open http://localhost:8000, fill in a founder brief and press **Start Discover**. The run stops at every gate for your decision. The app opens at once while the open-weight model (`qwen3:8b`, ~5 GB) downloads; meanwhile replay a recorded run: http://localhost:8000/replay/48fc7649.
 
-Without Docker: install [Ollama](https://ollama.com), `ollama pull qwen3:8b`, then `pip install -r requirements.txt && uvicorn app.main:app`. Terminal version: `python -m app.cli run briefs/study-notes.json`. Smoke tests: `python -m pytest -q` (no model, no network, no keys).
+Without Docker: install [Ollama](https://ollama.com), `ollama pull qwen3:8b`, then `pip install -r requirements.txt && uvicorn app.main:app`. Terminal version: `python -m app.cli run briefs/study-notes.json`. Tests: `python -m pytest -q` (no model, network or keys).
 
 ## What works and what is mocked
 
-Every **Working** row has real output from the committed demo runs ([step-to-output map](docs/demo-run.md), [full step-by-step table](docs/status.md)).
+Rows marked **Working** without a note have real output in the committed demo runs ([map](docs/demo-run.md), [full table](docs/status.md)).
 
 | Step | Status |
 |---|---|
 | Brief intake + policy screen (excluded products, unsafe requests) | **Working** |
 | 1 Discover: research from free sources (Hacker News, Stack Exchange, Wikipedia, DuckDuckGo) and scored opportunities | **Working** |
 | 1 Discover: market definition and Mom Test interview plan with outreach draft | **Working** |
-| 1 Discover: area check first, when the founder names where they will sell: local fit, whether what the product needs is available there, local and global competitors and where the idea would stand; the fit stays UNKNOWN in code without a retrieved source about the place | **Working** (added after the committed demo run) |
-| 1 Discover: co-founder verdict (strong / promising / weak / do not pursue) with the killer risk and 2-4 concrete improvements, each with the cheapest test this week, plus the best launch window (dates) and what to avoid; capped in code so it is never more positive than the evidence gate | **Working** (added after the committed demo run) |
-| 1 Discover: funding scout for strong or promising ideas: grants, accelerators, competitions and sponsors near the founder, with a fit % computed in code (criteria met / checked, not a probability), history, missing criteria, an apply link only if a source has it, and a draft email the founder sends personally; names not in any source are UNVERIFIED, banks and loans are dropped | **Working** (added after the committed demo run) |
+| 1 Discover: co-founder layer: area check (local fit, resources, competitors; UNKNOWN in code without a source about the place), an honest verdict capped by the gate with the killer risk, fixes, cheapest tests and a launch window, and a funding scout (grants, accelerators, sponsors; fit % computed in code, unverified names flagged, no loans) | **Working** (added after the committed demo run) |
 | Evidence ledger: every claim SOURCED (a retrieved URL) or labelled ASSUMPTION, enforced in code and audited in CI | **Working** |
 | 2 Validate: Lean Canvas, landing page with real sign-up form, targets locked by the founder before the test | **Working** |
-| 2 Validate: each real customer interview (pasted notes, or a recording in Arabic or English transcribed by open-weight Whisper) analysed by a Mom Test agent; every quote is checked against the transcript in code and the counts feed the demand gate | **Working** (added after the committed demo run; audio needs the free-tier endpoint, STUBBED with local Ollama) |
+| 2 Validate: real interviews (notes, or an Arabic/English recording via open-weight Whisper) analysed by a Mom Test agent; quotes checked against the transcript in code; counts feed the demand gate | **Working** (added after the demo run; audio STUBBED with local Ollama) |
 | 3 Build: MVP spec (user stories, acceptance criteria, hours vs budget), clickable prototype, build gate | **Working** |
 | 3 Build: core code for every user story, tested against its acceptance criteria in a sandbox (CI re-runs the checks) | **Working** |
 | 3 Build: MVP app at `/mvp/<run>` (each request runs the tested code in the sandbox) and its user guide at `/mvp/<run>/guide` | **Working** |
@@ -39,7 +37,7 @@ Every **Working** row has real output from the committed demo runs ([step-to-out
 | 5 Launch: payment → automatic delivery, refund revokes access, idempotency, reconciliation | **MOCKED** (real logic on mock events; no provider, no money) |
 | 6 Operate and learn: results vs locked targets (counted by the app), support reply drafts, learn gate, learning memo | **Working** |
 | Gates after every phase (go / repeat / pivot / stop), recommending STOP on weak evidence; overruling a recommendation needs a written reason, logged | **Working** |
-| Founder-specific advice: a specificity critic in code sends back drafts with stock advice or that ignore the founder's budget, hours, skills and market; gates end with a next step built from the run's numbers | **Working** |
+| Founder-specific advice: a critic in code sends back stock advice, money-taking suggestions and drafts that ignore the budget, hours, skills or market; the killer risk, suggested changes and interview objections are carried into the Lean Canvas and MVP spec, which must answer each one (checked in code) | **Working** |
 | Founder approval queue for everything published, sent, spent or signed, enforced in code | **Working** |
 | Decision log (`decision_log.json`): every agent action, required keys, tamper-evident hash chain | **Working** |
 | Red-team guard (fake reviews, urgency, income promises, impersonation, money, credentials, prompt injection; English + Arabic), 0 failures | **Working** |
@@ -49,14 +47,13 @@ Every **Working** row has real output from the committed demo runs ([step-to-out
 
 ## Architecture
 
-An explicit state machine (`app/orchestrator.py`) moves a run through the six phases and stops wherever only the founder can decide. Each agent (`app/agents/`) has one job and one prompt (`prompts/`) and returns schema-checked JSON from an open-weight model. Every claim passes the evidence ledger (`app/evidence.py`), which keeps a citation only if the source was actually retrieved and supports it. Gates (`app/gates.py`) compute a recommendation from thresholds fixed in advance; the founder decides, and overrides are logged. Details, diagrams and sale to cash: [ARCHITECTURE.md](ARCHITECTURE.md).
+A state machine (`app/orchestrator.py`) moves a run through six phases and stops wherever only the founder can decide. Each agent (`app/agents/`) has one job and one prompt and returns schema-checked JSON. The evidence ledger keeps a citation only if the source was retrieved and supports it; gates compute a recommendation from thresholds fixed in advance, and the founder decides. Details: [ARCHITECTURE.md](ARCHITECTURE.md).
 
 ## Models and free resources
 
 - Default: `qwen3:8b` (open weights) via [Ollama](https://ollama.com), locally. Any Ollama model works (`MODEL=gpt-oss:20b` in `.env`).
-- No GPU: `LLM_PROVIDER=openai` with a free-tier endpoint serving open weights, e.g. Groq's free tier with `openai/gpt-oss-120b` (see `.env.example`; the key stays in your untracked `.env`). When it is rate-limited, calls fall back to the local model and the log records which model answered.
-- The committed demo runs used `openai/gpt-oss-120b` on Groq's free tier from a laptop without a GPU.
-- Research: Hacker News, Stack Exchange, Wikipedia and DuckDuckGo, with no keys or accounts. If they are unreachable, the run continues and claims are labelled ASSUMPTION.
+- No GPU: `LLM_PROVIDER=openai` with a free tier serving open weights, e.g. Groq with `openai/gpt-oss-120b` (used for the committed demo runs; key in your untracked `.env`). A used-up limit fails fast and falls back to the local model; the log records which model answered.
+- Research: Hacker News, Stack Exchange, Wikipedia and DuckDuckGo, no keys; off-topic results are dropped, and if sources are unreachable claims are labelled ASSUMPTION.
 - No paid service is used or required.
 
 ## Cost per run
@@ -78,12 +75,12 @@ An explicit state machine (`app/orchestrator.py`) moves a run through the six ph
 - Hide core features behind a paywall.
 - Spin weak results: targets are set before the test, and the system recommends stop when they are missed.
 
-Each limit is enforced in code by the guard and the approval queue; [`evals/red_team_report.md`](evals/red_team_report.md) lists the 90 trick requests (English and Arabic), 24 normal requests that must still work, 31 product ideas and 13 generated texts it was tested on, with 0 failures.
+Each limit is enforced in code by the guard and the approval queue, and tested in [`evals/red_team_report.md`](evals/red_team_report.md) (0 failures).
 
 ## How the project stays alive after the hackathon
 
 - Maintainers: Mohamed (@Elgahmy1) and contributors; MIT licence.
-- Roadmap: [ARCHITECTURE.md](ARCHITECTURE.md#roadmap) (MVP storage in a container sandbox, more SOURCED prices, provider webhooks in the founder's own account, product analytics).
+- Roadmap: [ARCHITECTURE.md](ARCHITECTURE.md#roadmap).
 - Quality: every push to `main` runs the smoke tests, the red-team evaluation and the decision-log check in GitHub Actions, on free runners with no keys.
 - Community: [CONTRIBUTING.md](CONTRIBUTING.md) (first contributions: guard rules, research tools, agents, translations), [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md), [SECURITY.md](SECURITY.md).
 - Funding: it runs on free local models, so there is no hosting bill; grants or sponsorship would pay for maintainer time, never for paywalled features.

@@ -20,6 +20,7 @@ import uuid
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from app import carry as carry_mod
 from app import guard
 from app.next_steps import next_step
 from app.guard import invented_identity
@@ -477,12 +478,14 @@ class Orchestrator:
         opp = Opportunity(**st.opportunities[st.chosen])
         market = Market(**st.market)
         self._step(st, P2_STEPS, 0)
-        canvas = StrategistAgent(ctx).lean_canvas(brief, opp, market, docs)
+        carry = carry_mod.collect(st, with_interviews=False)
+        canvas = StrategistAgent(ctx).lean_canvas(brief, opp, market, docs, carry)
         st.canvas = canvas.model_dump()
         led = Ledger.from_list(st.ledger)
         cclaims = led.add(resolve(canvas.claims, docs))
         st.ledger = led.to_list()
-        self.write_output(st, "phase2_step1_lean_canvas.md", _canvas_md(opp.name, canvas, cclaims))
+        self.write_output(st, "phase2_step1_lean_canvas.md",
+                          _canvas_md(opp.name, canvas, cclaims) + "\n".join(carry_mod.render(carry, canvas)) + "\n")
 
         self._step(st, P2_STEPS, 1)
         copy = MarketerAgent(ctx).landing_copy(canvas, opp.name)
@@ -516,9 +519,10 @@ class Orchestrator:
         opp = Opportunity(**st.opportunities[st.chosen])
         canvas = LeanCanvas(**st.canvas)
         self._step(st, P3_STEPS, 0)
-        spec = BuilderAgent(ctx).mvp_spec(brief, opp, canvas, st.build_feedback)
+        carry = carry_mod.collect(st, with_interviews=True)
+        spec = BuilderAgent(ctx).mvp_spec(brief, opp, canvas, st.build_feedback, carry)
         st.mvp = spec.model_dump()
-        self.write_output(st, "phase3_step1_mvp_spec.md", _mvp_md(spec, brief))
+        self.write_output(st, "phase3_step1_mvp_spec.md", _mvp_md(spec, brief) + "\n".join(carry_mod.render(carry, spec)) + "\n")
 
         self._step(st, P3_STEPS, 1)
         page, removed = render_prototype(spec)
@@ -1079,7 +1083,11 @@ class Orchestrator:
             st, q = self.load(run_id)
             if st.stage != "p2_collecting":
                 raise ValueError(f"interviews are added while the demand test runs (stage={st.stage})")
-            text = guard.sanitize_source((transcript or "").strip())[:30000]
+            raw_text = (transcript or "").strip()
+            text = guard.sanitize_source(raw_text)[:30000]
+            if len(text) < len(raw_text[:30000]) - 2:
+                self.log.append(agent="guard", action="screen_interview", run_id=run_id, phase=2, outcome="scrubbed",
+                                detail="removed sentences that tried to instruct the agents (e.g. 'mark this GO')")
             if len(text.split()) < 20:
                 raise ValueError("the interview is too short to analyse: paste at least a few exchanges")
             plan = st.interview_plan or {}
