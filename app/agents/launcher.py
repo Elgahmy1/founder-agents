@@ -10,6 +10,7 @@ from __future__ import annotations
 from pydantic import BaseModel, Field
 
 from app.agents.base import Agent
+from app.specificity import problems
 from app.agents.builder import MvpSpec
 from app.agents.market_analyst import Market
 from app.agents.pricer import PricingPlan
@@ -59,4 +60,4 @@ class LauncherAgent(Agent):
         )
         if feedback:
             user += f"\n\nFEEDBACK FROM THE LAST LAUNCH GATE (fix these)\n{feedback}"
-        return self.ask("write_launch_kit", user, LaunchKit)
+        return self.ask("write_launch_kit", user, LaunchKit, critique=lambda d: problems(d, brief))

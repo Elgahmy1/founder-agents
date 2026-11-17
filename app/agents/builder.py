@@ -11,6 +11,7 @@ from __future__ import annotations
 from pydantic import BaseModel, Field
 
 from app.agents.base import Agent
+from app.specificity import problems
 from app.agents.scout import Opportunity
 from app.agents.strategist import LeanCanvas
 from app.brief import FounderBrief
@@ -62,4 +63,4 @@ class BuilderAgent(Agent):
         )
         if feedback:
             user += f"\n\nFEEDBACK FROM THE LAST BUILD GATE (fix these)\n{feedback}"
-        return self.ask("write_mvp_spec", user, MvpSpec)
+        return self.ask("write_mvp_spec", user, MvpSpec, critique=lambda d: problems(d, brief))

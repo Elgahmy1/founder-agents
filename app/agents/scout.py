@@ -13,6 +13,7 @@ from app.agents.base import Agent
 from app.brief import FounderBrief
 from app.evidence import RawClaim
 from app.research import Doc, docs_for_prompt
+from app.specificity import problems
 
 
 class Scores(BaseModel):
@@ -32,6 +33,10 @@ class Opportunity(BaseModel):
     scores: Scores
     claims: list[RawClaim]
     pain_source_ids: list[str] = Field(default_factory=list, description="Source ids where real people describe this pain")
+    strongest_alternative: str = Field(default="", description="What these customers use today that is hardest to beat, "
+                                       "including free general-purpose AI assistants (ChatGPT, Gemini) where they apply")
+    why_switch: str = Field(default="", description="The concrete reason a customer would switch from that alternative, "
+                            "or a plain statement that they would not")
     biggest_risk: str
 
     @property
@@ -53,4 +58,5 @@ class ScoutAgent(Agent):
             "Produce up to 3 sharpened digital-product opportunities derived from the idea, "
             "including the founder's original framing as one of them."
         )
-        return self.ask("find_opportunities", user, Opportunities, sources=[d.url for d in docs])
+        return self.ask("find_opportunities", user, Opportunities, sources=[d.url for d in docs],
+                        critique=lambda d: problems(d, brief, need_alternative=True))

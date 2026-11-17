@@ -352,6 +352,8 @@ class Orchestrator:
             md += [f"## {i + 1}. {o.name} (score {o.score}/5)", "",
                    f"- Problem: {o.problem}", f"- Customer: {o.customer}", f"- Digital product: {o.digital_product}",
                    f"- Alternatives today: {', '.join(o.current_alternatives)}",
+                   *([f"- Strongest alternative: {o.strongest_alternative}"] if o.strongest_alternative else []),
+                   *([f"- Why a customer would switch: {o.why_switch}"] if o.why_switch else []),
                    f"- Scores: pain {o.scores.pain}, founder fit {o.scores.founder_fit}, feasibility {o.scores.feasibility}, "
                    f"reach {o.scores.reach}, differentiation {o.scores.differentiation} (model judgement)",
                    f"- Biggest risk: {o.biggest_risk}", "", "Claims:", *[f"- {c.md()}" for c in claims], ""]

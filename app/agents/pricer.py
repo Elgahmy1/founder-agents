@@ -11,6 +11,7 @@ from __future__ import annotations
 from pydantic import BaseModel, Field
 
 from app.agents.base import Agent
+from app.specificity import problems
 from app.agents.builder import MvpSpec
 from app.agents.strategist import LeanCanvas
 from app.brief import FounderBrief
@@ -53,4 +54,4 @@ class PricerAgent(Agent):
         )
         if feedback:
             user += f"\n\nFEEDBACK FROM THE LAST COMMERCIAL GATE (fix these)\n{feedback}"
-        return self.ask("propose_pricing", user, PricingPlan, sources=[d.url for d in docs])
+        return self.ask("propose_pricing", user, PricingPlan, sources=[d.url for d in docs], critique=lambda d: problems(d, brief))

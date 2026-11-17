@@ -4,6 +4,7 @@ from __future__ import annotations
 from pydantic import BaseModel, Field
 
 from app.agents.base import Agent
+from app.specificity import problems
 from app.agents.market_analyst import Market
 from app.agents.scout import Opportunity
 from app.brief import FounderBrief
@@ -33,4 +34,4 @@ class StrategistAgent(Agent):
             f"FOUNDER BRIEF\n{brief.as_text()}\n\nOPPORTUNITY\n{opp.model_dump_json(indent=1)}\n\n"
             f"MARKET\n{market.model_dump_json(indent=1)}\n\nSOURCES\n{docs_for_prompt(docs)}"
         )
-        return self.ask("design_lean_canvas", user, LeanCanvas, sources=[d.url for d in docs])
+        return self.ask("design_lean_canvas", user, LeanCanvas, sources=[d.url for d in docs], critique=lambda d: problems(d, brief))

@@ -4,6 +4,7 @@ from __future__ import annotations
 from pydantic import BaseModel, Field
 
 from app.agents.base import Agent
+from app.specificity import problems
 from app.agents.scout import Opportunity
 from app.brief import FounderBrief
 from app.evidence import RawClaim
@@ -27,4 +28,4 @@ class MarketAnalystAgent(Agent):
             f"FOUNDER BRIEF\n{brief.as_text()}\n\nCHOSEN OPPORTUNITY\n{opp.model_dump_json(indent=1)}\n\n"
             f"SOURCES\n{docs_for_prompt(docs)}"
         )
-        return self.ask("define_market", user, Market, sources=[d.url for d in docs])
+        return self.ask("define_market", user, Market, sources=[d.url for d in docs], critique=lambda d: problems(d, brief))

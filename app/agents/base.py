@@ -32,7 +32,29 @@ class Agent:
         own = (self.ctx.prompts_dir / f"{self.role}.md").read_text(encoding="utf-8")
         return f"{own}\n\n{policy}"
 
-    def ask(self, action: str, user: str, schema: type[T], sources: list[str] | None = None) -> T:
+    def ask(self, action: str, user: str, schema: type[T], sources: list[str] | None = None,
+            critique=None) -> T:
+        """One model call. With `critique` (draft -> list of problems, see app/specificity.py), a draft that has
+        problems gets one redraft with the problems listed; the check is logged as `specificity_check`."""
+        out = self._ask_once(action, user, schema, sources)
+        if critique is None:
+            return out
+        found = critique(out)
+        if found:
+            fix = "\n".join(f"- {p}" for p in found)
+            out = self._ask_once(f"redraft_{action}", f"{user}\n\nYOUR LAST DRAFT WAS TOO GENERIC. Fix these and keep "
+                                 f"everything that was specific:\n{fix}", schema, sources)
+            left = critique(out)
+        else:
+            left = []
+        self.ctx.log.append(agent="critic", action="specificity_check", sources=[], model=None, cost=0,
+                            run_id=self.ctx.run_id, outcome=("pass" if not found else "redrafted" if not left
+                                                             else "redrafted_with_problems_left"),
+                            detail="; ".join(found + [f"still: {p}" for p in left])[:1500] or "no generic advice found",
+                            checked=action)
+        return out
+
+    def _ask_once(self, action: str, user: str, schema: type[T], sources: list[str] | None = None) -> T:
         u = self.ctx.llm.usage
         before = (u.calls, u.prompt_tokens, u.completion_tokens, u.cost_usd)
         out = self.ctx.llm.structured(self.system_prompt(), user, schema)
