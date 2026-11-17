@@ -210,6 +210,18 @@ def check_request(text: str) -> Verdict:
     return Verdict(True)
 
 
+# A founder's value such as "no fake reviews" is a commitment, not a request. A value that only states what the
+# founder refuses is not screened; anything else in it (a "but", an instruction verb) is screened as usual.
+_REFUSAL_VALUE = re.compile(r"^\s*(no|never|not|zero|avoid\w*|without|refus\w*|لا|بدون|مفيش|عدم|ممنوع)\b", re.I)
+_SNEAK = re.compile(r"\b(but|however|except|unless|write|make|generate|create|post|buy|add|give)\b|لكن|بس|اكتب|اعمل|ضيف", re.I)
+
+
+def check_brief(brief) -> Verdict:
+    """Idea, market and skills are screened in full; values that only state a refusal are skipped."""
+    values = [v for v in brief.values if not (_REFUSAL_VALUE.search(v) and not _SNEAK.search(v))]
+    return check_request(" ".join([brief.idea, brief.target_market, *brief.skills, *values]))
+
+
 # A product whose purpose is fake reviews, fake urgency or promised income is excluded too, not only the request.
 PRODUCT_PURPOSE_RULES = [r for r in REQUEST_RULES + ARABIC_RULES if r[0] == "income_promise"] + [
     ("fake_social_proof", "A product that fakes reviews, ratings, followers or sign-ups is excluded.",

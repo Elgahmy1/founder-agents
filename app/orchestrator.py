@@ -278,7 +278,7 @@ class Orchestrator:
         st = RunState(run_id=run_id, slug=slugify(brief.idea.split(".")[0]), brief=brief.model_dump())
         q = self.queue(run_id)
         self.log.append(agent="orchestrator", action="start_run", run_id=run_id, detail=brief.idea[:200])
-        v = guard.check_request(brief.all_text())
+        v = guard.check_brief(brief)
         if not v.allowed:
             self.log.append(agent="guard", action="screen_brief", run_id=run_id, outcome="stop", detail=v.reason)
             g = GateResult("policy_gate", 1, "stop", [v.reason or "blocked by policy"])
