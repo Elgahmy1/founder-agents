@@ -10,12 +10,13 @@ from __future__ import annotations
 import hashlib
 import json
 import threading
+import time
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
 REQUIRED_KEYS = ("timestamp", "agent", "action", "sources", "model", "cost", "approved_by")
-_lock = threading.Lock()
+_lock = threading.RLock()
 
 
 def _now() -> str:
@@ -32,9 +33,17 @@ class DecisionLog:
         self.path = Path(path)
 
     def read(self) -> list[dict[str, Any]]:
-        if not self.path.exists() or not self.path.read_text(encoding="utf-8").strip():
-            return []
-        return json.loads(self.path.read_text(encoding="utf-8"))
+        for i in range(20):
+            try:
+                if not self.path.exists():
+                    return []
+                text = self.path.read_text(encoding="utf-8")
+                return json.loads(text) if text.strip() else []
+            except (PermissionError, json.JSONDecodeError):
+                if i == 19:
+                    raise
+                time.sleep(0.05 * (i + 1))
+        return []
 
     def append(
         self,
@@ -65,12 +74,19 @@ class DecisionLog:
             entry["hash"] = _digest(entry)
             entries.append(entry)
             self.path.parent.mkdir(parents=True, exist_ok=True)
-            tmp = self.path.with_suffix(".tmp")
-            tmp.write_text(json.dumps(entries, indent=1, ensure_ascii=False) + "\n", encoding="utf-8")
-            try:
-                tmp.replace(self.path)
-            except OSError:  # e.g. the file is a Docker bind mount
-                self.path.write_text(tmp.read_text(encoding="utf-8"), encoding="utf-8")
+            text = json.dumps(entries, indent=1, ensure_ascii=False) + "\n"
+            tmp = self.path.with_name(self.path.name + ".tmp")
+            tmp.write_text(text, encoding="utf-8")
+            for i in range(20):
+                try:
+                    tmp.replace(self.path)
+                    break
+                except PermissionError:  # Windows: file is being read right now
+                    time.sleep(0.05 * (i + 1))
+                except OSError:  # e.g. the file is a Docker bind mount
+                    break
+            if tmp.exists():
+                self.path.write_text(text, encoding="utf-8")
                 tmp.unlink(missing_ok=True)
             return entry
 

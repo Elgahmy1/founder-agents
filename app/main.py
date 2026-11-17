@@ -62,6 +62,9 @@ def tag(s: str) -> str:
 
 
 def _bg(run_id: str, label: str, fn, *args) -> None:
+    if run_id in _busy:  # one background job per run; extra clicks are ignored
+        return
+
     def work():
         try:
             fn(*args)
@@ -142,7 +145,7 @@ def view_run(run_id: str):
         body.append(f"<div class='card'><b class=stop>Error:</b> {html.escape(st.error)}"
                     f"<form method=post action='/runs/{run_id}/retry'><button>Retry step</button></form></div>")
     pend = q.pending()
-    if pend:
+    if pend and not busy:
         items = "".join(f"""<div class="card"><b>{i.kind.upper()}</b>: {html.escape(i.title)}
 <pre>{html.escape(i.content[:3000])}</pre><form method="post" action="/runs/{run_id}/approvals/{i.id}">
 <input name="note" placeholder="Note (optional)"><button name="approve" value="1">Approve</button>
@@ -153,15 +156,15 @@ def view_run(run_id: str):
         body.append("<div class='card'><h2>Approval history</h2><table>" + "".join(
             f"<tr><td>{i.kind}</td><td>{html.escape(i.title)}</td><td>{i.status}</td><td>{html.escape(i.result or '')}</td></tr>"
             for i in done) + "</table></div>")
-    body.append(_gate_panel(st))
-    if st.stage == "p2_targets_wait" and st.demand_plan:
+    body.append(_gate_panel(st) if not busy else "")
+    if st.stage == "p2_targets_wait" and st.demand_plan and not busy:
         p = st.demand_plan
         body.append(f"""<div class="card"><h2>Lock demand-test targets before the test</h2>
 <p>{p['waitlist_signups_target']} waitlist sign-ups in {p['window_days']} days · {p['interviews_target']} interviews ·
 {p['pain_confirm_rate_target']:.0%} confirm the problem</p><p class=mut>{html.escape(p['rationale'])}</p>
 <form method="post" action="/runs/{run_id}/targets"><button name="approve" value="1">Lock these targets</button>
 <button class="rej" name="approve" value="0">Reject and re-plan</button></form></div>""")
-    if st.stage == "p2_collecting":
+    if st.stage == "p2_collecting" and not busy:
         body.append(f"""<div class="card"><h2>Record real results</h2>
 <p>Waitlist sign-ups counted by the app: <b>{orch.signups(run_id)}</b> (from <a href="/lp/{run_id}">the landing page</a>)</p>
 <form method="post" action="/runs/{run_id}/results"><label>Interviews completed</label><input type="number" name="interviews_done" min="0" required>
@@ -182,7 +185,11 @@ def view_run(run_id: str):
 
 @app.post("/runs/{run_id}/approvals/{item_id}")
 def decide(run_id: str, item_id: str, approve: str = Form(...), note: str = Form("")):
-    orch.approve(run_id, item_id, approve == "1", note or None)
+    if run_id not in _busy:
+        try:
+            orch.approve(run_id, item_id, approve == "1", note or None)
+        except (KeyError, ValueError):
+            pass  # stale or already-decided item: the refreshed page shows the current state
     return RedirectResponse(f"/runs/{run_id}", status_code=303)
 
 
@@ -203,6 +210,8 @@ def results(run_id: str, interviews_done: int = Form(...), pain_confirmed: int =
     try:
         orch.founder_record_results(run_id, interviews_done, pain_confirmed)
     except ValueError as e:
+        if "not collecting" in str(e):
+            return RedirectResponse(f"/runs/{run_id}", status_code=303)
         raise HTTPException(400, str(e))
     return RedirectResponse(f"/runs/{run_id}", status_code=303)
 

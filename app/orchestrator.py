@@ -13,6 +13,8 @@ from __future__ import annotations
 
 import json
 import re
+import threading
+import time
 import uuid
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -36,6 +38,34 @@ from app.gates import OUTCOMES, DemandTargets, GateResult, demand_gate, discover
 from app.landing import render_landing
 from app.llm import LLM
 from app.research import Doc, Researcher
+
+
+_io_lock = threading.RLock()
+
+
+def _atomic_write(p: Path, text: str) -> None:
+    """Write via a temp file; retry the swap because Windows refuses to
+    replace a file another request is reading at that instant."""
+    tmp = p.with_name(p.name + f".{threading.get_ident()}.tmp")
+    tmp.write_text(text, encoding="utf-8")
+    for i in range(20):
+        try:
+            tmp.replace(p)
+            return
+        except PermissionError:
+            time.sleep(0.05 * (i + 1))
+    p.write_text(text, encoding="utf-8")
+    tmp.unlink(missing_ok=True)
+
+
+def _read_json(p: Path):
+    for i in range(20):
+        try:
+            return json.loads(p.read_text(encoding="utf-8"))
+        except (PermissionError, json.JSONDecodeError):
+            if i == 19:
+                raise
+            time.sleep(0.05 * (i + 1))
 
 
 def slugify(s: str, n: int = 24) -> str:
@@ -76,6 +106,13 @@ class Orchestrator:
         self.log = DecisionLog(settings.decision_log_path)
         self.runs_dir = settings.data_dir / "runs"
         self.sites_dir = settings.data_dir / "sites"
+        self._run_locks: dict[str, threading.RLock] = {}
+
+    def lock(self, run_id: str) -> threading.RLock:
+        """One writer per run: agent steps and founder actions never interleave,
+        so a background step cannot overwrite an approval made meanwhile."""
+        with _io_lock:
+            return self._run_locks.setdefault(run_id, threading.RLock())
 
     # ---------- persistence ----------
     def _path(self, run_id: str) -> Path:
@@ -87,12 +124,11 @@ class Orchestrator:
                     "completion_tokens": self.llm.usage.completion_tokens, "cost_usd": self.llm.usage.cost_usd}
         p = self._path(st.run_id)
         p.parent.mkdir(parents=True, exist_ok=True)
-        tmp = p.with_suffix(".tmp")
-        tmp.write_text(json.dumps(st.__dict__, indent=1, ensure_ascii=False), encoding="utf-8")
-        tmp.replace(p)  # atomic: a failed write never leaves an empty state file
+        with _io_lock:
+            _atomic_write(p, json.dumps(st.__dict__, indent=1, ensure_ascii=False))
 
     def load(self, run_id: str) -> tuple[RunState, ApprovalQueue]:
-        st = RunState(**json.loads(self._path(run_id).read_text(encoding="utf-8")))
+        st = RunState(**_read_json(self._path(run_id)))
         q = self.queue(st.run_id)
         q.load(st.approvals)
         return st, q
@@ -102,7 +138,10 @@ class Orchestrator:
             return []
         out = []
         for p in sorted(self.runs_dir.glob("*/state.json"), key=lambda p: p.stat().st_mtime, reverse=True):
-            out.append(RunState(**json.loads(p.read_text(encoding="utf-8"))))
+            try:
+                out.append(RunState(**_read_json(p)))
+            except (OSError, ValueError):
+                continue  # skip an unreadable run instead of breaking the home page
         return out
 
     def queue(self, run_id: str) -> ApprovalQueue:
@@ -166,6 +205,10 @@ class Orchestrator:
         return st
 
     def advance(self, run_id: str) -> RunState:
+        with self.lock(run_id):
+            return self._advance(run_id)
+
+    def _advance(self, run_id: str) -> RunState:
         st, q = self.load(run_id)
         try:
             if st.stage == "p1_running":
@@ -290,6 +333,10 @@ class Orchestrator:
 
     # ---------- founder actions ----------
     def founder_gate_decision(self, run_id: str, decision: str, note: str | None = None) -> RunState:
+        with self.lock(run_id):
+            return self._founder_gate_decision(run_id, decision=decision, note=note)
+
+    def _founder_gate_decision(self, run_id: str, decision: str, note: str | None = None) -> RunState:
         if decision not in OUTCOMES:
             raise ValueError(f"decision must be one of {OUTCOMES}")
         st, q = self.load(run_id)
@@ -330,6 +377,10 @@ class Orchestrator:
         return st
 
     def founder_lock_targets(self, run_id: str, approve: bool, note: str | None = None) -> RunState:
+        with self.lock(run_id):
+            return self._founder_lock_targets(run_id, approve=approve, note=note)
+
+    def _founder_lock_targets(self, run_id: str, approve: bool, note: str | None = None) -> RunState:
         st, q = self.load(run_id)
         if st.stage != "p2_targets_wait":
             raise ValueError(f"targets are not waiting (stage={st.stage})")
@@ -365,6 +416,10 @@ class Orchestrator:
                 f.write(email + "\n")
 
     def founder_record_results(self, run_id: str, interviews_done: int, pain_confirmed: int) -> RunState:
+        with self.lock(run_id):
+            return self._founder_record_results(run_id, interviews_done=interviews_done, pain_confirmed=pain_confirmed)
+
+    def _founder_record_results(self, run_id: str, interviews_done: int, pain_confirmed: int) -> RunState:
         st, q = self.load(run_id)
         if st.stage != "p2_collecting":
             raise ValueError(f"not collecting evidence (stage={st.stage})")
@@ -383,6 +438,10 @@ class Orchestrator:
         return st
 
     def approve(self, run_id: str, item_id: str, approve: bool, note: str | None = None) -> RunState:
+        with self.lock(run_id):
+            return self._approve(run_id, item_id=item_id, approve=approve, note=note)
+
+    def _approve(self, run_id: str, item_id: str, approve: bool, note: str | None = None) -> RunState:
         st, q = self.load(run_id)
         q.decide(item_id, approve, note)
         self.save(st, q)

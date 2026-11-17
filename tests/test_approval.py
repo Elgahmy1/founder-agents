@@ -59,3 +59,26 @@ def test_landing_page_404_until_approved(monkeypatch, make_orch, brief, settings
     st = orch.founder_gate_decision(st.run_id, "go")
     c = TestClient(main.app)
     assert c.get(f"/lp/{st.run_id}").status_code == 404
+
+
+def test_concurrent_advance_does_not_duplicate_work(make_orch, brief):
+    import threading
+    orch = make_orch()
+    st = orch.create(brief)
+    ts = [threading.Thread(target=orch.advance, args=(st.run_id,)) for _ in range(5)]
+    [t.start() for t in ts]
+    [t.join() for t in ts]
+    st, q = orch.load(st.run_id)
+    assert st.stage == "p1_gate_wait"
+    assert len(q.items) == 1 and len(st.gates) == 1
+    assert sum(1 for e in orch.log.read() if e["action"] == "evidence_gate") == 1
+
+
+def test_stale_approval_click_does_not_500(monkeypatch, make_orch, brief):
+    import app.main as main
+    orch = make_orch()
+    monkeypatch.setattr(main, "orch", orch)
+    st = orch.start(brief)
+    r = TestClient(main.app).post(f"/runs/{st.run_id}/approvals/doesnotexist", data={"approve": "1"},
+                                  follow_redirects=False)
+    assert r.status_code == 303
