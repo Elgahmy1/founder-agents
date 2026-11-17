@@ -223,3 +223,42 @@ def commercial_gate(*, free_tier_with_core: bool, comparables: int, sourced_comp
     for c in failed:
         reasons.append(f"Failed: {c.name} (target {c.target}, actual {c.actual}).")
     return GateResult("commercial_gate", 4, rec, reasons, checks)
+
+
+@dataclass(frozen=True)
+class LaunchThresholds:
+    """Fixed before the launcher runs."""
+    min_posts: int = 1
+    max_attempts: int = 2
+
+
+def launch_gate(*, store_safe: list[str], store_guard_removed: list[str], prices_match_approved: bool,
+                posts_ok: int, posts_flagged: int, targets_set: bool, payment_test_passed: bool,
+                policies_signed: bool, attempt: int = 1, t: LaunchThresholds = LaunchThresholds()) -> GateResult:
+    checks = [
+        Check("Store page safety (no scripts, forms, external links)", "0 problems", ", ".join(store_safe) or "0", not store_safe),
+        Check("Guard flags on store page (removed lines or whole page)", "0", str(len(store_guard_removed)), not store_guard_removed),
+        Check("Store prices equal the founder-approved pricing", "yes", "yes" if prices_match_approved else "no",
+              prices_match_approved),
+        Check("Launch posts that pass the guard", f">= {t.min_posts}", str(posts_ok), posts_ok >= t.min_posts),
+        Check("Launch posts blocked by the guard", "0", str(posts_flagged), posts_flagged == 0),
+        Check("Launch targets proposed before launch", "yes", "yes" if targets_set else "no", targets_set),
+        Check("Policies signed off in Phase 4", "yes", "yes" if policies_signed else "no", policies_signed),
+        Check("Sale-to-cash test (MOCKED): delivery, idempotency, refund, reconciliation", "PASS",
+              "PASS" if payment_test_passed else "FAIL", payment_test_passed),
+    ]
+    failed = [c for c in checks if not c.passed]
+    reasons: list[str] = []
+    if not failed:
+        rec = "go"
+        reasons.append("The store page, launch posts, targets and the (MOCKED) sale-to-cash path are ready. "
+                       "GO needs the founder to approve the page and lock the targets.")
+    elif attempt >= t.max_attempts:
+        rec = "stop"
+        reasons.append(f"Launch attempt {attempt}: required launch checks still fail after a redraft.")
+    else:
+        rec = "repeat"
+        reasons.append("Redraft the launch kit: the failed checks below are sent back to the launcher.")
+    for c in failed:
+        reasons.append(f"Failed: {c.name} (target {c.target}, actual {c.actual}).")
+    return GateResult("launch_gate", 5, rec, reasons, checks)

@@ -39,8 +39,7 @@ def test_commercial_phase_go_needs_founder_signatures(make_orch, brief, settings
         orch.founder_gate_decision(st.run_id, "go")  # unsigned: GO is refused in code
     _sign_all(orch, st.run_id)
     st = orch.founder_gate_decision(st.run_id, "go")
-    assert st.stage == "done"
-    assert any(o.startswith("phase5_") and "STUBBED" in o for o in st.outputs)
+    assert st.stage == "p5_gate_wait", st.error
     assert not any(o.startswith("phase4_") and "STUBBED" in o for o in st.outputs)
     assert not validate(orch.log.read())
 

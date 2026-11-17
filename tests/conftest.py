@@ -14,6 +14,7 @@ sys.path.insert(0, str(ROOT))
 from app.agents.advisor import Advice  # noqa: E402
 from app.agents.analyst import DemandTestPlan, GateMemo  # noqa: E402
 from app.agents.builder import MvpSpec  # noqa: E402
+from app.agents.launcher import LaunchKit  # noqa: E402
 from app.agents.policy_drafter import PolicyDrafts  # noqa: E402
 from app.agents.pricer import PricingPlan  # noqa: E402
 from app.agents.interviewer import InterviewPlan  # noqa: E402
@@ -84,6 +85,18 @@ class FakeLLM:
         return {"terms": pol("Terms of use"), "privacy": pol("Privacy policy"), "refund": pol("Refund policy"),
                 "data_collected": ["uploaded notes (deleted after processing)", "email if given"]}
 
+    post_text = "Hi r/college, I'm Mohamed. I built a free tool that turns lecture notes into summaries. Honest feedback welcome."
+
+    def launch(self):
+        return {"headline": "Exam-ready notes", "subheadline": "Turn lecture notes into summaries",
+                "what_you_get": ["A summary of your notes", "Key terms to revise"],
+                "faq": [{"question": "Is it free?", "answer": "The core is free."},
+                        {"question": "Does it replace studying?", "answer": "No, it helps you revise."}],
+                "posts": [{"channel": "r/college", "text": self.post_text},
+                          {"channel": "Facebook groups", "text": "Join 5,000 happy students! Only 3 spots left."}],
+                "targets": {"window_days": 14, "store_visits": 200, "free_signups": 30, "paid_orders": 2,
+                            "rationale": "ASSUMPTION: 15% of visitors try the free tier."}}
+
     def structured(self, system, user, schema):
         self.usage.calls += 1
         c = [{"text": "Students struggle organizing lecture notes before exams", "source_ids": ["S1"]},
@@ -117,6 +130,7 @@ class FakeLLM:
             MvpSpec: self.mvp(),
             PricingPlan: self.pricing(),
             PolicyDrafts: self.policies(),
+            LaunchKit: self.launch(),
         }[schema]
         return schema.model_validate(data)
 

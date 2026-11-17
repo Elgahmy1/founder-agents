@@ -2,7 +2,7 @@
 
 ## Overview
 
-Founder Agents is a team of single-purpose agents coordinated by an explicit state machine. A run starts from a founder brief, passes a policy screen, then moves phase by phase. Every phase ends in a gate: a recommendation computed from thresholds fixed in advance (or tests passing), followed by the founder's decision: **go**, **repeat**, **pivot** or **stop**. Agents only draft; anything that leaves the system (publish, send, spend, sign) becomes an item in the approval queue, and the only code path that executes it refuses unless the founder approved it. All agent actions append to `decision_log.json`. Phases 1-4 are built (phase 3 up to a clickable prototype and acceptance tests; code generation is STUBBED); phases 5-6 are designed here and STUBBED or MOCKED in the prototype.
+Founder Agents is a team of single-purpose agents coordinated by an explicit state machine. A run starts from a founder brief, passes a policy screen, then moves phase by phase. Every phase ends in a gate: a recommendation computed from thresholds fixed in advance (or tests passing), followed by the founder's decision: **go**, **repeat**, **pivot** or **stop**. Agents only draft; anything that leaves the system (publish, send, spend, sign) becomes an item in the approval queue, and the only code path that executes it refuses unless the founder approved it. All agent actions append to `decision_log.json`. Phases 1-5 are built (phase 3 up to a clickable prototype and acceptance tests, with code generation STUBBED; phase 5 with checkout, hosting and posting MOCKED); phase 6 is designed here and STUBBED.
 
 ```mermaid
 flowchart LR
@@ -27,7 +27,9 @@ flowchart LR
     G4 -- repeat --> C
     G4 -- stop --> STOP
     G4 -- go --> L[5 Launch: sell, deliver]
-    L --> G5{Launch targets}
+    L --> G5{Launch gate: store, posts, targets, sale-to-cash test}
+    G5 -- repeat --> L
+    G5 -- stop --> STOP
     G5 -- go --> O[6 Operate and learn]
     O --> G6{Persevere / pivot / stop}
     G6 -- pivot --> D
@@ -69,8 +71,12 @@ stateDiagram-v2
     p4_running --> p4_gate_wait: commercial gate computed
     p4_gate_wait --> p4_running: repeat (redraft with failed checks)
     p4_gate_wait --> stopped: stop
-    p4_gate_wait --> p5_6_stubbed: go, only after pricing approved and 3 policies signed
-    p5_6_stubbed --> done
+    p4_gate_wait --> p5_running: go, only after pricing approved and 3 policies signed
+    p5_running --> p5_gate_wait: launch gate computed
+    p5_gate_wait --> p5_running: repeat (redraft with failed checks)
+    p5_gate_wait --> stopped: stop
+    p5_gate_wait --> p6_stubbed: go, only after store page approved and targets locked
+    p6_stubbed --> done
 ```
 
 ## Phases
@@ -164,13 +170,31 @@ flowchart LR
 - **Method:** comparable prices go through the evidence ledger, so a price fact is SOURCED only when a retrieved source states it; otherwise it is labelled ASSUMPTION. Pricing is guarded like copy; policies use `guard.check_policy`, which allows "results are not guaranteed" but blocks positive promises. The pricing and each policy become `sign` approval items; signing records the founder's sign-off and publishes nothing.
 - **Commercial gate (`app/gates.py: commercial_gate`):** the core feature sits in a free tier; ≥2 comparables; every paid tier has a disclosed basis; all three policy drafts complete; the privacy draft lists the data handled; zero guard flags. Any failure → **repeat** with the failed checks sent back; a second failing draft → **stop**. **GO is refused in code** (`founder_gate_decision`) until the founder approved the pricing and signed all three policies.
 - **Output:** `phase4_step1_pricing-*.md`, `phase4_step2_policies-*.md`, `phase4_gate_decision-*.md`.
-- **Never:** no payment provider, checkout or price is configured anywhere; prices go live only with the Phase 5 store page (STUBBED).
+- **Never:** no payment provider, checkout or price is configured anywhere; prices go live only with the Phase 5 store page, which renders them from this approved plan.
 
-### Phase 5: Launch: sell, deliver, get paid (MOCKED / STUBBED)
+### Phase 5: Launch: sell, deliver, get paid (built; checkout, hosting and posting MOCKED)
+
+```mermaid
+flowchart LR
+    IN[MVP spec + approved pricing + market channels] --> LA[launcher: store copy, FAQ, posts, targets]
+    LA --> ST[our store template: prices from Phase 4 data, no checkout]
+    LA --> PO[launch posts, one per channel, founder's voice]
+    PO --> GU[guard per post]
+    ST --> GU2[guard + structural safety]
+    PT[sale-to-cash test on MOCKED events] --> G5{launch gate}
+    GU --> G5
+    GU2 --> G5
+    LA --> TG[launch targets] --> SI[sign item: founder locks targets]
+    ST --> AP[publish item: store page] --> SV["/store/&lt;run&gt;"]
+    GU --> PI[publish items: posts, founder posts personally]
+```
+
 - **Core step:** Open the store; deliver automatically.
-- **Agents:** `launcher` (store page and launch posts as `publish` items, one per channel), `delivery` (grants access on a payment event).
-- **Method:** see Sale to cash. Launch posts are written in the founder's voice for the founder's own accounts and published only after approval; the system never creates accounts.
-- **Gate:** launch targets set before launch (visits, conversion, delivered orders) plus a passing `payment_test_log.md`.
+- **Agents:** `launcher` (`app/agents/launcher.py`) writes store copy, an honest FAQ, one launch post per channel where customers gather (in the founder's voice, for the founder's own accounts) and launch targets; `delivery` runs the sale-to-cash path (`app/sale_to_cash.py`).
+- **Method:** the store page is rendered by our template (`app/store.py`) with prices taken from the Phase 4 plan the founder approved, never from the model; the free tier links to the approved waitlist page and the paid tier shows "Not on sale yet: payments are MOCKED". Each post is guarded; blocked posts are never queued and are shown as BLOCKED in the launch kit. Before the gate, the sale-to-cash test runs at the paid tier's price on MOCKED events and writes `payment_test_log.md`.
+- **Launch gate (`app/gates.py: launch_gate`):** store page passes structural safety and the guard; store prices equal the approved pricing; ≥1 post passes and 0 posts are blocked; targets proposed; policies signed in Phase 4; sale-to-cash test PASS. Failure → **repeat** with feedback; a second failing attempt → **stop**. **GO is refused in code** until the founder approved the store page and locked the launch targets.
+- **Output:** `phase5_step1_store_page-*.html`, `phase5_step2_launch_kit-*.md`, `phase5_step3_payment_test-*.md`, `phase5_gate_decision-*.md`, `payment_test_log.md`.
+- **MOCKED:** public hosting, posting to channels (the founder posts personally), checkout and the payment provider. The system never creates accounts or takes money.
 
 ### Phase 6: Operate and learn (STUBBED)
 - **Core step:** none (ongoing).
@@ -186,7 +210,7 @@ flowchart LR
 | Phase 2 demand gate | Waitlist sign-ups ≥ target in window; interviews ≥ target; share confirming the problem ≥ target | go / repeat / pivot / stop |
 | Phase 3 build gate | ≥2 stories; all stories testable; all features traced; ≤6 must-haves; hours ≤ founder budget; prototype safe | go / repeat / pivot / stop |
 | Phase 4 commercial gate | Core feature free; ≥2 comparables; price basis disclosed; 3 policy drafts; privacy lists data; 0 guard flags; founder signed pricing + 3 policies | go / repeat / stop |
-| Phase 5 launch gate | Launch targets; payment test log passes | go / repeat / pivot / stop |
+| Phase 5 launch gate | Store page safe; prices = approved pricing; posts pass the guard; targets set and locked by founder; policies signed; sale-to-cash test PASS | go / repeat / stop |
 | Phase 6 learn gate | Retention and refund targets | persevere / pivot / stop |
 
 **When the system recommends STOP** (`app/gates.py`):
@@ -195,6 +219,7 @@ flowchart LR
 - Discover: three or more evidence checks fail, or no source shows the pain and the opportunity scores below 3/5.
 - Discover, second pass: after one repeat or pivot, still fewer than 2 independent sources show the pain. One retry is allowed; a second failing pass is a stop, not another retry.
 - Build: scope still exceeds the founder's hours after one smaller-MVP rebuild.
+- Launch: required launch checks still fail after one redraft.
 - Commercial setup: the plan still fails a required check (for example the core feature is behind a paywall) after one redraft.
 - Validate: interviews are complete but fewer than half the target share confirm the problem, or sign-ups are under 25% of target and interviews also miss.
 - Example: target 100 sign-ups in 14 days, 12 arrive and interviews miss → **stop**, not "promising early traction".
@@ -203,7 +228,7 @@ The gate memo is written after the recommendation is computed and may not change
 
 ## Sale to cash
 
-Designed for phase 5; the logic runs today on **MOCKED** events (`app/payments.py`, `app/delivery.py`, `app/refunds.py`, `app/reconcile.py`, test in `outputs/payment_test_log.md`). No provider, sandbox, card data or money is involved.
+Runs inside phase 5 before the launch gate, on **MOCKED** events (`app/payments.py`, `app/delivery.py`, `app/refunds.py`, `app/reconcile.py`, test in `outputs/payment_test_log.md`). No provider, sandbox, card data or money is involved.
 
 ```mermaid
 sequenceDiagram
@@ -252,19 +277,20 @@ Persistence is plain files (JSON, CSV, Markdown) so runs are inspectable and por
 
 | Component | Status |
 |---|---|
-| Orchestrator state machine, phases 1-4 agents, evidence ledger, gates 1-4, approval queue, guard, decision log, web UI, CLI | Built |
+| Orchestrator state machine, phases 1-5 agents, evidence ledger, gates 1-5, approval queue, guard, decision log, web UI, CLI | Built |
 | Landing page publishing | Built locally; public hosting MOCKED |
 | Outreach sending | MOCKED (founder sends personally) |
 | Payment → delivery, refunds, idempotency, reconciliation | MOCKED events, real logic |
 | Phase 3 Build: MVP spec, clickable prototype, acceptance tests, build gate | Built |
 | Phase 3 code generation and test execution in a sandbox | STUBBED |
 | Phase 4 Commercial setup: pricing, policy drafts, founder sign-off, commercial gate | Built |
-| Phase 5 store page and posts, Phase 6 Operate | STUBBED (reports in `outputs/` when a run reaches them) |
+| Phase 5 Launch: store page, launch posts, launch targets, launch gate | Built (hosting, posting, checkout MOCKED) |
+| Phase 6 Operate | STUBBED (report in `outputs/` when a run reaches it) |
 
 ## Roadmap
 
 1. Phase 3: generate the MVP's code from the spec in a no-network container sandbox, and turn the acceptance criteria into the tests that gate it.
 2. Phase 4: a targeted price lookup tool so more comparable prices are SOURCED instead of ASSUMPTION.
-3. Phase 5: store page and launch posts as approval items; webhook handler for a real provider in the founder's own account (founder-configured, never our keys).
+3. Phase 5: webhook handler for a real provider in the founder's own account (founder-configured, never our keys), replacing the MOCKED events.
 4. Phase 6: metrics dashboard from real product events; persevere-or-pivot memo.
 5. Community: more free research tools, more red-team prompts in `evals/` (runner: `python evals/run_red_team.py`), translations (Arabic first). See [CONTRIBUTING.md](CONTRIBUTING.md).

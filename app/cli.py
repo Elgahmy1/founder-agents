@@ -8,7 +8,6 @@ from __future__ import annotations
 
 import json
 import sys
-from datetime import datetime, timezone
 
 from app.brief import FounderBrief
 from app.config import load_settings
@@ -47,7 +46,7 @@ def run(path: str) -> None:
             d = ask("Approve?", ("y", "n"))
             note = input("Note (optional): ").strip() or None
             st = orch.approve(st.run_id, item.id, d == "y", note)
-        if st.stage in ("p1_gate_wait", "p2_gate_wait", "p3_gate_wait", "p4_gate_wait"):
+        if st.stage in ("p1_gate_wait", "p2_gate_wait", "p3_gate_wait", "p4_gate_wait", "p5_gate_wait"):
             g = st.gates[-1]
             print(f"\nGATE {g['gate']} -> system recommends {g['recommendation'].upper()}")
             for c in g["checks"]:
@@ -78,42 +77,14 @@ def run(path: str) -> None:
 
 def payment_test() -> None:
     """Exercises sale-to-cash on MOCKED events. No provider, no money."""
-    from app.delivery import Delivery
-    from app.payments import MockLedger, MockPaymentEvent
-    from app.reconcile import reconcile
-
+    from app.sale_to_cash import run_payment_test
     s = load_settings()
-    log = DecisionLog(s.decision_log_path)
-    ledger = MockLedger()
-    d = Delivery(ledger)
-    ledger.create_order("ord_1", "demo-product", 1500)
-    ledger.create_order("ord_2", "demo-product", 1500)
-    steps = [
-        ("payment for ord_1 triggers delivery", MockPaymentEvent("evt_1", "ord_1", "payment_succeeded", 1500, 75), "delivered"),
-        ("same event replayed (webhook retry)", MockPaymentEvent("evt_1", "ord_1", "payment_succeeded", 1500, 75), "duplicate_ignored"),
-        ("payment for ord_2 triggers delivery", MockPaymentEvent("evt_2", "ord_2", "payment_succeeded", 1500, 75), "delivered"),
-        ("refund for ord_2 revokes access", MockPaymentEvent("evt_3", "ord_2", "refund_succeeded", 1500, 0), "access_revoked"),
-    ]
-    lines = ["# Payment and delivery test log (MOCKED)", "",
-             f"Run at {datetime.now(timezone.utc).isoformat(timespec='seconds')}. All events are MOCKED: "
-             "no payment provider, sandbox, card data or money is involved.", "",
-             "| Step | Event | Expected | Got | Result |", "|---|---|---|---|---|"]
-    ok_all = True
-    for name, ev, expected in steps:
-        got = d.handle(ev)
-        ok = got == expected
-        ok_all &= ok
-        lines.append(f"| {name} | {ev.event_id} {ev.type} | {expected} | {got} | {'PASS' if ok else 'FAIL'} |")
-    ledger.payouts.append({"amount_cents": 1500 - 75})
-    issues = reconcile(ledger)
-    lines += ["", f"Deliveries made: {d.deliveries} (expected 2, idempotency held: {d.deliveries == 2})",
-              f"Access now: {d.access}", f"Reconciliation issues: {issues or 'none'}"]
-    ok_all &= d.deliveries == 2 and not issues
-    lines.append(f"\n**Overall: {'PASS' if ok_all else 'FAIL'}**")
+    text, ok = run_payment_test()
     s.outputs_dir.mkdir(parents=True, exist_ok=True)
-    (s.outputs_dir / "payment_test_log.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
-    log.append(agent="delivery", action="mock_payment_delivery_test", outcome="pass" if ok_all else "fail")
-    print("\n".join(lines))
+    (s.outputs_dir / "payment_test_log.md").write_text(text, encoding="utf-8")
+    DecisionLog(s.decision_log_path).append(agent="delivery", action="mock_payment_delivery_test",
+                                            outcome="pass" if ok else "fail")
+    print(text)
 
 
 def main() -> None:

@@ -31,7 +31,8 @@ STATUS = [
     ("Phase 3 Build: MVP spec, clickable prototype, acceptance tests, build gate", "Working"),
     ("Phase 3 code generation in a sandbox", "STUBBED"),
     ("Phase 4 Commercial setup: pricing with a free core tier, policy drafts, founder sign-off, commercial gate", "Working"),
-    ("Phase 5 Launch, payments and delivery", "MOCKED / STUBBED"),
+    ("Phase 5 Launch: store page, launch post drafts, launch targets, launch gate", "Working"),
+    ("Phase 5 checkout, public hosting and posting", "MOCKED"),
     ("Phase 6 Operate and learn", "STUBBED"),
 ]
 
@@ -139,10 +140,11 @@ def create_run(founder_name: str = Form("Founder"), idea: str = Form(...), skill
 
 
 PHASES = [(1, "Discover", "Working"), (2, "Validate", "Working"), (3, "Build", "Working"),
-          (4, "Commercial setup", "Working"), (5, "Launch", "MOCKED"), (6, "Operate & learn", "STUBBED")]
+          (4, "Commercial setup", "Working"), (5, "Launch", "Working"), (6, "Operate & learn", "STUBBED")]
 STAGE_PHASE = {"new": 1, "p1_running": 1, "p1_gate_wait": 1, "p2_running": 2, "p2_targets_wait": 2,
                "p2_collecting": 2, "p2_gate_wait": 2, "p3_running": 3, "p3_gate_wait": 3, "p3_6_stubbed": 3,
-               "p4_6_stubbed": 4, "p4_running": 4, "p4_gate_wait": 4, "p5_6_stubbed": 5, "done": 6, "stopped": 0}
+               "p4_6_stubbed": 4, "p4_running": 4, "p4_gate_wait": 4, "p5_6_stubbed": 5,
+               "p5_running": 5, "p5_gate_wait": 5, "p6_stubbed": 6, "done": 6, "stopped": 0}
 OUTCOME_HELP = {
     "go": "Move on to the next phase.",
     "repeat": "Run this phase again (new research or a longer test).",
@@ -159,7 +161,7 @@ def _stepper(st: RunState) -> str:
         if stopped_at is not None:
             cls = "done" if n < stopped_at else ("stopped" if n == stopped_at else "off")
         elif st.stage == "done":
-            cls = "done" if n <= (4 if st.pricing else 3 if st.mvp else 2) else "stub"
+            cls = "done" if n <= (5 if st.launch else 4 if st.pricing else 3 if st.mvp else 2) else "stub"
         else:
             cls = "done" if n < cur else ("cur" if n == cur else ("stub" if status != "Working" else "off"))
         label = "" if status == "Working" else f"<small>{status}</small>"
@@ -202,6 +204,12 @@ def _next_step(st: RunState, q, run_id: str) -> str:
         if i.kind == "sign":
             why = ("Approving records your sign-off in the decision log. Nothing is published or charged; "
                    "these are drafts to review with a lawyer before launch.")
+        if i.executor == "post_launch_mock":
+            why = "Approving only marks the post ready for <b>you</b> to post from your own account; the system posts nothing (MOCKED)."
+        if i.executor == "publish_store_local":
+            why = "Approving puts the store page live on this computer only. Checkout and public hosting are MOCKED."
+        if i.executor == "lock_launch_targets":
+            why = "Locking the targets now means the launch result can't be spun later."
         if i.kind == "publish" and "prototype" in i.title:
             why = (f"Approving lets you click through the prototype at <a href='/proto/{run_id}' target='_blank'>/proto/{run_id}</a>"
                    " on this computer. Nothing is deployed (public hosting is MOCKED).")
@@ -210,19 +218,24 @@ def _next_step(st: RunState, q, run_id: str) -> str:
 <pre>{html.escape(i.content[:3000])}</pre><form method="post" action="/runs/{run_id}/approvals/{i.id}" class="once">
 <input name="note" placeholder="Note (optional)"><div class="row"><button name="approve" value="1">Approve</button>
 <button class="rej" name="approve" value="0">Reject</button></div></form></div>"""
-    if st.stage in ("p1_gate_wait", "p2_gate_wait", "p3_gate_wait", "p4_gate_wait"):
+    if st.stage in ("p1_gate_wait", "p2_gate_wait", "p3_gate_wait", "p4_gate_wait", "p5_gate_wait"):
         g = st.gates[-1]
         rec = g["recommendation"]
         unsigned = st.stage == "p4_gate_wait" and any(
             i.executor == "sign_commercial" and i.status not in ("executed", "superseded") for i in q.items)
         if st.stage == "p4_gate_wait" and not any(i.executor == "sign_commercial" and i.status != "superseded" for i in q.items):
             unsigned = True
+        if st.stage == "p5_gate_wait":
+            need = [i for i in q.items if i.executor in ("publish_store_local", "lock_launch_targets") and i.status != "superseded"]
+            unsigned = len(need) < 2 or any(i.status != "executed" for i in need)
         btns = "".join(
             f"<button name='decision' value='{o}' class='opt {o}{' rec' if o == rec else ''}'><b>{o.upper()}"
             f"{' (recommended)' if o == rec else ''}</b><small>{OUTCOME_HELP[o]}</small></button>"
             for o in ("go", "repeat", "pivot", "stop") if not (o == "go" and unsigned))
         if unsigned:
-            btns += "<p class=mut>GO needs your approval of the pricing and your sign-off on all three policy drafts.</p>"
+            btns += ("<p class=mut>GO needs your approval of the store page and your lock on the launch targets.</p>"
+                     if st.stage == "p5_gate_wait" else
+                     "<p class=mut>GO needs your approval of the pricing and your sign-off on all three policy drafts.</p>")
         return f"""<div class="card next"><div class="kicker">Your decision is needed: Phase {g['phase']} gate</div>
 <h2>The system recommends <span class="{rec}">{rec.upper()}</span></h2>{_gate_table(g)}
 <form method="post" action="/runs/{run_id}/gate" class="once"><input name="note" placeholder="Why? (optional, saved in the log)">
@@ -248,14 +261,16 @@ Sign-ups so far (counted by the app, never typed in): <b>{orch.signups(run_id)}<
         return ("<div class='card next end'><div class='kicker'>Run ended</div><h2 class='stop'>STOP</h2>"
                 + (_gate_table(g) if g else "") + "<p>Stopping saved your time and money. Everything is in the decision log.</p></div>")
     if st.stage == "done":
-        built = ("Discover, Validate, Build and Commercial setup" if st.pricing else
+        built = ("Discover, Validate, Build, Commercial setup and Launch" if st.launch else
+                 "Discover, Validate, Build and Commercial setup" if st.pricing else
                  "Discover, Validate and Build" if st.mvp else "Discover and Validate")
-        rest = "5-6" if st.pricing else "4-6" if st.mvp else "3-6"
+        rest = "6" if st.launch else "5-6" if st.pricing else "4-6" if st.mvp else "3-6"
         proto = (f" <a href='/proto/{run_id}' target='_blank'>Open the prototype</a>."
                  if (settings.data_dir / "sites" / run_id / "prototype.html").exists() else "")
         passed = {g["gate"] for g in st.gates if g.get("founder_decision") == "go"}
         nxt = (3, "Build") if (not st.mvp and "demand_gate" in passed) else \
-              (4, "Commercial setup") if (st.mvp and not st.pricing and "build_gate" in passed) else None
+              (4, "Commercial setup") if (st.mvp and not st.pricing and "build_gate" in passed) else \
+              (5, "Launch") if (st.pricing and not st.launch and "commercial_gate" in passed) else None
         build_btn = (f"<form method='post' action='/runs/{run_id}/build' class='once'><p>This run finished before Phase {nxt[0]} "
                      f"was available. You passed the gate before it, so it can continue now.</p>"
                      f"<button>Run Phase {nxt[0]} {nxt[1]}</button></form>" if nxt else "")
@@ -394,6 +409,14 @@ def prototype(run_id: str):
     p = settings.data_dir / "sites" / Path(run_id).name / "prototype.html"
     if not p.exists():
         raise HTTPException(404, "Not published: the founder has not approved this prototype.")
+    return HTMLResponse(p.read_text(encoding="utf-8"))
+
+
+@app.get("/store/{run_id}", response_class=HTMLResponse)
+def store(run_id: str):
+    p = settings.data_dir / "sites" / Path(run_id).name / "store.html"
+    if not p.exists():
+        raise HTTPException(404, "Not published: the founder has not approved this store page.")
     return HTMLResponse(p.read_text(encoding="utf-8"))
 
 

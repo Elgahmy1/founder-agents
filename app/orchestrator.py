@@ -6,7 +6,7 @@ then stops and waits. Phases 1-2 are built; phases 3-6 are STUBBED.
 
 Stages:
   new -> p1_running -> p1_gate_wait -> p2_running -> p2_targets_wait
-      -> p2_collecting -> p2_gate_wait -> p3_running -> p3_gate_wait -> p4_running -> p4_gate_wait -> p5_6_stubbed -> done
+      -> p2_collecting -> p2_gate_wait -> p3_running -> p3_gate_wait -> p4_running -> p4_gate_wait -> p5_running -> p5_gate_wait -> p6_stubbed -> done
   any gate can end in: stopped
 """
 from __future__ import annotations
@@ -27,6 +27,7 @@ from app.agents.market_analyst import Market, MarketAnalystAgent
 from app.agents.marketer import LandingCopy, MarketerAgent
 from app.agents.researcher import ResearcherAgent
 from app.agents.builder import BuilderAgent, MvpSpec
+from app.agents.launcher import LaunchKit, LauncherAgent
 from app.agents.policy_drafter import PolicyDrafterAgent, PolicyDrafts
 from app.agents.pricer import PricerAgent, PricingPlan
 from app.agents.scout import Opportunities, Opportunity, ScoutAgent
@@ -37,7 +38,10 @@ from app.brief import FounderBrief
 from app.config import Settings
 from app.decision_log import DecisionLog
 from app.evidence import Ledger, RawClaim, resolve
-from app.gates import OUTCOMES, DemandTargets, GateResult, build_gate, commercial_gate, demand_gate, discover_gate
+from app.gates import (OUTCOMES, DemandTargets, GateResult, build_gate, commercial_gate, demand_gate, discover_gate,
+                       launch_gate)
+from app.sale_to_cash import run_payment_test
+from app.store import render_store
 from app.prototype import prototype_is_safe, render_prototype
 from app.landing import render_landing
 from app.llm import LLM
@@ -81,6 +85,8 @@ P3_STEPS = ["Builder: scoping the MVP (user stories, features, screens)", "Build
             "QA: checking acceptance criteria, scope and safety", "Gate: build gate"]
 P4_STEPS = ["Pricer: tiers from comparable products", "Policy drafter: terms, privacy and refund drafts",
             "Gate: commercial gate"]
+P5_STEPS = ["Launcher: store page, launch posts and targets", "Delivery: sale-to-cash test on MOCKED events",
+            "Gate: launch gate"]
 
 
 def slugify(s: str, n: int = 24) -> str:
@@ -108,6 +114,8 @@ class RunState:
     pricing: dict | None = None
     policies: dict | None = None
     commercial_feedback: str | None = None
+    launch: dict | None = None
+    launch_feedback: str | None = None
     targets: dict | None = None
     results: dict | None = None
     gates: list[dict] = field(default_factory=list)
@@ -173,6 +181,9 @@ class Orchestrator:
             "send_outreach_mock": self._send_outreach_mock,
             "publish_prototype_local": self._publish_prototype_local,
             "sign_commercial": self._sign_commercial,
+            "publish_store_local": self._publish_store_local,
+            "post_launch_mock": self._post_launch_mock,
+            "lock_launch_targets": self._lock_launch_targets,
         })
 
     # ---------- executors (only reachable through an approved item) ----------
@@ -195,6 +206,20 @@ class Orchestrator:
     def _sign_commercial(self, item: ApprovalItem) -> str:
         return ("Signed off by the founder (recorded in the decision log). Nothing was published: policies and prices "
                 "go live only with the store page in Phase 5 (STUBBED). Review with a lawyer before launch.")
+
+    def _publish_store_local(self, item: ApprovalItem) -> str:
+        run_id = item.title.split(":")[-1].strip()
+        d = self.sites_dir / run_id
+        d.mkdir(parents=True, exist_ok=True)
+        (d / "store.html").write_text(item.content, encoding="utf-8")
+        return (f"Store page available at {self.settings.public_base_url}/store/{run_id} on this computer "
+                "(public hosting and checkout are MOCKED)")
+
+    def _post_launch_mock(self, item: ApprovalItem) -> str:
+        return "MOCKED: approved for the founder to post personally from their own account; the system posted nothing"
+
+    def _lock_launch_targets(self, item: ApprovalItem) -> str:
+        return "Launch targets locked by the founder before launch (recorded in the decision log)"
 
     def _send_outreach_mock(self, item: ApprovalItem) -> str:
         return "MOCKED: message marked approved for the founder to send personally; the system sent nothing"
@@ -256,7 +281,9 @@ class Orchestrator:
                 self._phase3(st, q)
             elif st.stage == "p4_running":
                 self._phase4(st, q)
-            elif st.stage in ("p5_6_stubbed", "p4_6_stubbed", "p3_6_stubbed"):
+            elif st.stage == "p5_running":
+                self._phase5(st, q)
+            elif st.stage in ("p6_stubbed", "p5_6_stubbed", "p4_6_stubbed", "p3_6_stubbed"):
                 self._stubs(st)
         except Exception as e:  # surface, never hide
             st.error = f"{type(e).__name__}: {e}"
@@ -500,6 +527,60 @@ class Orchestrator:
         self.write_output(st, "phase4_gate_decision.md", g.md())
         st.stage = "p4_gate_wait"
 
+    # ---------- phase 5: Launch (store page, posts, targets, sale-to-cash test) ----------
+    def _phase5(self, st: RunState, q: ApprovalQueue) -> None:
+        brief = FounderBrief(**st.brief)
+        ctx = self.ctx(st)
+        st.error = None
+        spec, pricing, market = MvpSpec(**st.mvp), PricingPlan(**st.pricing), Market(**st.market)
+        self._step(st, P5_STEPS, 0)
+        kit = LauncherAgent(ctx).launch_kit(brief, spec, pricing, market, st.launch_feedback)
+        st.launch = kit.model_dump()
+        page, removed = render_store(spec.product_name, kit, pricing, st.run_id)
+        self.write_output(st, "phase5_step1_store_page.html", page)
+        posts = [(p, guard.check_output(p.text)) for p in kit.posts]
+        self.write_output(st, "phase5_step2_launch_kit.md", _launch_md(kit, posts))
+        if removed:
+            self.log.append(agent="guard", action="scrub_store_page", run_id=st.run_id, outcome="scrubbed",
+                            detail=", ".join(removed))
+
+        self._step(st, P5_STEPS, 1)
+        paid = [t for t in pricing.tiers if t.price_usd_per_month > 0]
+        cents = round((paid[0].price_usd_per_month if paid else 1) * 100)
+        text, ok = run_payment_test(spec.product_name, cents)
+        self.write_output(st, "phase5_step3_payment_test.md", text)
+        self.settings.outputs_dir.mkdir(parents=True, exist_ok=True)
+        (self.settings.outputs_dir / "payment_test_log.md").write_text(text, encoding="utf-8")
+        self.log.append(agent="delivery", action="mock_payment_delivery_test", run_id=st.run_id,
+                        outcome="pass" if ok else "fail", phase=5)
+
+        self._step(st, P5_STEPS, 2)
+        prices_ok = all((f"{t.price_usd_per_month:g} USD / month" in page) if t.price_usd_per_month else ("Free" in page)
+                        for t in pricing.tiers)
+        signed = any(i.executor == "sign_commercial" and i.status == "executed" for i in q.items) or \
+            any(g["gate"] == "commercial_gate" and g.get("founder_decision") == "go" for g in st.gates)
+        page_ok = guard.check_output(page)  # the same check the approval queue applies on submit
+        store_flags = removed + ([page_ok.rule] if not page_ok.allowed else [])
+        g = launch_gate(store_safe=prototype_is_safe(page), store_guard_removed=store_flags, prices_match_approved=prices_ok,
+                        posts_ok=sum(1 for _, v in posts if v.allowed), posts_flagged=sum(1 for _, v in posts if not v.allowed),
+                        targets_set=kit.targets.store_visits > 0, payment_test_passed=ok, policies_signed=signed,
+                        attempt=1 + sum(1 for x in st.gates if x["gate"] == "launch_gate"))
+        for ex in ("publish_store_local", "post_launch_mock", "lock_launch_targets"):
+            q.supersede(ex)
+        if not prototype_is_safe(page) and page_ok.allowed:
+            q.submit("publish", f"Publish store page: {st.run_id}", page, "publish_store_local", 5)
+        t = kit.targets
+        q.submit("sign", f"Lock launch targets before launch: {st.run_id}",
+                 f"{t.store_visits} store visits, {t.free_signups} free sign-ups and {t.paid_orders} paid orders "
+                 f"in {t.window_days} days.\n\nRationale: {t.rationale}", "lock_launch_targets", 5)
+        for p, v in posts:
+            if v.allowed:
+                q.submit("publish", f"Post launch message on {p.channel}: {st.run_id}", p.text, "post_launch_mock", 5)
+        st.gates.append(g.to_dict())
+        self.log.append(agent="gate", action="launch_gate", run_id=st.run_id, outcome=g.recommendation, phase=5)
+        self.write_output(st, "phase5_gate_decision.md", g.md())
+        st.stage = "p5_gate_wait"
+
     def _stubs(self, st: RunState) -> None:
         for p in STUB_PHASES:
             self.write_output(st, f"phase{p.phase}_step1_{slugify(p.name, 20)}-STUBBED.md", stub_report(p))
@@ -515,7 +596,7 @@ class Orchestrator:
         if decision not in OUTCOMES:
             raise ValueError(f"decision must be one of {OUTCOMES}")
         st, q = self.load(run_id)
-        if st.stage not in ("p1_gate_wait", "p2_gate_wait", "p3_gate_wait", "p4_gate_wait"):
+        if st.stage not in ("p1_gate_wait", "p2_gate_wait", "p3_gate_wait", "p4_gate_wait", "p5_gate_wait"):
             raise ValueError(f"no gate is waiting (stage={st.stage})")
         from app.gates import Check
         g_full = st.gates[-1]
@@ -546,12 +627,24 @@ class Orchestrator:
             else:
                 st.tried.append(st.chosen)
                 st.stage = "p1_running"
+        elif phase == 5:
+            if decision == "go":
+                need = [i for i in q.items if i.executor in ("publish_store_local", "lock_launch_targets")
+                        and i.status != "superseded"]
+                if len(need) < 2 or any(i.status != "executed" for i in need):
+                    raise ValueError("GO needs the founder to approve the store page and lock the launch targets first")
+                st.stage = "p6_stubbed"
+            else:
+                failed = [c for c in gr.checks if not c.passed]
+                st.launch_feedback = "\n".join([f"- {c.name}: target {c.target}, got {c.actual}" for c in failed]
+                                               + ([f"- Founder note: {note}"] if note else []))
+                st.stage = "p5_running"
         elif phase == 4:
             if decision == "go":
                 signs = [i for i in q.items if i.executor == "sign_commercial" and i.status != "superseded"]
                 if not signs or any(i.status != "executed" for i in signs):
                     raise ValueError("GO needs the founder to approve the pricing and sign off all three policy drafts first")
-                st.stage = "p5_6_stubbed"
+                st.stage = "p5_running"
             else:  # repeat or pivot: redraft with the failed checks
                 failed = [c for c in gr.checks if not c.passed]
                 st.commercial_feedback = "\n".join([f"- {c.name}: target {c.target}, got {c.actual}" for c in failed]
@@ -568,7 +661,7 @@ class Orchestrator:
                     + ([f"- Founder note: {note}"] if note else []))
                 st.stage = "p3_running"
         self.save(st, q)
-        if st.stage in ("p1_running", "p2_running", "p3_running", "p4_running", "p5_6_stubbed"):
+        if st.stage in ("p1_running", "p2_running", "p3_running", "p4_running", "p5_running", "p6_stubbed"):
             return self.advance(run_id)
         return st
 
@@ -584,6 +677,8 @@ class Orchestrator:
                 st.stage, phase = "p3_running", 3
             elif st.mvp and not st.pricing and "build_gate" in passed:
                 st.stage, phase = "p4_running", 4
+            elif st.pricing and not st.launch and "commercial_gate" in passed:
+                st.stage, phase = "p5_running", 5
             else:
                 raise ValueError("nothing to continue: the next phase needs a gate the founder passed with GO")
             self.log.append(agent="founder", action=f"start_phase{phase}", approved_by="founder", run_id=run_id,
@@ -717,6 +812,19 @@ def _overlap(a: str, b: str) -> bool:
 
 PROTECTIVE = re.compile(r"\b(delet\w*|privacy|private|security|secure|data protection|consent|accessib\w*)\b", re.I)
 EMAIL = re.compile(r"[\w.+-]+@[\w-]+\.[\w.]+")
+
+
+def _launch_md(kit: LaunchKit, posts) -> str:
+    t = kit.targets
+    return "\n".join([
+        "# Phase 5, step 2: Launch kit (drafts for the founder; nothing is posted by the system)", "",
+        "## Launch targets (proposed before launch; the founder locks them)",
+        f"- {t.store_visits} store visits, {t.free_signups} free sign-ups, {t.paid_orders} paid orders in {t.window_days} days",
+        f"- Rationale: {t.rationale}", "", "## Launch posts (the founder posts them personally from their own accounts)",
+        *[f"### {p.channel}{'' if v.allowed else ' (BLOCKED by guard: ' + (v.reason or '') + ')'}\n\n{p.text if v.allowed else '[removed]'}\n"
+          for p, v in posts],
+        "## FAQ on the store page", *[f"- **{f.question}** {f.answer}" for f in kit.faq],
+        "", "Checkout and public hosting are MOCKED: no payment is taken."]) + "\n"
 
 
 def _pricing_md(plan: PricingPlan, claims, comps, core: list[str]) -> str:

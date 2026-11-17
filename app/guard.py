@@ -13,7 +13,8 @@ from dataclasses import dataclass
 # Each rule: id, human reason, patterns matched against lower-cased text.
 REQUEST_RULES: list[tuple[str, str, list[str]]] = [
     ("fake_social_proof", "We never write fake reviews, testimonials, ratings or sign-ups.",
-     [r"\b(fake|invent|made[- ]up|fabricat\w*|generate|write|create)\b.{0,40}\b(reviews?|testimonials?|ratings?|sign[- ]?ups?|signups|endorsements?|case stud(y|ies)|followers|likes)\b",
+     [r"\b(fake|invent\w*|made[- ]up|fabricat\w*|generat\w*|writ\w*|creat\w*)\b.{0,40}\b(reviews?|testimonials?|ratings?|sign[- ]?ups?|signups|endorsements?|case stud(y|ies)|followers|likes)\b",
+      r"\b(imaginary|fictional|fictitious|fake|made[- ]up|invented|non-?existent)\s+(customers|users|clients|reviewers|buyers|students)\b",
       r"\b\d+\s*(five|5)[- ]star\b", r"\bfive[- ]star reviews?\b", r"\bpad\b.{0,20}\b(numbers|waitlist|metrics)\b",
       r"\b(inflate|boost|fake)\b.{0,20}\b(numbers|waitlist|metrics|traction|sign[- ]?ups?)\b"]),
     ("false_urgency", "We never add fake urgency such as countdown timers or invented scarcity.",
@@ -84,7 +85,7 @@ EXCLUDED_AR: list[tuple[str, str, list[str]]] = [
     ("financial_crypto", "Financial, investment and crypto products are excluded.",
      [r"(كريبتو|بيتكوين|عملات رقمية|عملات مشفرة|توصيات تداول|فوركس|اسهم|أسهم|استثمار)"]),
     ("health_legal_advice", "Health advice and legal advice products are excluded.",
-     [r"(تشخيص|استشارة طبية|نصايح طبية|علاج|روشتة|استشارة قانونية|محامي)"]),
+     [r"(تشخيص|يشخص|يشخّص|تشخّص|استشارة طبية|استشارات طبية|نصايح طبية|علاج|روشتة|الأمراض|استشارة قانونية|استشارات قانونية|استشارات قانونيه|محامي|قضايا|طلاق)"]),
     ("physical_goods", "Physical goods are out of scope: this system only builds digital products.",
      [r"(تيشيرتات|ملابس|منتج ملموس|شحن منتجات|دروب شيبنج|جلد|جلود|هاند ?ميد|مشغولات|اكسسوارات|إكسسوارات|شنط)"]),
     ("financial_wallet", "Wallets, payment apps and fintech are excluded: a digital wallet is a financial product and a leather wallet is a physical good.",
@@ -95,11 +96,16 @@ EXCLUDED_PRODUCT_RULES: list[tuple[str, str, list[str]]] = [
     ("physical_goods", "Physical goods are out of scope: this system only builds digital products.",
      [r"\b(physical (product|goods)|t-?shirts?|merch|hardware device|dropshipping|ship(ping)? boxes|candles|apparel|furniture|food truck|bakery|leather\w*|handmade|handcrafted|jewel(le)?ry|cosmetics|skincare|clothing|sneakers|shoes)\b"]),
     ("financial_crypto", "Financial, investment and crypto products are excluded.",
-     [r"\b(crypto\w*|bitcoin|ethereum|nft|token sale|trading (bot|signals?)|forex|stock (picks|tips|signals)|investment advice|day trading|defi|lending app|loans?)\b"]),
+     [r"\b(crypto\w*|bitcoin|ethereum|nft|token sale|trading (bot|signals?)|forex|stock (picks|tips|signals)|investment advice|day trading|defi|lending app|loans?|altcoins?|meme ?coins?)\b",
+      r"\b(which|what) (stocks?|shares|coins?|tokens?) to buy\b|\b(stocks?|shares|coins?|tokens?) to buy\b",
+      r"\b(stock|share|coin|token|crypto|options?) (picks|tips|signals|calls)\b|\binvest(ing|ment)? (tips|picks|signals)\b"]),
     ("financial_wallet", "Wallets, payment apps and fintech are excluded: a digital wallet is a financial product and a leather wallet is a physical good.",
      [r"\b(wallets?|e-?wallets?|payments? apps?|fintech|neo-?banks?|banking apps?|money transfers?|remittances?|budget(ing)? (app|tracker)s?|personal finance|expense tracker|portfolio trackers?|investing|investments?|insurance|credit scores?|bnpl|buy now,? pay later)\b"]),
     ("health_legal_advice", "Health advice and legal advice products are excluded.",
-     [r"\b(medical diagnos\w*|diagnose (patients|illness|disease)|symptom checker|medical advice|treatment plan|prescri\w*|therap(y|ist) bot|mental health advice|diet plan for (diabetes|disease)|legal advice|lawyer bot|contract review for clients|immigration advice)\b"]),
+     [r"\b(medical diagnos\w*|diagnose (patients|illness|disease)|symptom checker|medical advice|treatment plan|prescri\w*|therap(y|ist) bot|mental health advice|diet plan for (diabetes|disease)|legal advice|lawyer bot|contract review for clients|immigration advice)\b",
+      r"\b(divorce|custody|lawsuit|sue|visa) (papers|filings?|cases?|advice|lawyer)\b|\blegal (options|consultations?|counsel)\b|\bwrites? (your|their) (divorce|will|lawsuit|legal)\b",
+      r"\b(cure|cures|curing|reverse|reverses|treat|treats|treating) (diabetes|cancer|depression|anxiety|disease|illness|adhd|obesity)\b",
+      r"\b(diet|meal|nutrition) plans? (to|that) (cure|treat|reverse)\b|\btherapy (chatbot|bot|app)\b|\breplac\w* (a |your )?(therapist|doctor|psychiatrist|psychologist)\b|\bdiagnos\w*\b"]),
 ]
 
 # Things that must never appear in a generated artifact the founder may publish.
@@ -135,6 +141,9 @@ def normalize(text: str) -> list[str]:
     t = text.translate(_ZW)
     t = re.sub(r"[\u2010-\u2015]", "-", t)
     variants = [t]
+    joined = re.sub(r"(?<=[A-Za-z])[-._*~](?=[A-Za-z])", "", t)  # cryp-to, b.i.t.c.o.i.n
+    if joined != t:
+        variants.append(joined)
     despaced = re.sub(r"\b(\w) (?=\w\b)", r"\1", t)
     if despaced != t:
         variants.append(despaced)

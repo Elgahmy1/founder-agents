@@ -1,4 +1,4 @@
-"""Phases 5-6 agents (phases 3-4 are built: app/agents/builder.py, pricer.py, policy_drafter.py). STUBBED in this prototype: each one records what it
+"""Phase 6 agents (phases 3-5 are built: app/agents/builder.py, pricer.py, policy_drafter.py, launcher.py). STUBBED in this prototype: each one records what it
 would do and which gate it would hit, without calling a model or any
 external service. See ARCHITECTURE.md for the full design."""
 from __future__ import annotations
@@ -17,10 +17,6 @@ class StubPhase:
 
 
 STUB_PHASES = (
-    StubPhase(5, "Launch", "Open the store; deliver automatically", ("launcher", "delivery"),
-              ("Draft the store page and launch posts for founder approval",
-               "Deliver the product automatically after a (MOCKED) payment event, idempotently"),
-              "founder approves each post; payment_test_log passes"),
     StubPhase(6, "Operate and learn", "None", ("support", "metrics", "analyst"),
               ("Draft support replies for founder approval",
                "Track activation/retention against targets set at launch",

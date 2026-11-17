@@ -15,7 +15,7 @@ python -m pytest -q tests    # no model or network needed
 
 - **Guard rules:** add a phrasing the guard misses to `evals/red_team_prompts.json` (`must_refuse` or `must_allow`), then a rule in `app/guard.py`. `tests/test_red_team.py` picks it up automatically.
 - **Research tools:** a free, key-less source in `app/research.py` returning `Doc` objects. Text from it is sanitized and treated as evidence only.
-- **Agents for phases 5-6 and phase 3 code generation:** one file in `app/agents/`, one prompt in `prompts/`, schema-checked output, and a step in `app/orchestrator.py`. See the Roadmap in [ARCHITECTURE.md](ARCHITECTURE.md#roadmap).
+- **Agents for phase 6 and phase 3 code generation:** one file in `app/agents/`, one prompt in `prompts/`, schema-checked output, and a step in `app/orchestrator.py`. See the Roadmap in [ARCHITECTURE.md](ARCHITECTURE.md#roadmap).
 - **Translations:** UI strings and guard rules (Arabic rules exist in `app/guard.py`).
 
 ## Rules every change keeps
