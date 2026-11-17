@@ -1,3 +1,4 @@
+import pytest
 from app.decision_log import validate
 
 
@@ -48,9 +49,29 @@ def test_excluded_product_is_stopped_before_any_agent(make_orch, brief):
 def test_pivot_moves_back_to_discover(make_orch, brief):
     orch = make_orch()
     st = orch.start(brief)
-    st = orch.founder_gate_decision(st.run_id, "pivot")
+    st = orch.founder_gate_decision(st.run_id, "pivot", "I want to test the second opportunity first")
     assert st.stage == "p1_gate_wait"
     assert st.tried == [0]
+
+
+def test_overruling_a_recommendation_needs_a_written_reason(make_orch, brief, settings, monkeypatch):
+    from fastapi.testclient import TestClient
+    import app.main as main
+    orch = make_orch()
+    monkeypatch.setattr(main, "orch", orch)
+    st = orch.start(brief)
+    rec = st.gates[-1]["recommendation"]
+    other = "stop" if rec != "stop" else "go"
+    with pytest.raises(ValueError, match="needs a written reason"):
+        orch.founder_gate_decision(st.run_id, other)
+    r = TestClient(main.app).post(f"/runs/{st.run_id}/gate", data={"decision": other, "note": ""})
+    assert "Reason needed" in r.text
+    assert orch.load(st.run_id)[0].stage == "p1_gate_wait"  # nothing changed
+    st = orch.founder_gate_decision(st.run_id, other, "Two interviews contradict the sources")
+    entry = [e for e in orch.log.read() if e["action"] == "evidence_gate_decision"][-1]
+    assert entry["founder_override"] is True and entry["detail"] == "Two interviews contradict the sources"
+    out = (settings.outputs_dir / next(o for o in st.outputs if o.startswith("phase1_gate_decision"))).read_text(encoding="utf-8")
+    assert "overrode the system recommendation" in out and "Note: Two interviews contradict the sources" in out
 
 
 def test_second_discovery_pass_without_pain_evidence_stops():

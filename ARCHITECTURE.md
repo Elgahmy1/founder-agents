@@ -112,7 +112,7 @@ flowchart LR
 - Build, Commercial or Launch still fail after one redraft.
 - Operate: sign-ups under 25% of the locked target and feedback does not name the core problem.
 
-The gate memo is written after the recommendation and cannot change it. The founder may override; the log keeps both (`founder_override: true`).
+The gate memo is written after the recommendation and cannot change it. The founder may overrule a recommendation, but only with a written reason: the decision is refused in code without one, and the log and the gate output keep the recommendation, the decision and the reason (`founder_override: true`).
 
 ## Sale to cash
 

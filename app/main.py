@@ -266,7 +266,7 @@ views you open from this dashboard are not counted.</p>
                      "<p class=mut>GO needs your approval of the pricing and your sign-off on all three policy drafts.</p>")
         return f"""<div class="card next"><div class="kicker">Your decision is needed: Phase {g['phase']} gate</div>
 <h2>The system recommends <span class="{rec}">{rec.upper()}</span></h2>{_gate_table(g)}
-<form method="post" action="/runs/{run_id}/gate" class="once"><input name="note" placeholder="Why? (optional, saved in the log)">
+<form method="post" action="/runs/{run_id}/gate" class="once"><input name="note" placeholder="Why? (required if you overrule the recommendation; saved in the log)">
 <div class="opts">{btns}</div></form><p class=mut>You can overrule the system. If you do, the log records both the recommendation and your decision.</p></div>"""
     if st.stage == "p2_targets_wait" and st.demand_plan:
         p = st.demand_plan
@@ -389,6 +389,13 @@ def decide(run_id: str, item_id: str, approve: str = Form(...), note: str = Form
 
 @app.post("/runs/{run_id}/gate")
 def gate(run_id: str, decision: str = Form(...), note: str = Form("")):
+    st, _ = orch.load(run_id)
+    rec = st.gates[-1]["recommendation"] if st.gates else decision
+    if decision != rec and not note.strip():
+        return page("Reason needed", f"<div class=card><h2>Reason needed</h2><p>The system recommended "
+                                 f"<b>{html.escape(rec)}</b> and you chose <b>{html.escape(decision)}</b>. You can overrule it, "
+                                 "but write why: the reason is saved in the decision log and in the gate output, next to the "
+                                 f"recommendation.</p><a href='/runs/{run_id}'>Back to the gate</a></div>")
     _bg(run_id, f"Applying decision '{decision}'", orch.founder_gate_decision, run_id, decision, note or None)
     return RedirectResponse(f"/runs/{run_id}", status_code=303)
 

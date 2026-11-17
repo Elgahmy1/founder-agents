@@ -731,6 +731,9 @@ class Orchestrator:
             raise ValueError(f"no gate is waiting (stage={st.stage})")
         from app.gates import Check
         g_full = st.gates[-1]
+        if decision != g_full["recommendation"] and not (note or "").strip():
+            raise ValueError(f"overriding the system's recommendation ({g_full['recommendation']}) with "
+                             f"'{decision}' needs a written reason; it is saved in the log and the gate output")
         g_full["founder_decision"] = decision
         g_full["founder_note"] = note
         gr = GateResult(**{**g_full, "checks": [Check(**c) for c in g_full["checks"]]})
