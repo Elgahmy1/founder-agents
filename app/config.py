@@ -23,6 +23,8 @@ class Settings:
     provider: str = "ollama"
     openai_base_url: str = ""
     openai_api_key: str = ""
+    fallback_model: str = ""
+    max_rate_wait_s: float = 90.0
 
 
 def _load_dotenv() -> None:
@@ -54,4 +56,6 @@ def load_settings() -> Settings:
         provider=os.getenv("LLM_PROVIDER", "ollama").lower(),
         openai_base_url=os.getenv("OPENAI_BASE_URL", "https://api.groq.com/openai/v1").rstrip("/"),
         openai_api_key=os.getenv("OPENAI_API_KEY", ""),
+        fallback_model=os.getenv("FALLBACK_MODEL", ""),
+        max_rate_wait_s=float(os.getenv("MAX_RATE_WAIT_S", "90")),
     )

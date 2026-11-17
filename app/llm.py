@@ -23,6 +23,10 @@ class LLMError(RuntimeError):
     pass
 
 
+class RateLimited(LLMError):
+    """The free tier kept answering HTTP 429 for longer than the allowed wait."""
+
+
 @dataclass
 class Usage:
     prompt_tokens: int = 0
@@ -120,7 +124,8 @@ class OpenAICompatLLM:
         return bool(self.settings.openai_api_key)
 
     def _post(self, messages: list[dict]) -> httpx.Response:
-        """POST with backoff on free-tier rate limits (HTTP 429)."""
+        """POST with backoff on free-tier rate limits (HTTP 429), up to max_rate_wait_s in total."""
+        waited = 0.0
         for attempt in range(8):
             r = httpx.post(
                 f"{self.settings.openai_base_url}/chat/completions",
@@ -131,8 +136,12 @@ class OpenAICompatLLM:
             )
             if r.status_code != 429:
                 break
-            wait = _retry_after(r) or min(60, 5 * (attempt + 1))
-            time.sleep(wait + 0.5)
+            wait = (_retry_after(r) or min(60, 5 * (attempt + 1))) + 0.5
+            if waited + wait > self.settings.max_rate_wait_s:
+                raise RateLimited(f"{self.settings.openai_base_url} rate-limited '{self.model}' "
+                                  f"for longer than {self.settings.max_rate_wait_s:g} s")
+            time.sleep(wait)
+            waited += wait
         r.raise_for_status()
         return r
 
@@ -162,8 +171,53 @@ class OpenAICompatLLM:
         raise LLMError(f"model returned invalid JSON twice: {last_err}")
 
 
+@dataclass
+class FallbackLLM:
+    """Free-tier endpoint first; if it stays rate-limited or fails, the same call goes
+    to the local open-weight model, so a run never stalls on a daily cap. The decision
+    log records whichever model actually answered."""
+    primary: OpenAICompatLLM
+    fallback: OllamaLLM
+    usage: Usage = field(default_factory=Usage)
+    last_model: str = ""
+    fallbacks: int = 0
+
+    def __post_init__(self) -> None:
+        self.primary.usage = self.fallback.usage = self.usage
+        self.last_model = self.primary.model
+
+    @property
+    def model(self) -> str:
+        return self.last_model
+
+    def health(self) -> bool:
+        return self.primary.health() or self.fallback.health()
+
+    def structured(self, system: str, user: str, schema: type[T]) -> T:
+        try:
+            out = self.primary.structured(system, user, schema)
+            self.last_model = self.primary.model
+            return out
+        except LLMError as first:
+            if not self.fallback.health():
+                raise
+            self.fallbacks += 1
+            try:
+                out = self.fallback.structured(system, user, schema)
+            except LLMError as second:
+                raise LLMError(f"{first}; local fallback also failed: {second}") from second
+            self.last_model = self.fallback.model
+            return out
+
+
 def make_llm(settings: Settings):
-    return OpenAICompatLLM(settings) if settings.provider == "openai" else OllamaLLM(settings)
+    if settings.provider != "openai":
+        return OllamaLLM(settings)
+    primary = OpenAICompatLLM(settings)
+    if not settings.fallback_model:
+        return primary
+    from dataclasses import replace
+    return FallbackLLM(primary, OllamaLLM(replace(settings, model=settings.fallback_model)))
 
 
 def _retry_after(r: httpx.Response) -> float | None:
