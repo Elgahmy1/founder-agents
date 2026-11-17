@@ -314,6 +314,7 @@ Persistence is plain files (JSON, CSV, Markdown) so runs are inspectable and por
 | Founder run export (`app/report.py`, `/runs/<id>/export`) and guard-only red-team evaluation (`evals/run_red_team.py --guard-only`, report in `evals/red_team_report.md`) | Built |
 | Run metrics from the decision log (`evals/run_metrics.py`, report in `evals/run_metrics.md`): calls, tokens, cost, time, gate recommendation vs founder decision, approval audit; CI checks the report matches the log and re-runs the committed generated code against its acceptance checks | Built |
 | Claims audit (`evals/claims_audit.py`, report in `evals/claims_audit.md`): every cited URL in `outputs/` must appear in the `sources` of a logged action, so an invented citation fails CI | Built |
+| Read-only replay of recorded runs (`app/replay.py`, `/replay/<run>`) from `decision_log.json` and `outputs/`, no model call | Built |
 | Landing page publishing | Built locally; public hosting MOCKED |
 | Outreach sending | MOCKED (founder sends personally) |
 | Payment → delivery, refunds, idempotency, reconciliation | MOCKED events, real logic |

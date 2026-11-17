@@ -8,7 +8,7 @@ An open-source team of AI agents that takes a founder's brief (idea, skills, bud
 docker compose up
 ```
 
-Then open http://localhost:8000, fill in a founder brief and press **Start Discover**. The run goes through all six phases (Discover → Validate → Build → Commercial setup → Launch → Operate and learn) and stops at every gate for your decision. The first start downloads the open-weight model (about 5 GB for `qwen3:8b`), so it takes a few minutes once.
+Then open http://localhost:8000, fill in a founder brief and press **Start Discover**. The run goes through all six phases (Discover → Validate → Build → Commercial setup → Launch → Operate and learn) and stops at every gate for your decision. The app opens right away; the first start downloads the open-weight model (about 5 GB for `qwen3:8b`) in the background, which takes a few minutes once. Meanwhile, **Recorded runs** on the home page replays the committed demo runs read-only from `decision_log.json` and `outputs/` (every phase, gate, founder decision and logged action), with no model needed: for example http://localhost:8000/replay/48fc7649.
 
 Without Docker: install [Ollama](https://ollama.com), run `ollama pull qwen3:8b`, then `pip install -r requirements.txt && uvicorn app.main:app`. A terminal version is available with `python -m app.cli run briefs/study-notes.json`.
 
@@ -50,6 +50,7 @@ Every **Working** row below has real output from the committed demo runs: [docs/
 | Phase 6 Operate and learn: launch results vs the targets locked before launch (sign-ups counted by the app), support reply drafts for real feedback, learn gate (persevere / repeat / pivot / stop), learning memo | **Working** |
 | Phase 6 usage analytics: store visits, landing and MVP app views and MVP app runs since launch, counted by the app itself (page name and date only: no cookies, IPs or user agents; the founder's own dashboard views are skipped) and used by the learn gate | **Working** (counts only visits reaching this server, since public hosting is MOCKED) |
 | Phase 6: sending support replies | **MOCKED** (founder sends replies personally) |
+| Replay of the recorded runs at `/replay/<run>`: phases, gates vs founder decisions, outputs and every logged action, read-only from the committed log, available before any model is downloaded | **Working** |
 | Founder export: the whole run (brief, gates, decisions, approvals, decision log, outputs) as one Markdown file, no model call | **Working** |
 | Run metrics from the decision log: calls, tokens, cost, time, gate recommendation vs founder decision, approval audit; [`evals/run_metrics.md`](evals/run_metrics.md), checked against the log in CI | **Working** |
 | Claims audit: every `[source: URL]` in `outputs/` must be a URL a logged research action actually retrieved, plus SOURCED vs ASSUMPTION counts per output; [`evals/claims_audit.md`](evals/claims_audit.md), checked in CI (38 sourced claims, 24 ASSUMPTION labels, 0 unretrieved URLs) | **Working** |

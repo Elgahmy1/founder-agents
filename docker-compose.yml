@@ -1,5 +1,6 @@
 # One-command setup: docker compose up
-# Starts a local Ollama server, pulls the open-weight model once, then the app on http://localhost:8000
+# Starts a local Ollama server and the app on http://localhost:8000 right away; the open-weight model is pulled
+# once in the background (the recorded demo runs can be replayed at /replay/<run> while it downloads)
 services:
   ollama:
     image: ollama/ollama:latest
@@ -29,8 +30,8 @@ services:
   app:
     build: .
     depends_on:
-      model-pull:
-        condition: service_completed_successfully
+      ollama:
+        condition: service_healthy
     env_file:
       - path: .env
         required: false

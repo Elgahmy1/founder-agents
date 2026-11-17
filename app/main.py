@@ -9,7 +9,7 @@ from pathlib import Path
 from fastapi import FastAPI, Form, HTTPException, Request
 from fastapi.responses import HTMLResponse, PlainTextResponse, RedirectResponse
 
-from app import analytics, guard, mvp_app, sandbox
+from app import analytics, guard, mvp_app, replay, sandbox
 import json
 from app.agents.advisor import AdvisorAgent
 from app.brief import FounderBrief
@@ -122,6 +122,9 @@ and can recommend stopping. You approve everything that is published, sent, spen
 <label>Sources you already have (one URL per line, optional)</label><textarea name="source_urls" rows="2"></textarea>
 <button>Start Discover</button></form></div>
 <div class="card"><h2>Runs</h2><table>{rows or '<tr><td class=mut>No runs yet</td></tr>'}</table></div>
+<div class="card"><h2>Recorded runs (replay, no model needed)</h2><p class="mut">Real runs committed in
+<code>decision_log.json</code> and <code>outputs/</code>, shown read-only: open one to see every phase, gate, founder
+decision and logged action. Useful while the local model is still downloading.</p>{replay.runs_table(replay.runs(orch.log.read()))}</div>
 <div class="card"><h2>What works and what is mocked</h2><table>{status}</table></div>""")
 
 
@@ -560,6 +563,16 @@ def join(run_id: str, email: str = Form(...)):
         raise HTTPException(404)
     return HTMLResponse("<p style='font-family:system-ui;padding:40px'>Thanks, you're on the waitlist. "
                         "We'll only email you if this launches.</p>")
+
+
+@app.get("/replay/{run_id}", response_class=HTMLResponse)
+def replay_run(run_id: str):
+    entries = orch.log.read()
+    r = replay.runs(entries).get(run_id)
+    if r is None:
+        raise HTTPException(404, "No such run in decision_log.json.")
+    return page(f"Replay {run_id}", replay.render_run(run_id, r, replay.run_outputs(r["slug"], settings.outputs_dir),
+                                                       not validate(entries)))
 
 
 @app.get("/api/decision-log/validate")
