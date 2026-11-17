@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import json
 import re
+import time
 from dataclasses import dataclass, field
 from typing import Protocol, TypeVar
 
@@ -118,6 +119,23 @@ class OpenAICompatLLM:
     def health(self) -> bool:
         return bool(self.settings.openai_api_key)
 
+    def _post(self, messages: list[dict]) -> httpx.Response:
+        """POST with backoff on free-tier rate limits (HTTP 429)."""
+        for attempt in range(8):
+            r = httpx.post(
+                f"{self.settings.openai_base_url}/chat/completions",
+                headers={"Authorization": f"Bearer {self.settings.openai_api_key}"},
+                json={"model": self.model, "messages": messages, "temperature": 0.3,
+                      "response_format": {"type": "json_object"}},
+                timeout=self.settings.llm_timeout_s,
+            )
+            if r.status_code != 429:
+                break
+            wait = _retry_after(r) or min(60, 5 * (attempt + 1))
+            time.sleep(wait + 0.5)
+        r.raise_for_status()
+        return r
+
     def structured(self, system: str, user: str, schema: type[T]) -> T:
         sys_msg = (f"{system}\n\nReply with a single JSON object that matches this JSON schema:\n"
                    f"{json.dumps(schema.model_json_schema())}")
@@ -125,14 +143,7 @@ class OpenAICompatLLM:
         last_err: Exception | None = None
         for _ in range(2):
             try:
-                r = httpx.post(
-                    f"{self.settings.openai_base_url}/chat/completions",
-                    headers={"Authorization": f"Bearer {self.settings.openai_api_key}"},
-                    json={"model": self.model, "messages": messages, "temperature": 0.3,
-                          "response_format": {"type": "json_object"}},
-                    timeout=self.settings.llm_timeout_s,
-                )
-                r.raise_for_status()
+                r = self._post(messages)
             except httpx.HTTPError as e:
                 detail = getattr(getattr(e, "response", None), "text", "")[:300]
                 raise LLMError(f"{self.settings.openai_base_url} failed for '{self.model}': {e} {detail}") from e
@@ -153,3 +164,17 @@ class OpenAICompatLLM:
 
 def make_llm(settings: Settings):
     return OpenAICompatLLM(settings) if settings.provider == "openai" else OllamaLLM(settings)
+
+
+def _retry_after(r: httpx.Response) -> float | None:
+    h = r.headers.get("retry-after")
+    if h:
+        try:
+            return float(h)
+        except ValueError:
+            pass
+    m = re.search(r"try again in ([\d.]+)(ms|s)", r.text)
+    if m:
+        v = float(m.group(1))
+        return v / 1000 if m.group(2) == "ms" else v
+    return None

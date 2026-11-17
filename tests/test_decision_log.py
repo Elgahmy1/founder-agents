@@ -34,3 +34,11 @@ def test_payment_mock_is_idempotent_and_refund_revokes():
     assert d.deliveries == 1
     assert d.handle(MockPaymentEvent("e2", "o1", "refund_succeeded", 100)) == "access_revoked"
     assert d.access["o1"] is False
+
+
+def test_rate_limit_retry_after_parsing():
+    import httpx
+    from app.llm import _retry_after
+    r = httpx.Response(429, text="Please try again in 720ms.")
+    assert abs(_retry_after(r) - 0.72) < 1e-6
+    assert _retry_after(httpx.Response(429, headers={"retry-after": "3"})) == 3
