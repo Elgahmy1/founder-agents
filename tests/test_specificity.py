@@ -80,3 +80,10 @@ def test_opportunities_must_name_the_strongest_alternative():
     o.update(strongest_alternative="ChatGPT (free): students paste slides and ask for a summary",
              why_switch="Questions tied to their own course slides and past exam style; ChatGPT does not know either")
     assert specificity.problems(Opportunities(opportunities=[o]), BRIEF, need_alternative=True) == []
+
+
+def test_suggesting_any_payment_even_a_test_is_sent_back():
+    found = specificity.problems(Plan(advice="With $200, add a $5 pre-order button (Stripe test mode) for 10 hours of work."), BRIEF)
+    assert any("takes no payments of any kind" in p for p in found)
+    ok = Plan(advice="With $200 and 10 hours, show the $5 price next to a free waitlist and ask 5 students what they paid for tutoring.")
+    assert specificity.problems(ok, BRIEF) == []

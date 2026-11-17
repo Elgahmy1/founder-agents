@@ -33,6 +33,10 @@ GENERIC_PHRASES = [
 ]
 _GENERIC = [re.compile(p, re.I) for p in GENERIC_PHRASES]
 
+# Suggestions to take money in any form, even a test: the rules allow no payments of any kind (not even sandbox).
+MONEY_ADVICE = re.compile(r"\b(pre-?orders?|pre-?sales?|deposits?|stripe|paypal|gumroad|payment (link|button|page)|buy button|"
+                          r"test[- ]mode|sandbox (payment|checkout)|charge (them|customers|students|users)|collect payments?)\b", re.I)
+
 
 def _texts(obj) -> list[str]:
     """Every string value in a model (or nested lists and dicts)."""
@@ -77,6 +81,11 @@ def problems(draft, brief=None, *, need_alternative: bool = False) -> list[str]:
             seen.add(m.group(0).lower())
             out.append(f"Generic phrase \"{m.group(0)}\": replace it with a concrete action for this founder "
                        "(who exactly, where, how many, by when, within the budget and hours).")
+    m = MONEY_ADVICE.search(blob)
+    if m:
+        out.append(f"\"{m.group(0)}\" suggests taking money. This system takes no payments of any kind, not even a test or "
+                   "sandbox: test willingness to pay without money (a price shown next to a free waitlist, interview questions "
+                   "about what they paid for alternatives in the past).")
     if brief is not None:
         facts = brief_facts(brief)
         if facts and not any(f in low for f in facts):
