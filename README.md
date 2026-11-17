@@ -53,7 +53,8 @@ An explicit state machine (`app/orchestrator.py`) moves a run through the six ph
 
 - Model: `qwen3:8b` (open weights) via [Ollama](https://ollama.com), running locally. Set `MODEL=gpt-oss:20b` (or any Ollama model) in `.env` to switch.
 - Research: Hacker News Algolia API, Stack Exchange API, DuckDuckGo HTML results. No keys, no accounts.
-- No GPU? Set `LLM_PROVIDER=openai` with a free-tier OpenAI-compatible endpoint that serves open-weight models (for example Groq's free tier with `openai/gpt-oss-120b`); see `.env.example`. The key stays in your untracked `.env`.
+- No GPU? Set `LLM_PROVIDER=openai` with a free-tier OpenAI-compatible endpoint that serves open-weight models (for example Groq's free tier with `openai/gpt-oss-120b`); see `.env.example`. The key stays in your untracked `.env`, and `docker compose up` then skips the Ollama model download.
+- The committed demo run (`outputs/`, `decision_log.json`) was made on a laptop without a GPU, so it used the open-weight `openai/gpt-oss-120b` on Groq's free tier; the `model` field of each log entry records this.
 - No paid service is used or required. If research sites are unreachable, the run continues and every claim is labelled ASSUMPTION.
 
 ## Cost per run
