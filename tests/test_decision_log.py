@@ -17,7 +17,7 @@ def test_tampering_is_detected(tmp_path):
     log = DecisionLog(p)
     log.append(agent="gate", action="evidence_gate", outcome="stop")
     log.append(agent="founder", action="decide", approved_by="founder")
-    entries = json.loads(p.read_text())
+    entries = json.loads(p.read_text(encoding="utf-8"))
     entries[0]["outcome"] = "go"
     assert validate(entries)
 

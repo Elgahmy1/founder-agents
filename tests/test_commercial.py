@@ -28,9 +28,9 @@ def test_commercial_phase_go_needs_founder_signatures(make_orch, brief, settings
     assert g["gate"] == "commercial_gate" and g["recommendation"] == "go", g
     for prefix in ("phase4_step1_pricing", "phase4_step2_policies", "phase4_gate_decision"):
         assert any(o.startswith(prefix) for o in st.outputs), prefix
-    pricing = (settings.outputs_dir / next(o for o in st.outputs if o.startswith("phase4_step1"))).read_text()
+    pricing = (settings.outputs_dir / next(o for o in st.outputs if o.startswith("phase4_step1"))).read_text(encoding="utf-8")
     assert "[source: https://example.com/notion-vs-obsidian]" in pricing and "ASSUMPTION" in pricing
-    policies = (settings.outputs_dir / next(o for o in st.outputs if o.startswith("phase4_step2"))).read_text()
+    policies = (settings.outputs_dir / next(o for o in st.outputs if o.startswith("phase4_step2"))).read_text(encoding="utf-8")
     assert policies.count("DRAFT") >= 3
     _, q = orch.load(st.run_id)
     assert sorted(i.title.split(":")[0] for i in q.pending()) == [
@@ -118,7 +118,7 @@ def test_real_terms_disclaimer_is_queued_and_email_is_placeholder(make_orch, bri
     assert st.gates[-1]["recommendation"] == "go"
     _, q = orch.load(st.run_id)
     assert len(q.pending()) == 4
-    policies = (settings.outputs_dir / next(o for o in st.outputs if o.startswith("phase4_step2"))).read_text()
+    policies = (settings.outputs_dir / next(o for o in st.outputs if o.startswith("phase4_step2"))).read_text(encoding="utf-8")
     assert "examready.ai" not in policies and "[founder contact email]" in policies
 
 

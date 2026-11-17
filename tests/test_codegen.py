@@ -33,7 +33,7 @@ def test_codegen_writes_output_and_never_changes_the_run(make_orch, brief, setti
     st = orch.founder_generate_code(st.run_id)
     assert st.stage == stage and st.gates == gates
     assert st.code == {"passed": 1, "total": 1, "ok": True, "attempts": 1, "stories": "1/2", "deferred": 1}
-    out = (settings.outputs_dir / next(o for o in st.outputs if o.startswith("phase3_step4_code"))).read_text()
+    out = (settings.outputs_dir / next(o for o in st.outputs if o.startswith("phase3_step4_code"))).read_text(encoding="utf-8")
     assert "1/1 acceptance checks passed" in out and "def summarize" in out and "Nothing here is published" in out
     log = orch.log.read()
     assert any(e["action"] == "run_acceptance_checks" and e["outcome"] == "pass" for e in log)
@@ -60,7 +60,7 @@ def test_unsafe_code_is_never_run_and_reported(make_orch, brief, settings):
     st = _to_build(orch, brief)
     st = orch.founder_generate_code(st.run_id)
     assert not st.code["ok"] and st.code["passed"] == 0
-    out = (settings.outputs_dir / next(o for o in st.outputs if o.startswith("phase3_step4_code"))).read_text()
+    out = (settings.outputs_dir / next(o for o in st.outputs if o.startswith("phase3_step4_code"))).read_text(encoding="utf-8")
     assert "import of 'os' is not allowed" in out and "should not rely on this code" in out
 
 
@@ -102,7 +102,7 @@ def test_code_covers_every_story_and_lists_deferred_criteria(make_orch, brief, s
     st = _to_build(orch, brief)
     st = orch.founder_generate_code(st.run_id)
     assert st.code["stories"] == "2/2" and st.code["deferred"] == 1 and st.code["ok"]
-    out = (settings.outputs_dir / next(o for o in st.outputs if o.startswith("phase3_step4_code"))).read_text()
+    out = (settings.outputs_dir / next(o for o in st.outputs if o.startswith("phase3_step4_code"))).read_text(encoding="utf-8")
     assert "Stories with at least one executable check: 2 of 2" in out and "DEFERRED (STUBBED): needs hosting" in out
     assert "2/2 acceptance checks passed" in out
 
@@ -113,7 +113,7 @@ def test_criteria_the_coder_leaves_out_are_listed_as_deferred_not_dropped(make_o
     orch.llm.code_drafts = [dict(GOOD_CODE, deferred=[])]
     st = _to_build(orch, brief)
     st = orch.founder_generate_code(st.run_id)
-    out = (settings.outputs_dir / next(o for o in st.outputs if o.startswith("phase3_step4_code"))).read_text()
+    out = (settings.outputs_dir / next(o for o in st.outputs if o.startswith("phase3_step4_code"))).read_text(encoding="utf-8")
     assert st.code["deferred"] == 1
     assert "| US2 | Given a summary, the page lists at least 5 key terms | - | DEFERRED (STUBBED): no executable check" in out
     assert "2 in the spec, 1 checked in the sandbox, 1 deferred" in out

@@ -6,7 +6,7 @@ import pytest
 
 from app import guard
 
-PROMPTS = json.loads((Path(__file__).resolve().parent.parent / "evals" / "red_team_prompts.json").read_text())
+PROMPTS = json.loads((Path(__file__).resolve().parent.parent / "evals" / "red_team_prompts.json").read_text(encoding="utf-8"))
 
 
 @pytest.mark.parametrize("p", PROMPTS["must_refuse"])
@@ -60,7 +60,7 @@ def test_landing_page_never_contains_scripts_or_payment_fields(make_orch, brief,
     orch = make_orch()
     st = orch.start(brief)
     st = orch.founder_gate_decision(st.run_id, "go")
-    html = (settings.outputs_dir / next(n for n in st.outputs if n.startswith("phase2_step2"))).read_text()
+    html = (settings.outputs_dir / next(n for n in st.outputs if n.startswith("phase2_step2"))).read_text(encoding="utf-8")
     low = html.lower()
     assert "<script" not in low and "card" not in low and "type=\"password\"" not in low
 

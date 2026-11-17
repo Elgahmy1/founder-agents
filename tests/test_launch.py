@@ -22,12 +22,12 @@ def test_launch_phase_outputs_gate_and_approvals(make_orch, brief, settings):
     assert g["gate"] == "launch_gate"
     for prefix in ("phase5_step1_store_page", "phase5_step2_launch_kit", "phase5_step3_payment_test", "phase5_gate_decision"):
         assert any(o.startswith(prefix) for o in st.outputs), prefix
-    store = (settings.outputs_dir / next(o for o in st.outputs if o.startswith("phase5_step1"))).read_text()
+    store = (settings.outputs_dir / next(o for o in st.outputs if o.startswith("phase5_step1"))).read_text(encoding="utf-8")
     assert "4 USD / month" in store and "Free" in store and "<script" not in store and "<form" not in store
     assert "Not on sale yet" in store
-    kit = (settings.outputs_dir / next(o for o in st.outputs if o.startswith("phase5_step2"))).read_text()
+    kit = (settings.outputs_dir / next(o for o in st.outputs if o.startswith("phase5_step2"))).read_text(encoding="utf-8")
     assert "Only 3 spots left" not in kit and "BLOCKED by guard" in kit  # hype post blocked, never queued
-    assert (settings.outputs_dir / "payment_test_log.md").read_text().count("PASS") >= 5
+    assert (settings.outputs_dir / "payment_test_log.md").read_text(encoding="utf-8").count("PASS") >= 5
     # one post was blocked, so the gate recommends a redraft
     assert g["recommendation"] == "repeat"
     _, q = orch.load(st.run_id)
@@ -98,7 +98,7 @@ def test_post_with_invented_founder_name_is_blocked(make_orch, brief, settings):
         return d
     orch.llm.launch = one_post
     st = _to_launch(orch, brief)  # brief founder is Mohamed
-    kit = (settings.outputs_dir / next(o for o in st.outputs if o.startswith("phase5_step2"))).read_text()
+    kit = (settings.outputs_dir / next(o for o in st.outputs if o.startswith("phase5_step2"))).read_text(encoding="utf-8")
     assert "BLOCKED by guard" in kit and "is not the founder" in kit and "I'm Alex" not in kit
     assert st.gates[-1]["recommendation"] == "repeat"
     _, q = orch.load(st.run_id)
@@ -116,7 +116,7 @@ def test_faq_cannot_invent_plan_terms(make_orch, brief, settings):
         return d
     orch.llm.launch = faq_quota
     st = _to_launch(orch, brief)
-    store = (settings.outputs_dir / next(o for o in st.outputs if o.startswith("phase5_step1"))).read_text()
+    store = (settings.outputs_dir / next(o for o in st.outputs if o.startswith("phase5_step1"))).read_text(encoding="utf-8")
     assert "3 documents per month" not in store
     assert "What does each plan include?" in store and "4 USD / month" in store
 

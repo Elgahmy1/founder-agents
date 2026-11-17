@@ -941,11 +941,28 @@ class Orchestrator:
             self.log.append(agent="builder", action="build_mvp_app", run_id=run_id, phase=3, outcome="built",
                             detail=f"functions {', '.join(f for f, _ in funcs)}; acceptance checks {passed}"
                                    + (f"; guard removed {len(removed)} line(s)" if removed else ""))
-            q.supersede("publish_mvp_local")
             names = [f for f, _ in funcs]
-            bundle = json.dumps({"page": page, "code": code, "func": names[0], "funcs": names}, ensure_ascii=False)
-            q.submit("publish", f"Publish the MVP app on this computer: {run_id}", bundle, "publish_mvp_local", 3,
-                     check=lambda c: guard.check_output(json.loads(c)["page"]))
+            sample = " ".join([mvp.one_line.rstrip(".") + "."] + [f"As {s.as_a}, I want {s.i_want.rstrip('.')}, so that "
+                                                                   f"{s.so_that.rstrip('.')}." for s in mvp.user_stories])
+            example = mvp_app.run_functions(code, names, sample, sandbox.call)
+            guide = mvp_app.render_user_guide(
+                run_id=run_id, product_name=mvp.product_name, one_line=mvp.one_line,
+                stories=[s.model_dump() for s in mvp.user_stories], out_of_scope=list(mvp.out_of_scope), funcs=funcs,
+                docs=mvp_app.function_docs(code), rows=mvp_app.criteria_rows(src.read_text(encoding="utf-8")),
+                checks_passed=passed, sample=sample, example=example)
+            g = guard.check_output(guide)
+            if not g.allowed:
+                raise ValueError(f"the user guide failed the output guard ({g.rule})")
+            self.write_output(st, "phase3_step6_user_guide.md", guide)
+            self.log.append(agent="builder", action="write_user_guide", run_id=run_id, phase=3, outcome="written",
+                            detail=f"user docs for the MVP app from the spec, the tested code and a sandbox run of "
+                                   f"{', '.join(names)}; no model call")
+            q.supersede("publish_mvp_local")
+            bundle = json.dumps({"page": page, "guide": guide, "code": code, "func": names[0], "funcs": names},
+                                ensure_ascii=False)
+            q.submit("publish", f"Publish the MVP app and its user guide on this computer: {run_id}", bundle,
+                     "publish_mvp_local", 3,
+                     check=lambda c: guard.check_output(json.loads(c)["page"] + "\n" + json.loads(c).get("guide", "")))
             st.mvp_app = {"func": ", ".join(names), "checks": passed}
             self.save(st, q)
             return st

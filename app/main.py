@@ -476,6 +476,14 @@ def mvp_page(request: Request, run_id: str):
     return HTMLResponse(b["page"])
 
 
+@app.get("/mvp/{run_id}/guide", response_class=HTMLResponse)
+def mvp_guide(run_id: str):
+    b = _mvp_bundle(run_id)
+    if not b.get("guide"):
+        raise HTTPException(404, "This MVP app was published before user guides existed: rebuild it to get one.")
+    return HTMLResponse(mvp_app.guide_html(b["guide"], "User guide"))
+
+
 @app.post("/mvp/{run_id}", response_class=HTMLResponse)
 def mvp_run(request: Request, run_id: str, text: str = Form(...)):
     b = _mvp_bundle(run_id)

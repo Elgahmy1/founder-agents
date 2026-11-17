@@ -77,6 +77,7 @@ button{{padding:8px 14px;border:0;border-radius:6px;background:var(--acc);color:
 pre{{white-space:pre-wrap;word-wrap:break-word}} .mut{{color:var(--mut);font-size:.9em}}
 </style></head><body>
 <h1>{name}</h1><p class="mut">Product vision: {tagline}</p>
+<p><a href="/mvp/{html.escape(run_id)}/guide">User guide</a>: what this MVP does today, how to use it, and what it does not do yet.</p>
 <div class="card"><p><b>What this MVP does today:</b> paste text, press Run, and it shows the result of
 {" and ".join(f"<code>{html.escape(f)}</code>" for f, _ in funcs)} on your text.</p><p class="mut">{want}</p>
 <form method="post" action="/mvp/{html.escape(run_id)}">
@@ -124,3 +125,125 @@ def result_html(results: list[tuple[str, dict]]) -> str:
             body = f"<pre>{html.escape(text)}</pre>"
         parts.append(f"<h3><code>{html.escape(func)}</code></h3>{body}")
     return "<div class='card'><h2>Result</h2>" + "".join(parts) + "</div>"
+
+
+def function_docs(code: str) -> dict[str, str]:
+    """First sentence of each public top-level function's docstring (written by the coder agent)."""
+    out: dict[str, str] = {}
+    for node in ast.parse(code).body:
+        if isinstance(node, ast.FunctionDef) and not node.name.startswith("_"):
+            doc = " ".join((ast.get_docstring(node) or "").split())
+            out[node.name] = re.split(r"(?<=[.!?])\s", doc, maxsplit=1)[0] if doc else ""
+    return out
+
+
+def criteria_rows(md: str) -> list[tuple[str, str, str]]:
+    """(story, acceptance criterion, result) rows of the table in a phase3_step4_code output."""
+    rows = []
+    for line in md.splitlines():
+        m = re.match(r"^\| (US\d+) \| (.+?) \| (check \d+|-) \| (.+?) \|$", line.strip())
+        if m:
+            rows.append((m.group(1), m.group(2), m.group(4)))
+    return rows
+
+
+def _show(res: dict) -> str:
+    if not res.get("ok"):
+        return f"(error: {res.get('error')})"
+    out = res.get("result")
+    if isinstance(out, list):
+        return "\n".join(f"  - {x}" for x in out)
+    return "\n".join(f"  {line}" for line in str(out).splitlines())
+
+
+def render_user_guide(*, run_id: str, product_name: str, one_line: str, stories: list[dict], out_of_scope: list[str],
+                      funcs: list[tuple[str, list[str]]], docs: dict[str, str], rows: list[tuple[str, str, str]],
+                      checks_passed: str, sample: str, example: list[tuple[str, dict]]) -> str:
+    """Phase 3 user docs for the MVP app, built in code from the run's own artifacts (MVP spec, tested code,
+    acceptance results and a real sandbox run); no model call, so it cannot describe features the MVP lacks."""
+    passed = [r for r in rows if r[2] == "PASS"]
+    deferred = [r for r in rows if r[2].startswith("DEFERRED")]
+    chained = [f for f, p in funcs[1:] if p and funcs and p[0] != funcs[0][1][0]]
+    lines = [f"# {product_name}: user guide (MVP)", "",
+             f"Written by the pipeline when the MVP app was built (run `{run_id}`), from the MVP spec, the tested core code "
+             f"({checks_passed} acceptance checks passed) and a real run of that code in the sandbox. No model wrote this guide.", "",
+             "## What it does today", ""]
+    for f, p in funcs:
+        lines.append(f"- **{f}** (input: `{p[0]}`): {docs.get(f) or 'no description in the code.'}")
+    lines += ["", f"Product vision (not built yet): {one_line}", "", "## How to use it", "",
+              f"1. Open the MVP app at `/mvp/{run_id}` (on this computer; public hosting is MOCKED).",
+              "2. Paste your text into the box (up to 20,000 characters).",
+              "3. Press **Run**. The result shows one section per step, in this order: "
+              + ", ".join(f"`{f}`" for f, _ in funcs) + "."]
+    if chained:
+        lines.append(f"4. {', '.join(f'`{f}`' for f in chained)} works on the result of the step before it, not on your raw text.")
+    lines += ["", "## Example (real output of this MVP)", "",
+              "Input: the product's own description and user stories, used as sample text.", "", "```text", sample, "```", ""]
+    for f, res in example:
+        lines += [f"`{f}`:", "", "```text", _show(res).rstrip(), "```", ""]
+    lines += ["## What was tested", "", "| Story | Acceptance criterion | Result |", "|---|---|---|"]
+    lines += [f"| {s} | {c} | {r} |" for s, c, r in rows]
+    lines += ["", "## What it does not do yet", ""]
+    lines += [f"- {c} ({s}): not built yet, so it is listed as DEFERRED, not claimed." for s, c, _ in deferred]
+    lines += [f"- Out of scope for this MVP: {x}" for x in out_of_scope]
+    lines += ["- Uploading files (PDF, slides), accounts, saving results and public hosting are STUBBED: paste plain text instead.",
+              "- The steps are plain, deterministic code, not an AI model: results can be simple, and they are not checked for accuracy.", "",
+              "## Your data", "",
+              "Nothing you paste is stored. Each request runs the code in an isolated sandbox with no file, network or process access, "
+              "and the page has no accounts, cookies, password or payment fields.", "",
+              "## Who it is for", ""]
+    lines += [f"- {s.get('id', '')}: as {s.get('as_a', '')}, I want {s.get('i_want', '')}, so that {s.get('so_that', '')}." for s in stories]
+    lines += ["", f"Tested stories: {len({r[0] for r in passed})} of {len(stories)}; "
+              f"acceptance criteria checked: {len(passed)}, deferred: {len(deferred)}.", ""]
+    return "\n".join(lines)
+
+
+def guide_html(md: str, title: str) -> str:
+    """Small Markdown-to-HTML for the user guide (headings, lists, tables, code blocks); everything is escaped."""
+    out, in_code, in_list, in_table = [], False, False, False
+    def close():
+        nonlocal in_list, in_table
+        if in_list:
+            out.append("</ul>"); in_list = False
+        if in_table:
+            out.append("</table>"); in_table = False
+    def inline(t: str) -> str:
+        t = html.escape(t)
+        t = re.sub(r"\*\*(.+?)\*\*", r"<b>\1</b>", t)
+        return re.sub(r"`(.+?)`", r"<code>\1</code>", t)
+    for line in md.splitlines():
+        if line.startswith("```"):
+            close()
+            out.append("</pre>" if in_code else "<pre>"); in_code = not in_code
+            continue
+        if in_code:
+            out.append(html.escape(line)); continue
+        if line.startswith("|"):
+            cells = [c.strip() for c in line.strip().strip("|").split("|")]
+            if set("".join(cells)) <= set("-: "):
+                continue
+            if not in_table:
+                close(); out.append("<table>"); in_table = True
+                out.append("<tr>" + "".join(f"<th>{inline(c)}</th>" for c in cells) + "</tr>"); continue
+            out.append("<tr>" + "".join(f"<td>{inline(c)}</td>" for c in cells) + "</tr>"); continue
+        if line.startswith("- ") or re.match(r"^\d+\. ", line):
+            if in_table:
+                close()
+            if not in_list:
+                out.append("<ul>"); in_list = True
+            item = re.sub(r"^(- |\d+\. )", "", line)
+            out.append(f"<li>{inline(item)}</li>"); continue
+        close()
+        if line.startswith("## "):
+            out.append(f"<h2>{inline(line[3:])}</h2>")
+        elif line.startswith("# "):
+            out.append(f"<h1>{inline(line[2:])}</h1>")
+        elif line.strip():
+            out.append(f"<p>{inline(line)}</p>")
+    close()
+    style = ("body{font-family:system-ui,sans-serif;max-width:760px;margin:0 auto;padding:16px;line-height:1.5}"
+             "pre{background:#f2f2f5;padding:8px;white-space:pre-wrap}table{border-collapse:collapse}"
+             "td,th{border:1px solid #ccc;padding:4px 6px;text-align:left;vertical-align:top}")
+    return (f"<!doctype html><html lang=\"en\"><head><meta charset=\"utf-8\"><meta name=\"viewport\" "
+            f"content=\"width=device-width,initial-scale=1\"><title>{html.escape(title)}</title><style>{style}</style>"
+            f"</head><body>{''.join(out)}</body></html>")

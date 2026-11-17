@@ -13,7 +13,7 @@ def test_counter_stores_only_page_and_date(tmp_path):
     snap = c.totals()
     c.hit("store")
     assert snap["store"] == 2 and c.since(snap)["store"] == 1 and c.since(snap)["mvp_run"] == 0
-    data = json.loads(c.path.read_text())
+    data = json.loads(c.path.read_text(encoding="utf-8"))
     assert set(data) == {"store", "mvp_run"} and all(len(k) == 10 for d in data.values() for k in d)
     assert from_dashboard("http://localhost:8000/runs/abc") and not from_dashboard(None)
 
@@ -37,7 +37,7 @@ def test_launch_results_use_counted_visits(make_orch, brief, monkeypatch):
             break
         import time; time.sleep(0.05)
     assert st.operate["visits"] == 3 and st.operate["visits_source"] == "counted by the app"
-    md = (orch.settings.outputs_dir / next(o for o in st.outputs if o.startswith("phase6_step1"))).read_text()
+    md = (orch.settings.outputs_dir / next(o for o in st.outputs if o.startswith("phase6_step1"))).read_text(encoding="utf-8")
     assert "| 3 | counted by the app |" in md and "no cookies" in md
     assert any(e["action"] == "count_launch_usage" for e in orch.log.read())
 

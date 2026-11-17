@@ -77,3 +77,28 @@ def test_a_later_step_gets_the_previous_steps_text_result():
     assert res["summarize_text"]["result"] == "- Cells divide"
     assert res["generate_questions"]["result"] == ["Q: Cells divide"]
     assert res["word_count"]["result"] == 4
+
+
+def test_mvp_ships_with_a_user_guide_built_from_its_own_artifacts(monkeypatch, make_orch, brief, settings):
+    import app.main as main
+    orch = make_orch()
+    monkeypatch.setattr(main, "orch", orch)
+    monkeypatch.setattr(main, "settings", orch.settings)
+    c = TestClient(main.app)
+    st = _to_build(orch, brief)
+    orch.founder_generate_code(st.run_id)
+    st = orch.founder_build_mvp(st.run_id)
+    guide = (settings.outputs_dir / next(o for o in st.outputs if o.startswith("phase3_step6_user_guide"))).read_text(encoding="utf-8")
+    assert "## How to use it" in guide and "**summarize**" in guide and "No model wrote this guide" in guide
+    assert "| US1 |" in guide and "PASS" in guide  # what was tested, from the code output
+    assert "DEFERRED" in guide and "STUBBED" in guide  # what it does not do is said, not hidden
+    assert "## Example (real output of this MVP)" in guide
+    assert c.get(f"/mvp/{st.run_id}/guide").status_code == 404  # not live before the founder approves
+    _, q = orch.load(st.run_id)
+    item = next(i for i in q.pending() if i.executor == "publish_mvp_local")
+    orch.approve(st.run_id, item.id, True)
+    page = c.get(f"/mvp/{st.run_id}").text
+    assert f"/mvp/{st.run_id}/guide" in page
+    r = c.get(f"/mvp/{st.run_id}/guide")
+    assert r.status_code == 200 and "How to use it" in r.text and "<script" not in r.text
+    assert "write_user_guide" in [e["action"] for e in orch.log.read()]

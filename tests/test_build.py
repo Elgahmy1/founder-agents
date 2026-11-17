@@ -30,7 +30,7 @@ def test_build_phase_produces_spec_prototype_tests_and_go(make_orch, brief, sett
     assert g["gate"] == "build_gate" and g["recommendation"] == "go", g
     for prefix in ("phase3_step1_mvp_spec", "phase3_step2_prototype", "phase3_step3_acceptance_tests", "phase3_gate_decision"):
         assert any(o.startswith(prefix) for o in st.outputs), prefix
-    proto = (settings.outputs_dir / next(o for o in st.outputs if o.startswith("phase3_step2"))).read_text()
+    proto = (settings.outputs_dir / next(o for o in st.outputs if o.startswith("phase3_step2"))).read_text(encoding="utf-8")
     assert "<script" not in proto and "<form" not in proto and "SAMPLE output" in proto
     _, q = orch.load(st.run_id)
     assert [i.title for i in q.pending()] == [f"Publish clickable prototype for review: {st.run_id}"]
@@ -58,7 +58,7 @@ def test_prototype_drops_password_and_payment_fields(make_orch, brief, settings)
     orch = make_orch()
     orch.llm.mvp_extra_inputs = ["Password", "Card number"]
     st = _to_build(orch, brief)
-    proto = (settings.outputs_dir / next(o for o in st.outputs if o.startswith("phase3_step2"))).read_text()
+    proto = (settings.outputs_dir / next(o for o in st.outputs if o.startswith("phase3_step2"))).read_text(encoding="utf-8")
     assert "Password" not in proto and "Card number" not in proto
     assert st.gates[-1]["recommendation"] == "repeat"
 

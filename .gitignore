@@ -5,3 +5,8 @@ __pycache__/
 data/
 .venv/
 venv/
+
+# local helper scripts and logs (never committed)
+_*.bat
+_*_log.txt
+CLAUDE-HANDOFF.md

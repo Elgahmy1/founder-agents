@@ -10,7 +10,7 @@ def test_discover_strong_idea_reaches_gate_with_go(make_orch, brief, settings):
     names = st.outputs
     assert any(n.startswith("phase1_step1_opportunities") for n in names)
     assert any(n.startswith("phase1_gate_decision") for n in names)
-    text = (settings.outputs_dir / next(n for n in names if n.startswith("phase1_step1"))).read_text()
+    text = (settings.outputs_dir / next(n for n in names if n.startswith("phase1_step1"))).read_text(encoding="utf-8")
     assert "ASSUMPTION" in text and "https://www.reddit.com" in text
 
 
@@ -20,7 +20,7 @@ def test_full_validate_flow_and_stop_on_missed_targets(make_orch, brief, setting
     st = orch.founder_gate_decision(st.run_id, "go")
     assert st.stage == "p2_targets_wait", st.error
     # landing copy contained a fake traction line; it must have been scrubbed
-    html = (settings.outputs_dir / next(n for n in st.outputs if n.startswith("phase2_step2"))).read_text()
+    html = (settings.outputs_dir / next(n for n in st.outputs if n.startswith("phase2_step2"))).read_text(encoding="utf-8")
     assert "10,000" not in html and "<script" not in html.lower()
     st = orch.founder_lock_targets(st.run_id, True)
     assert st.stage == "p2_collecting"
@@ -84,7 +84,7 @@ def test_excluded_opportunities_from_model_are_never_chosen(make_orch, brief, se
     st = orch.start(brief)
     assert st.error is None, st.error
     assert st.opportunities[st.chosen]["name"] == "Note Summaries"
-    text = (settings.outputs_dir / next(n for n in st.outputs if n.startswith("phase1_step1"))).read_text()
+    text = (settings.outputs_dir / next(n for n in st.outputs if n.startswith("phase1_step1"))).read_text(encoding="utf-8")
     assert text.count("EXCLUDED by policy") == 2
     assert any(e["action"] == "exclude_opportunity" for e in orch.log.read())
 

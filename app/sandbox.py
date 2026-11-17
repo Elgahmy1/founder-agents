@@ -148,7 +148,7 @@ def run(code: str, checks: list[str]) -> SandboxResult:
         if os.name == "nt":  # Windows needs these to start Python at all
             env.update({k: os.environ[k] for k in ("SYSTEMROOT", "TEMP", "TMP") if k in os.environ})
         try:
-            p = subprocess.run([sys.executable, "-I", "harness.py"], cwd=d, env=env, capture_output=True, text=True,
+            p = subprocess.run([sys.executable, "-I", "harness.py"], cwd=d, env=env, capture_output=True, text=True, encoding="utf-8", errors="replace",
                                timeout=TIMEOUT_S, preexec_fn=_limits if os.name == "posix" else None)
         except subprocess.TimeoutExpired:
             return SandboxResult(timed_out=True)
@@ -193,7 +193,7 @@ def call(code: str, func: str, arg: str) -> dict:
         if os.name == "nt":
             env.update({k: os.environ[k] for k in ("SYSTEMROOT", "TEMP", "TMP") if k in os.environ})
         try:
-            p = subprocess.run([sys.executable, "-I", "harness.py"], cwd=d, env=env, capture_output=True, text=True,
+            p = subprocess.run([sys.executable, "-I", "harness.py"], cwd=d, env=env, capture_output=True, text=True, encoding="utf-8", errors="replace",
                                timeout=TIMEOUT_S, preexec_fn=_limits if os.name == "posix" else None)
         except subprocess.TimeoutExpired:
             return {"ok": False, "error": f"stopped after the {TIMEOUT_S}-second limit"}

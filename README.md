@@ -2,6 +2,8 @@
 
 An open-source team of AI agents that takes a founder's brief (idea, skills, budget, time, target market, values) toward a validated digital product. It gathers real sources, labels everything else as an ASSUMPTION, sets evidence targets before testing, and recommends **stop** when the evidence is weak. The founder approves everything that is published, sent, spent or signed, and that rule lives in code (`app/approval.py`).
 
+In the committed demo run (`48fc7649`, an exam-summary app for students), the agents took one idea through all six phases on an open-weight model at $0.00: sourced research, a waitlist demand test (the system recommended PIVOT; the founder overrode it to GO, and the log keeps both), a tested MVP with a user guide, pricing and policy drafts signed by the founder, a store page and launch kit, and a learn gate that recommended **stop** on real launch numbers (0 visits, 0 sign-ups). Three other ideas were stopped earlier on weak evidence, and a crypto-signals idea was refused by the policy screen. You can replay every recorded run without a model at `/replay/<run>` ([demo-run map](docs/demo-run.md), [run metrics](evals/run_metrics.md)).
+
 ## Quickstart
 
 ```bash
@@ -41,6 +43,7 @@ Every **Working** row below has real output from the committed demo runs: [docs/
 | Phase 3 Build: acceptance tests + build gate (scope vs founder hours, traceability, testability, safety) | **Working** |
 | Phase 3 Build: coder agent writes core code for every user story in the MVP spec plus one check per acceptance criterion (criteria that need storage, a UI or hosting are listed as deferred, never faked); the sandbox (static allowlist + isolated process, no file/network/process access) runs them, with one repair attempt; CI re-runs the committed code against its checks on every push | **Working** |
 | Phase 3 Build: MVP app: the tested core code wrapped in a working web app at `/mvp/<run>` after founder approval; each request runs the code in the sandbox, nothing is stored | **Working** locally; public hosting **MOCKED** |
+| Phase 3 Build: user docs for the MVP: a user guide (what it does today, how to use it, a real example run, what was tested, what it does not do yet, data handling) written by the pipeline from the spec, the tested code and a sandbox run, no model call; published with the app at `/mvp/<run>/guide` after founder approval | **Working** locally; public hosting **MOCKED** |
 | Phase 3 Build: MVP app storage, accounts, and the acceptance criteria that need them (listed as DEFERRED in `phase3_step4_code`) | **STUBBED** |
 | Phase 4 Commercial setup: tiered pricing with the core feature always free; comparable prices SOURCED or labelled ASSUMPTION | **Working** |
 | Phase 4 Commercial setup: terms, privacy and refund policy DRAFTS, each signed off by the founder; commercial gate | **Working** |
@@ -70,7 +73,7 @@ An explicit state machine (`app/orchestrator.py`) moves a run through the six ph
 
 ## Cost per run
 
-About $0.00 per run (open-weight model, local via Ollama or Groq free tier). The demo run used ~50k tokens in 18 model calls on `openai/gpt-oss-120b` via the Groq free tier across all six phases, including one redraft each of the MVP spec, pricing and policies; the optional Phase 3 core-code step added ~16k tokens in 5 calls (three generations and two repairs). The second run used ~33k tokens in 9 calls before it stopped. Token counts per call are in `decision_log.json`, and the app shows the token count of each run.
+About $0.00 per run (open-weight model, local via Ollama or Groq free tier). The demo run (`48fc7649`) used ~52k tokens in 19 model calls on `openai/gpt-oss-120b` via the Groq free tier across all six phases, including one redraft each of the MVP spec, pricing and policies. The Phase 3 core-code step costs 1-2 calls per generation (~10k tokens to write the code for every user story, ~5k for a repair); across the day it ran 7 times on this run (12 calls, ~62k tokens). The MVP app and its user guide need no model call. The second run used ~33k tokens in 9 calls before it stopped. Token counts per call are in `decision_log.json`, totals per run in [`evals/run_metrics.md`](evals/run_metrics.md), and the app shows the token count of each run.
 
 ## Demo video
 
