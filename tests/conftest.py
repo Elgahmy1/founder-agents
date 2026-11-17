@@ -17,6 +17,7 @@ from app.agents.analyst import DemandTestPlan, GateMemo  # noqa: E402
 from app.agents.builder import MvpSpec  # noqa: E402
 from app.agents.launcher import LaunchKit  # noqa: E402
 from app.agents.operator import SupportDrafts  # noqa: E402
+from app.agents.coder import CodeDraft  # noqa: E402
 from app.agents.policy_drafter import PolicyDrafts  # noqa: E402
 from app.agents.pricer import PricingPlan  # noqa: E402
 from app.agents.interviewer import InterviewPlan  # noqa: E402
@@ -44,12 +45,25 @@ def opp(name, pain, score, pain_ids, claims):
             "claims": claims, "pain_source_ids": pain_ids, "biggest_risk": "students may not pay"}
 
 
+GOOD_CODE = {
+    "module_code": "import re\n\ndef summarize(notes: str, max_words: int = 300) -> str:\n"
+                   "    \"\"\"Extractive summary: first sentences up to max_words.\"\"\"\n"
+                   "    out = []\n    for s in re.split(r'(?<=[.!?])\\s+', notes.strip()):\n"
+                   "        if len(' '.join(out + [s]).split()) > max_words:\n            break\n        out.append(s)\n"
+                   "    return ' '.join(out)\n",
+    "checks": [{"story_id": "US1", "criterion": "Given pasted notes, when I press Summarize, then a summary of at most 300 words appears",
+                "code": "s = summarize('Cells divide. ' * 400)\nassert 0 < len(s.split()) <= 300"}],
+    "notes": "Deterministic extractive summary stands in for the model call; UI and storage come later.",
+}
+
+
 class FakeLLM:
     def __init__(self, strong: bool = True):
         self.model = "fake-test-model"
         self.usage = Usage()
         self.strong = strong
 
+    code_drafts: list = []    # queued CodeDraft dicts; empty -> the passing default below
     translations: dict = {}   # feedback -> English rendering returned by the fake support agent
     support_reply = "Thanks for telling me. — Mohamed"
     mvp_hours = 8.0       # per feature; tests raise it to force an over-scope build gate
@@ -103,6 +117,8 @@ class FakeLLM:
 
     def structured(self, system, user, schema):
         self.usage.calls += 1
+        if schema is CodeDraft and self.code_drafts:
+            return schema.model_validate(self.code_drafts.pop(0))
         c = [{"text": "Students struggle organizing lecture notes before exams", "source_ids": ["S1"]},
              {"text": "Students spend hours rewriting lecture notes", "source_ids": ["S2"]},
              {"text": "Students use Notion and Obsidian for notes", "source_ids": ["S3"]},
@@ -135,6 +151,7 @@ class FakeLLM:
             PricingPlan: self.pricing(),
             PolicyDrafts: self.policies(),
             LaunchKit: self.launch(),
+            CodeDraft: GOOD_CODE,
             SupportDrafts: {"replies": [{"feedback": f, "feedback_english": self.translations.get(f, f), "category": "other",
                                          "reply": self.support_reply,
                                          "product_change": "none" if i else "add key terms export"}

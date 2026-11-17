@@ -37,7 +37,8 @@ Without Docker: install [Ollama](https://ollama.com), run `ollama pull qwen3:8b`
 | Phase 3 Build: MVP spec (user stories, acceptance criteria, scoped features with hour estimates) | **Working** |
 | Phase 3 Build: clickable prototype from a safe template, published locally after founder approval | **Working** |
 | Phase 3 Build: acceptance tests + build gate (scope vs founder hours, traceability, testability, safety) | **Working** |
-| Phase 3 Build: generating and running the MVP's code in a sandbox | **STUBBED** |
+| Phase 3 Build: coder agent writes the primary user story's core code plus one check per acceptance criterion; the sandbox (static allowlist + isolated process, no file/network/process access) runs them, with one repair attempt | **Working** |
+| Phase 3 Build: full application code (user interface, storage, hosting) and deployment | **STUBBED** |
 | Phase 4 Commercial setup: tiered pricing with the core feature always free; comparable prices SOURCED or labelled ASSUMPTION | **Working** |
 | Phase 4 Commercial setup: terms, privacy and refund policy DRAFTS, each signed off by the founder; commercial gate | **Working** |
 | Phase 5 Launch: store page rendered from the founder-approved prices, launch post drafts per channel, launch targets locked before launch, launch gate | **Working** |
@@ -83,6 +84,6 @@ Each limit is checked in code by the guard and the approval queue; [`evals/red_t
 ## How the project stays alive after the hackathon
 
 - Maintainers: Mohamed (@Elgahmy1) and contributors; MIT licensed.
-- Roadmap: phase 3 code generation in a sandbox, real payment-provider webhooks in the founder's own account, and product analytics for phase 6, in the order of [ARCHITECTURE.md](ARCHITECTURE.md#roadmap).
+- Roadmap: phase 3 full-app code generation in a container sandbox, real payment-provider webhooks in the founder's own account, and product analytics for phase 6, in the order of [ARCHITECTURE.md](ARCHITECTURE.md#roadmap).
 - Community: [CONTRIBUTING.md](CONTRIBUTING.md) lists first contributions (guard rules, research tools, new agents, translations); red-team prompts in `evals/` run in `tests/` and live via `python evals/run_red_team.py`.
 - Funding: runs on free local models, so there is no hosting bill to cover; grants or sponsorship would pay for maintainer time, never for paywalling features.

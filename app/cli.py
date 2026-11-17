@@ -1,6 +1,7 @@
 """Command-line founder console.
 
   python -m app.cli run briefs/study-notes.json     # interactive: you approve every gate and action
+  python -m app.cli code <run_id>                  # Phase 3 step 4: write the core code and test it in the sandbox
   python -m app.cli payment-test                    # MOCKED sale-to-cash test -> outputs/payment_test_log.md
   python -m app.cli validate-log                    # check decision_log.json
 """
@@ -107,6 +108,10 @@ def main() -> None:
     cmd = sys.argv[1]
     if cmd == "run" and len(sys.argv) == 3:
         run(sys.argv[2])
+    elif cmd == "code" and len(sys.argv) == 3:
+        s = load_settings()
+        st = Orchestrator(s, make_llm(s)).founder_generate_code(sys.argv[2])
+        print(f"{st.code['passed']}/{st.code['total']} acceptance checks passed; see outputs/{next(o for o in st.outputs if o.startswith('phase3_step4'))}")
     elif cmd == "payment-test":
         payment_test()
     elif cmd == "validate-log":

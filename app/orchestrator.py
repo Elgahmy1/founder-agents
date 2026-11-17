@@ -29,6 +29,8 @@ from app.agents.market_analyst import Market, MarketAnalystAgent
 from app.agents.marketer import LandingCopy, MarketerAgent
 from app.agents.researcher import ResearcherAgent
 from app.agents.builder import BuilderAgent, MvpSpec
+from app.agents.coder import CoderAgent
+from app import sandbox
 from app.agents.launcher import LaunchKit, LauncherAgent
 from app.agents.operator import SupportAgent, SupportDrafts
 from app.agents.policy_drafter import PolicyDrafterAgent, PolicyDrafts
@@ -122,6 +124,7 @@ class RunState:
     launch: dict | None = None
     launch_feedback: str | None = None
     operate: dict | None = None
+    code: dict | None = None
     targets: dict | None = None
     results: dict | None = None
     gates: list[dict] = field(default_factory=list)
@@ -799,6 +802,69 @@ class Orchestrator:
             return self._advance(run_id)
 
     founder_start_build = founder_continue
+
+    def founder_generate_code(self, run_id: str) -> RunState:
+        """Phase 3, step 4, started by the founder: the coder writes the primary story's core functions and one
+        check per acceptance criterion; the sandbox runs them (one repair attempt). Nothing is published or
+        deployed, and the run's stage and gates do not change."""
+        with self.lock(run_id):
+            st, q = self.load(run_id)
+            if not st.mvp:
+                raise ValueError("no MVP spec yet: Phase 3 has not run")
+            mvp = MvpSpec(**st.mvp)
+            story = mvp.user_stories[0]
+            spec = json.dumps({"product_name": mvp.product_name, "one_line": mvp.one_line,
+                               "primary_story": story.model_dump(),
+                               "features_for_this_story": [f.name for f in mvp.must_have if story.id in f.story_ids],
+                               "out_of_scope": mvp.out_of_scope}, indent=1, ensure_ascii=False)
+            coder = CoderAgent(self.ctx(st))
+            feedback, attempts = None, []
+            for attempt in (1, 2):
+                draft = coder.write_core(spec, feedback)
+                res = sandbox.run(draft.module_code, [c.code for c in draft.checks])
+                attempts.append((draft, res))
+                self.log.append(agent="sandbox", action="run_acceptance_checks", run_id=run_id, phase=3,
+                                outcome="pass" if res.ok else "fail",
+                                detail=f"attempt {attempt}: {res.passed}/{len(draft.checks)} checks passed"
+                                       + (f"; static: {'; '.join(res.static_problems)}" if res.static_problems else "")
+                                       + (f"; load error: {res.load_error}" if res.load_error else "")
+                                       + ("; timed out" if res.timed_out else ""))
+                if res.ok:
+                    break
+                feedback = "\n".join(res.static_problems + ([f"module failed to load: {res.load_error}"] if res.load_error else [])
+                                     + (["timed out after 10 s"] if res.timed_out else [])
+                                     + [f"check {i} ({c.criterion}): {r['error']}" for i, (c, r) in
+                                        enumerate(zip(draft.checks, res.results), 1) if not r["passed"]])
+            draft, res = attempts[-1]
+            notes_ok = guard.check_output(draft.notes)
+            lines = ["# Phase 3, step 4: MVP core code, tested in a sandbox", "",
+                     f"Primary user story {story.id}: as {story.as_a}, I want {story.i_want}, so that {story.so_that}.", "",
+                     "Written by the coder agent and run by `app/sandbox.py`: static allowlist (pure standard library, "
+                     "no file, network or process access) and a separate isolated Python process with a time limit. "
+                     "Nothing here is published or deployed. User interface, storage, hosting and the real model call "
+                     "are not generated (STUBBED for this step).", "",
+                     f"**Result: {res.passed}/{len(draft.checks)} acceptance checks passed"
+                     f"{' after one repair' if len(attempts) == 2 and res.ok else ''}"
+                     f"{'' if res.ok else ' (not all checks pass: the founder should not rely on this code yet)'}.**", ""]
+            if res.static_problems:
+                lines += ["Static check refused to run the code:", ""] + [f"- {p}" for p in res.static_problems] + [""]
+            if res.load_error:
+                lines += [f"Module failed to load: `{res.load_error}`", ""]
+            if res.timed_out:
+                lines += ["Run stopped after the 10-second limit.", ""]
+            lines += ["| Acceptance criterion | Check | Result |", "|---|---|---|"]
+            for i, c in enumerate(draft.checks):
+                r = res.results[i] if i < len(res.results) else {"passed": False, "error": "not run"}
+                lines.append(f"| {c.criterion.replace('|', '/')} | check {i + 1} | "
+                             f"{'PASS' if r['passed'] else 'FAIL: ' + str(r['error']).replace('|', '/')} |")
+            lines += ["", "## Notes", "", draft.notes if notes_ok.allowed else "[removed by guard]", "",
+                      "## core.py", "", "```python", draft.module_code.strip(), "```", "", "## Checks", ""]
+            for i, c in enumerate(draft.checks, 1):
+                lines += [f"Check {i} ({c.story_id}): {c.criterion}", "", "```python", c.code.strip(), "```", ""]
+            self.write_output(st, "phase3_step4_code.md", "\n".join(lines))
+            st.code = {"passed": res.passed, "total": len(draft.checks), "ok": res.ok, "attempts": len(attempts)}
+            self.save(st, q)
+            return st
 
     def founder_lock_targets(self, run_id: str, approve: bool, note: str | None = None) -> RunState:
         with self.lock(run_id):

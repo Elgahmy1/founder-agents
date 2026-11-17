@@ -330,6 +330,16 @@ def view_run(run_id: str):
         body.append("<div class='card'><h2>Approval history</h2><table>" + "".join(
             f"<tr><td>{i.kind}</td><td>{html.escape(i.title)}</td><td>{i.status}</td><td>{html.escape(i.result or '')}</td></tr>"
             for i in done) + "</table></div>")
+    if st.mvp and not busy:
+        c = st.code
+        res = (f"Last run: <b class='{'go' if c['ok'] else 'stop'}'>{c['passed']}/{c['total']} acceptance checks passed</b> "
+               "(see phase3_step4_code above). " if c else "")
+        body.append("<div class='card'><h2>MVP core code (Phase 3, sandbox)</h2>"
+                    f"<p>{res}The coder agent writes the primary user story's core functions and one check per acceptance "
+                    "criterion; the sandbox runs them with no file, network or process access. Nothing is published, "
+                    "and your gates and decisions do not change. Uses 1-2 model calls.</p>"
+                    f"<form method=post action='/runs/{run_id}/code' class='once'><button>"
+                    f"{'Generate again' if c else 'Generate and test the core code'}</button></form></div>")
     body.append(f"<p><a href='/runs/{run_id}/export'>Download the full run report (Markdown)</a>: brief, gates, your "
                 "decisions, approvals, decision log and outputs in one file.</p>")
     body.append(f"""<div class="card"><h2>Ask the team</h2><form method="post" action="/runs/{run_id}/ask" class="once">
@@ -391,6 +401,17 @@ def operate(run_id: str, visits: int = Form(...), paid_orders: int = Form(0), fe
         except ValueError:
             pass
     _bg(run_id, "Comparing launch results with your targets", go)
+    return RedirectResponse(f"/runs/{run_id}", status_code=303)
+
+
+@app.post("/runs/{run_id}/code")
+def generate_code(run_id: str):
+    def go():
+        try:
+            orch.founder_generate_code(run_id)
+        except ValueError:
+            pass
+    _bg(run_id, "Writing the core code and running its acceptance checks in the sandbox", go)
     return RedirectResponse(f"/runs/{run_id}", status_code=303)
 
 
