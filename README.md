@@ -4,7 +4,7 @@ An open-source team of AI agents that takes a founder's brief (idea, skills, bud
 
 In the committed demo run (`48fc7649`, an exam-summary app), the agents took one idea through all six phases at $0.00: sourced research, a demand test (0 of 120 sign-ups: PIVOT recommended, overruled to GO by the founder with both logged), a tested MVP with a user guide, signed pricing and policy drafts, a store page, and a learn gate that recommended **stop** on real numbers. Three other ideas stopped on weak evidence and a crypto idea was refused. Replay any recorded run without a model at `/replay/<run>` ([demo-run map](docs/demo-run.md)).
 
-CI recomputes these figures on every push: run metrics from `decision_log.json` ([run_metrics.md](evals/run_metrics.md)), every cited URL must have been retrieved ([claims_audit.md](evals/claims_audit.md)), the MVP code re-runs its checks, and the guard must refuse 90 trick requests (English and Arabic) and allow 24 normal ones ([red_team_report.md](evals/red_team_report.md)).
+CI recomputes these on every push: run metrics from `decision_log.json` ([run_metrics.md](evals/run_metrics.md)), every cited URL must have been retrieved ([claims_audit.md](evals/claims_audit.md)), the MVP code re-runs its checks, and the guard must refuse 102 trick requests (English, Egyptian Arabic, Arabizi) and allow 27 normal ones ([red_team_report.md](evals/red_team_report.md)).
 
 ## Quickstart
 
@@ -14,7 +14,7 @@ docker compose up
 
 Open http://localhost:8000, fill in a founder brief and press **Start Discover**. The run stops at every gate for your decision. The app opens at once while the open-weight model (`qwen3:8b`, ~5 GB) downloads; meanwhile replay a recorded run: http://localhost:8000/replay/48fc7649.
 
-Without Docker: install [Ollama](https://ollama.com), `ollama pull qwen3:8b`, then `pip install -r requirements.txt && uvicorn app.main:app`. Terminal version: `python -m app.cli run briefs/study-notes.json`. Tests: `python -m pytest -q` (no model, network or keys).
+Without Docker: install [Ollama](https://ollama.com), `ollama pull qwen3:8b`, then `pip install -r requirements.txt && uvicorn app.main:app`. Terminal version: `python -m app.cli run briefs/study-notes.json`. Tests: `python -m pytest -q` (no model or keys).
 
 ## What works and what is mocked
 

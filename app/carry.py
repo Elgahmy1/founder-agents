@@ -26,6 +26,9 @@ def collect(st, *, with_interviews: bool) -> list[dict]:
         out.append({"item": f"Killer risk: {v['killer_risk']}", "from": "phase1_step4_cofounder_verdict"})
         for i in v.get("improvements", [])[:2]:
             out.append({"item": f"Suggested change: {i['change']}", "from": "phase1_step4_cofounder_verdict"})
+    opp = (getattr(st, "opportunities", None) or [None])[getattr(st, "chosen", 0) or 0] if getattr(st, "opportunities", None) else None
+    if opp and opp.get("strongest_alternative"):
+        out.append({"item": f"Strongest alternative: {opp['strongest_alternative']}", "from": "phase1_step1_opportunities"})
     a = getattr(st, "area", None)
     if a and a.get("positioning"):
         out.append({"item": f"Local positioning ({a.get('location', '')}): {a['positioning']}", "from": "phase1_step0_area_check"})
@@ -37,6 +40,22 @@ def collect(st, *, with_interviews: bool) -> list[dict]:
             if an.get("current_workaround") and an["current_workaround"] != "not said":
                 out.append({"item": f"Current workaround (interview {n}): {an['current_workaround']}", "from": "phase2_step4_interviews"})
     return out[:8]
+
+
+def quote_ids(st) -> dict[str, str]:
+    """Stable IDs for quotes that were verified against the transcript in code: IV<interview>-Q<quote>."""
+    out = {}
+    for n, iv in enumerate(getattr(st, "interviews", None) or [], 1):
+        for k, e in enumerate(iv["analysis"].get("evidence", []), 1):
+            out[f"IV{n}-Q{k}"] = e["quote"]
+    return out
+
+
+def trace_stories(spec, quotes: dict[str, str]):
+    """A story may cite only a quote ID that exists; anything else becomes ASSUMPTION-DRIVEN in code."""
+    stories = [s.model_copy(update={"evidence": s.evidence.strip() if s.evidence.strip() in quotes else "ASSUMPTION-DRIVEN"})
+               for s in spec.user_stories]
+    return spec.model_copy(update={"user_stories": stories})
 
 
 def prompt_block(items: list[dict]) -> str:

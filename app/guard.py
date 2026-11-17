@@ -117,6 +117,24 @@ ARABIC_RULES: list[tuple[str, str, list[str]]] = [
       r"^\s*(انشر|ابعت|ارسل)\s.{0,25}(فيسبوك|فيس بوك|تويتر|انستجرام|انستا|لينكد|واتساب|تيك توك)"]),
     ("impersonation", "We never pose as the founder, a customer or another brand.",
      [r"(اعمل نفسك|عامل نفسك|خلي نفسك|انتحل|اتكلم كأنك|اكتب كأنك).{0,20}(دكتور|استاذ|أستاذ|طالب|خبير|عميل|شركة|مؤسس|بروفيسور)"]),
+    # Egyptian colloquial (Masri)
+    ("fake_social_proof", "We never write fake reviews, testimonials, ratings or sign-ups.",
+     [r"(ريفيوهات|كومنتات|تعليقات|لايكات|فولورز|متابعين).{0,15}(فيك|فيكس|مضروب|مضروبه|مش حقيقي|مش حقيقيه)",
+      r"(اعملي|اعملنا|اكتبلنا|ظبطلي|ظبطلنا).{0,15}(ريفيوهات|كومنتات|تقييمات|لايكات)",
+      r"(اشتري|اشترى|هات).{0,10}(فولورز|متابعين|لايكات|ريفيوهات)"]),
+    ("fake_traction", "We never invent traction: user, customer and sign-up numbers come only from what the app actually counted.",
+     [r"(قول|قولهم|اكتب|حط).{0,15}(إن|ان|اننا|إننا).{0,10}(عندنا|معانا).{0,15}\d+"]),
+    # Franco-Arabic / Arabizi (2=ء, 3=ع, 5=خ, 7=ح)
+    ("fake_social_proof", "We never write fake reviews, testimonials, ratings or sign-ups.",
+     [r"\b(e3mel|e3mly|e3mely|ekteb|ektebly|ektbly|zabatly)\b.{0,25}\b(reviews?|ta2yeem\w*|comments?|followers)\b",
+      r"\b(reviews?|ta2yeem\w*|comments?|followers)\b.{0,15}\b(fake|wahmy\w*|mazyaf\w*|madroob\w*)\b",
+      r"\b5 ?(negoom|nogoom|ngoom|nojoom)\b"]),
+    ("fake_traction", "We never invent traction: user, customer and sign-up numbers come only from what the app actually counted.",
+     [r"\b(2ol|oul|ekteb)\b.{0,15}\b(3andena|3ndna|ma3ana)\b.{0,10}\d+"]),
+    ("income_promise", "We never promise income or guarantee success.",
+     [r"\b(edman|madmoon|madmon|nedman)\b.{0,20}\b(rib7|ar?ba7|felos|floos|da5l|naga7)\b"]),
+    ("false_urgency", "We never add fake urgency such as countdown timers or invented scarcity.",
+     [r"\b3add? tanazoly\b", r"\bfadel \d+ (amaken|ama?kn)\b"]),
 ]
 
 EXCLUDED_AR: list[tuple[str, str, list[str]]] = [
@@ -193,12 +211,20 @@ def normalize(text: str) -> list[str]:
 
 
 def _check(text: str, rules: list[tuple[str, str, list[str]]]) -> Verdict:
-    for variant in normalize(text):
+    from app.arabic import normalize_ar
+    variants = normalize(text)
+    variants += [normalize_ar(v) for v in variants if normalize_ar(v) != v]  # Arabic spelling variants
+    for variant in variants:
         for rule_id, reason, patterns in rules:
             for p in patterns:
-                if re.search(p, variant, flags=re.I | re.S):
+                if re.search(p, variant, flags=re.I | re.S) or re.search(_ar_pat(p), variant, flags=re.I | re.S):
                     return Verdict(False, rule_id, reason)
     return Verdict(True)
+
+
+def _ar_pat(p: str) -> str:
+    from app.arabic import normalize_ar
+    return normalize_ar(p)
 
 
 def check_request(text: str) -> Verdict:

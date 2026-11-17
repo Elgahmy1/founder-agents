@@ -21,7 +21,7 @@ The step-by-step status behind the short table in the [README](../README.md#what
 | Approval queue (publish / send / spend / sign) | **Working** |
 | Decision log with required keys + tamper-evident hash chain | **Working** |
 | Red-team guard (fake reviews, urgency, income promises, impersonation, money, credentials, prompt injection; English + Arabic) | **Working** |
-| Red-team evaluation: 90 trick requests and 24 normal requests (English and Arabic), 31 product ideas, 13 generated texts; report in [`evals/red_team_report.md`](../evals/red_team_report.md), 0 failures | **Working** |
+| Red-team evaluation: 102 trick requests and 27 normal requests (English, Egyptian Arabic and Franco-Arabic/Arabizi), 31 product ideas, 13 generated texts; report in [`evals/red_team_report.md`](../evals/red_team_report.md), 0 failures | **Working** |
 | Phase 3 Build: MVP spec (user stories, acceptance criteria, scoped features with hour estimates) | **Working** |
 | Phase 3 Build: clickable prototype from a safe template, published locally after founder approval | **Working** |
 | Phase 3 Build: acceptance tests + build gate (scope vs founder hours, traceability, testability, safety) | **Working** |
@@ -44,3 +44,4 @@ The step-by-step status behind the short table in the [README](../README.md#what
 
 - Funding scout (`app/agents/funding_scout.py`, `phase1_step5_funding`) and launch timing in the co-founder verdict. UI: technical items (files, approvals, report export, token use) moved into a collapsed Details section.
 - Research relevance filter (`research.relevant`): results that share fewer than two content words with their query are dropped before the agents see them (a real run for Egyptian freelancers had pulled Wikipedia pages about wars that only mentioned Egypt).
+- Batch 1: Arabic normalization (`app/arabic.py`) in quote matching and the guard; Masri and Franco-Arabic/Arabizi rules (+12 red-team cases); polite non-commitments ("إن شاء الله", "فكرة جامدة") moved to red flags in code; user stories cite a verified interview quote ID or are ASSUMPTION-DRIVEN; MVP page "Load tested sample input"; web results and transcripts that try to instruct the agents are stripped and logged as `indirect_injection_filtered`.

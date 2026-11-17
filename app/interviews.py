@@ -11,11 +11,11 @@ import re
 import unicodedata
 
 from app.agents.interview_analyst import InterviewAnalysis
+from app.arabic import is_polite_non_commitment, normalize_ar
 
 
 def _norm(text: str) -> str:
-    text = unicodedata.normalize("NFKC", text or "").lower()
-    text = re.sub(r"[ً-ْـ]", "", text)  # Arabic diacritics and tatweel
+    text = normalize_ar(unicodedata.normalize("NFKC", text or "").lower())  # أ/إ/آ->ا, ة->ه, ى->ي, no diacritics
     text = re.sub(r"[^\w\s]", " ", text)
     return " ".join(text.split())
 
@@ -35,7 +35,12 @@ def verify(analysis: InterviewAnalysis, transcript: str) -> tuple[InterviewAnaly
                 dropped.append(e.quote)
         return out
 
-    a = analysis.model_copy(update={"evidence": keep(analysis.evidence), "red_flags": keep(analysis.red_flags)})
+    ev, flags = keep(analysis.evidence), keep(analysis.red_flags)
+    # "إن شاء الله", "فكرة جامدة", "I would totally use it": politeness, not evidence. Moved to red flags in code.
+    polite = [e for e in ev if is_polite_non_commitment(e.quote)]
+    ev = [e for e in ev if e not in polite]
+    flags += [e.model_copy(update={"shows": "red flag: polite non-commitment, not evidence (moved in code)"}) for e in polite]
+    a = analysis.model_copy(update={"evidence": ev, "red_flags": flags})
     if a.problem_confirmed and not a.evidence:
         a = a.model_copy(update={"problem_confirmed": False,
                                  "why": a.why + " (Set to not confirmed in code: no evidence quote was found in the transcript.)"})

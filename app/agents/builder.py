@@ -25,6 +25,8 @@ class UserStory(BaseModel):
     i_want: str
     so_that: str
     acceptance: list[str] = Field(min_length=1, description="Observable, testable checks: 'Given ... when ... then ...'")
+    evidence: str = Field(default="ASSUMPTION-DRIVEN", description="ID of the verified interview quote this story rests "
+                          "on (e.g. IV1-Q2), or ASSUMPTION-DRIVEN when no quote supports it")
 
 
 class Feature(BaseModel):
@@ -58,7 +60,7 @@ class BuilderAgent(Agent):
     role = "builder"
 
     def mvp_spec(self, brief: FounderBrief, opp: Opportunity, canvas: LeanCanvas, feedback: str | None = None,
-                 carry: list[dict] | None = None) -> MvpSpec:
+                 carry: list[dict] | None = None, quotes: dict[str, str] | None = None) -> MvpSpec:
         user = (
             f"FOUNDER BRIEF\n{brief.as_text()}\n\nOPPORTUNITY\n{opp.model_dump_json(indent=1)}\n\n"
             f"LEAN CANVAS\n{canvas.model_dump_json(indent=1, exclude={'claims'})}\n\n"
@@ -68,5 +70,8 @@ class BuilderAgent(Agent):
         if feedback:
             user += f"\n\nFEEDBACK FROM THE LAST BUILD GATE (fix these)\n{feedback}"
         user += carry_mod.prompt_block(carry or [])
+        if quotes:
+            user += ("\n\nVERIFIED INTERVIEW QUOTES (put the ID a story rests on in its `evidence`; otherwise ASSUMPTION-DRIVEN)\n"
+                     + "\n".join(f"{k}: \"{v}\"" for k, v in quotes.items()))
         return self.ask("write_mvp_spec", user, MvpSpec,
                         critique=lambda d: problems(d, brief) + carry_mod.check(d, carry or []))

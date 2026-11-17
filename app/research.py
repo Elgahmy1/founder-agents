@@ -143,6 +143,7 @@ class Researcher:
         self.max_sources = max_sources
         self.errors: list[str] = []
         self.dropped: list[str] = []  # off-topic results removed before the agents see them
+        self.quarantined: list[str] = []  # results whose text tried to instruct the agents; those lines are stripped
 
     SOURCES = (hn_search, stackexchange_search, wikipedia_search, ddg_search)
 
@@ -156,6 +157,7 @@ class Researcher:
                 for q in queries:
                     try:
                         for d in fn(q):
+                            d = self._quarantine(d)
                             if relevant(q, d.get("title", ""), d.get("snippet", "")):
                                 found.append(d)
                             else:
@@ -164,6 +166,17 @@ class Researcher:
                         self.errors.append(f"{fn.__name__}('{q}'): {type(e).__name__}")
                 per_source.append(found)
         return self._select(founder, per_source)
+
+    def _quarantine(self, d: dict) -> dict:
+        """Indirect prompt injection: lines in a web result that try to instruct the agents are removed here,
+        before any prompt is built, and the URL is recorded so the run logs `indirect_injection_filtered`."""
+        from app.guard import INJECTION_IN_SOURCE, sanitize_source
+        text = f"{d.get('title', '')} {d.get('snippet', '')}"
+        if INJECTION_IN_SOURCE.search(_clean(text, 2000)):
+            self.quarantined.append(d.get("url", ""))
+            d = {**d, "title": sanitize_source(_clean(d.get("title", ""), 400)),
+                 "snippet": sanitize_source(_clean(d.get("snippet", ""), 2000))}
+        return d
 
     def _select(self, founder: list[dict], per_source: list[list[dict]]) -> list[Doc]:
         """Founder URLs first, then round-robin across sources so the budget mixes origins."""

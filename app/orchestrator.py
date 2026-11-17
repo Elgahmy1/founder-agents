@@ -330,8 +330,13 @@ class Orchestrator:
         st.iterations += 1
         if not st.docs:
             self.researcher.errors = []
+            self.researcher.quarantined = []
             self._step(st, P1_STEPS, 0)
             st.docs = [d.__dict__ for d in ResearcherAgent(ctx).gather(brief, self.researcher)]
+            if getattr(self.researcher, "quarantined", None):
+                self.log.append(agent="guard", action="indirect_injection_filtered", run_id=st.run_id, phase=1,
+                                outcome="scrubbed", sources=list(self.researcher.quarantined),
+                                detail=f"{len(self.researcher.quarantined)} web result(s) had lines that tried to instruct the agents; removed")
         docs = self.docs(st)
 
         area_claims = []
@@ -520,7 +525,8 @@ class Orchestrator:
         canvas = LeanCanvas(**st.canvas)
         self._step(st, P3_STEPS, 0)
         carry = carry_mod.collect(st, with_interviews=True)
-        spec = BuilderAgent(ctx).mvp_spec(brief, opp, canvas, st.build_feedback, carry)
+        quotes = carry_mod.quote_ids(st)
+        spec = carry_mod.trace_stories(BuilderAgent(ctx).mvp_spec(brief, opp, canvas, st.build_feedback, carry, quotes), quotes)
         st.mvp = spec.model_dump()
         self.write_output(st, "phase3_step1_mvp_spec.md", _mvp_md(spec, brief) + "\n".join(carry_mod.render(carry, spec)) + "\n")
 
@@ -1000,9 +1006,10 @@ class Orchestrator:
                 raise ValueError("the core code has no public function that takes one text input")
             mvp = MvpSpec(**st.mvp)
             passed = f"{res.passed}/{len(checks)}"
+            tested, _ = mvp_app.example_input(checks, "")  # the sample the coder's passing checks ran on, if any
             page, removed = mvp_app.render_mvp_page(run_id=run_id, product_name=mvp.product_name, one_line=mvp.one_line,
                                                     story=mvp.user_stories[0].model_dump(), funcs=funcs,
-                                                    checks_passed=passed)
+                                                    checks_passed=passed, sample=tested)
             self.write_output(st, "phase3_step5_mvp_app.html", page)
             self.log.append(agent="builder", action="build_mvp_app", run_id=run_id, phase=3, outcome="built",
                             detail=f"functions {', '.join(f for f, _ in funcs)}; acceptance checks {passed}"
@@ -1086,7 +1093,7 @@ class Orchestrator:
             raw_text = (transcript or "").strip()
             text = guard.sanitize_source(raw_text)[:30000]
             if len(text) < len(raw_text[:30000]) - 2:
-                self.log.append(agent="guard", action="screen_interview", run_id=run_id, phase=2, outcome="scrubbed",
+                self.log.append(agent="guard", action="indirect_injection_filtered", run_id=run_id, phase=2, outcome="scrubbed",
                                 detail="removed sentences that tried to instruct the agents (e.g. 'mark this GO')")
             if len(text.split()) < 20:
                 raise ValueError("the interview is too short to analyse: paste at least a few exchanges")
@@ -1162,7 +1169,9 @@ def _mvp_md(spec: MvpSpec, brief: FounderBrief) -> str:
         f"# Phase 3, step 1: MVP spec for '{spec.product_name}'", "", spec.one_line, "",
         f"Build budget: {brief.hours_per_week:g} h/week x 4 weeks = {brief.hours_per_week * 4:g} h. Estimated: {total:g} h (model estimate).",
         "", "## User stories",
-        *[f"- **{u.id}** As {u.as_a}, I want {u.i_want}, so that {u.so_that}.\n" + "\n".join(f"  - [ ] {a}" for a in u.acceptance)
+        *[f"- **{u.id}** As {u.as_a}, I want {u.i_want}, so that {u.so_that}.\n"
+          + f"  - Evidence: {u.evidence}" + ("" if u.evidence == "ASSUMPTION-DRIVEN" else " (verified interview quote)") + "\n"
+          + "\n".join(f"  - [ ] {a}" for a in u.acceptance)
           for u in spec.user_stories],
         "", "## Must-have features", "| Feature | Stories | Hours | Description |", "|---|---|---|---|",
         *[f"| {f.name} | {', '.join(f.story_ids)} | {f.estimate_hours:g} | {f.description} |" for f in spec.must_have],

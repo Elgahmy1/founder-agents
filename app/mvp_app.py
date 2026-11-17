@@ -63,7 +63,7 @@ def _esc(text: str, removed: list[str]) -> str:
 
 
 def render_mvp_page(*, run_id: str, product_name: str, one_line: str, story: dict,
-                    funcs: list[tuple[str, list[str]]], checks_passed: str) -> tuple[str, list[str]]:
+                    funcs: list[tuple[str, list[str]]], checks_passed: str, sample: str = "") -> tuple[str, list[str]]:
     removed: list[str] = []
     name = _esc(product_name, removed) or "MVP"
     tagline = _esc(one_line, removed)
@@ -85,7 +85,7 @@ pre{{white-space:pre-wrap;word-wrap:break-word}} .mut{{color:var(--mut);font-siz
 <form method="post" action="/mvp/{html.escape(run_id)}">
 <label for="text">Paste your text</label>
 <textarea id="text" name="text" rows="10" maxlength="20000" required></textarea>
-<button>Run</button></form></div>
+<button>Run</button></form>{_sample_form(run_id, sample, removed)}</div>
 {RESULT_MARK}
 <p class="mut">MVP built by Founder Agents from code that passed {html.escape(checks_passed)} acceptance checks.
 Each request runs {", ".join(f"<code>{html.escape(f)}({html.escape(p[0])})</code>" for f, p in funcs)} in an isolated sandbox with no file, network or process access.
@@ -93,6 +93,16 @@ Nothing you paste is stored. Accounts, storage and public hosting are not part o
 </body></html>
 """
     return page, removed
+
+
+def _sample_form(run_id: str, sample: str, removed: list[str]) -> str:
+    """One click to try the MVP on the exact sample its acceptance checks passed on (no model call, no script)."""
+    s = _esc(sample, removed) if sample else ""
+    if not s:
+        return ""
+    return (f'<form method="post" action="/mvp/{html.escape(run_id)}"><input type="hidden" name="text" value="{s}">'
+            '<button>Load tested sample input</button> <span class="mut">runs the fictional sample text the acceptance '
+            'checks passed on</span></form>')
 
 
 def run_functions(code: str, names: list[str], text: str, call) -> list[tuple[str, dict]]:

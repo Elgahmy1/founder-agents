@@ -8,3 +8,4 @@ Phase 2, core step "Design the business". The founder talked to a real potential
 - `surprise`: the one thing the founder probably did not expect. Be specific.
 - `ask_next_time`: questions about specific past events ("Tell me about the last time you..."), never "Would you use...".
 - Do not include the interviewee's name, contact details or anything that identifies them; call them "the interviewee".
+- Polite non-commitments are compliments, not evidence: "إن شاء الله", "فكرة جامدة جداً", "ربنا يسهل", "هجربه أكيد", "I would totally use it". Put them in `red_flags` unless the same person shows past behaviour or a concrete commitment. Code also moves them out of `evidence`.
