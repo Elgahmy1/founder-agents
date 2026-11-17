@@ -894,23 +894,24 @@ class Orchestrator:
                             detail=f"before building the MVP app: {res.passed}/{len(checks)} checks passed")
             if not (ok and res.ok):
                 raise ValueError("the committed core code no longer passes its acceptance checks")
-            entry = mvp_app.entry_function(code)
-            if not entry:
+            funcs = mvp_app.entry_functions(code)
+            if not funcs:
                 raise ValueError("the core code has no public function that takes one text input")
             mvp = MvpSpec(**st.mvp)
             passed = f"{res.passed}/{len(checks)}"
             page, removed = mvp_app.render_mvp_page(run_id=run_id, product_name=mvp.product_name, one_line=mvp.one_line,
-                                                    story=mvp.user_stories[0].model_dump(), func=entry[0],
-                                                    params=entry[1], checks_passed=passed)
+                                                    story=mvp.user_stories[0].model_dump(), funcs=funcs,
+                                                    checks_passed=passed)
             self.write_output(st, "phase3_step5_mvp_app.html", page)
             self.log.append(agent="builder", action="build_mvp_app", run_id=run_id, phase=3, outcome="built",
-                            detail=f"entry function {entry[0]}({entry[1][0]}); acceptance checks {passed}"
+                            detail=f"functions {', '.join(f for f, _ in funcs)}; acceptance checks {passed}"
                                    + (f"; guard removed {len(removed)} line(s)" if removed else ""))
             q.supersede("publish_mvp_local")
-            bundle = json.dumps({"page": page, "code": code, "func": entry[0]}, ensure_ascii=False)
+            names = [f for f, _ in funcs]
+            bundle = json.dumps({"page": page, "code": code, "func": names[0], "funcs": names}, ensure_ascii=False)
             q.submit("publish", f"Publish the MVP app on this computer: {run_id}", bundle, "publish_mvp_local", 3,
                      check=lambda c: guard.check_output(json.loads(c)["page"]))
-            st.mvp_app = {"func": entry[0], "checks": passed}
+            st.mvp_app = {"func": ", ".join(names), "checks": passed}
             self.save(st, q)
             return st
 

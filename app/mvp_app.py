@@ -33,6 +33,13 @@ def parse_code_output(md: str) -> tuple[str, list[str], bool]:
 
 def entry_function(code: str) -> tuple[str, list[str]] | None:
     """The first public top-level function callable with one text argument: (name, parameter names)."""
+    found = entry_functions(code)
+    return found[0] if found else None
+
+
+def entry_functions(code: str, limit: int = 3) -> list[tuple[str, list[str]]]:
+    """Every public top-level function callable with one text argument, in file order (at most `limit`)."""
+    out: list[tuple[str, list[str]]] = []
     for node in ast.parse(code).body:
         if not isinstance(node, ast.FunctionDef) or node.name.startswith("_"):
             continue
@@ -41,8 +48,8 @@ def entry_function(code: str) -> tuple[str, list[str]] | None:
         required = len(params) - len(a.defaults)
         kw_required = [p.arg for p, d in zip(a.kwonlyargs, a.kw_defaults) if d is None]
         if params and required <= 1 and not kw_required:
-            return node.name, params
-    return None
+            out.append((node.name, params))
+    return out[:limit]
 
 
 def _esc(text: str, removed: list[str]) -> str:
@@ -53,8 +60,8 @@ def _esc(text: str, removed: list[str]) -> str:
     return html.escape(text)
 
 
-def render_mvp_page(*, run_id: str, product_name: str, one_line: str, story: dict, func: str,
-                    params: list[str], checks_passed: str) -> tuple[str, list[str]]:
+def render_mvp_page(*, run_id: str, product_name: str, one_line: str, story: dict,
+                    funcs: list[tuple[str, list[str]]], checks_passed: str) -> tuple[str, list[str]]:
     removed: list[str] = []
     name = _esc(product_name, removed) or "MVP"
     tagline = _esc(one_line, removed)
@@ -69,24 +76,33 @@ textarea{{width:100%;box-sizing:border-box;padding:8px;border:1px solid var(--li
 button{{padding:8px 14px;border:0;border-radius:6px;background:var(--acc);color:#fff;font-weight:600;cursor:pointer;margin-top:8px}}
 pre{{white-space:pre-wrap;word-wrap:break-word}} .mut{{color:var(--mut);font-size:.9em}}
 </style></head><body>
-<h1>{name}</h1><p>{tagline}</p>
-<div class="card"><p class="mut">{want}</p>
+<h1>{name}</h1><p class="mut">Product vision: {tagline}</p>
+<div class="card"><p><b>What this MVP does today:</b> paste text, press Run, and it shows the result of
+{" and ".join(f"<code>{html.escape(f)}</code>" for f, _ in funcs)} on your text.</p><p class="mut">{want}</p>
 <form method="post" action="/mvp/{html.escape(run_id)}">
 <label for="text">Paste your text</label>
 <textarea id="text" name="text" rows="10" maxlength="20000" required></textarea>
 <button>Run</button></form></div>
 {RESULT_MARK}
 <p class="mut">MVP built by Founder Agents from code that passed {html.escape(checks_passed)} acceptance checks.
-Each request runs <code>{html.escape(func)}({html.escape(params[0])})</code> in an isolated sandbox with no file, network or process access.
+Each request runs {", ".join(f"<code>{html.escape(f)}({html.escape(p[0])})</code>" for f, p in funcs)} in an isolated sandbox with no file, network or process access.
 Nothing you paste is stored. Accounts, storage and public hosting are not part of this MVP.</p>
 </body></html>
 """
     return page, removed
 
 
-def result_html(res: dict) -> str:
-    if not res.get("ok"):
-        return f"<div class='card'><b>Error:</b> {html.escape(str(res.get('error')))}</div>"
-    out = res.get("result")
-    text = out if isinstance(out, str) else json.dumps(out, indent=1, ensure_ascii=False, default=str)
-    return f"<div class='card'><h2>Result</h2><pre>{html.escape(text)}</pre></div>"
+def result_html(results: list[tuple[str, dict]]) -> str:
+    parts = []
+    for func, res in results:
+        if not res.get("ok"):
+            body = f"<b>Error:</b> {html.escape(str(res.get('error')))}"
+        else:
+            out = res.get("result")
+            if isinstance(out, list) and all(isinstance(x, str) for x in out):
+                text = "\n".join(f"- {x}" for x in out)
+            else:
+                text = out if isinstance(out, str) else json.dumps(out, indent=1, ensure_ascii=False, default=str)
+            body = f"<pre>{html.escape(text)}</pre>"
+        parts.append(f"<h3><code>{html.escape(func)}</code></h3>{body}")
+    return "<div class='card'><h2>Result</h2>" + "".join(parts) + "</div>"

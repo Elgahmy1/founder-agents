@@ -220,7 +220,7 @@ def _next_step(st: RunState, q, run_id: str) -> str:
         if i.executor == "publish_mvp_local":
             b = json.loads(i.content)
             why = (f"Approving runs the MVP app at <a href='/mvp/{run_id}' target='_blank'>/mvp/{run_id}</a> on this computer. "
-                   f"Each request runs <code>{html.escape(b['func'])}</code> below in the sandbox; nothing is stored. "
+                   f"Each request runs <code>{html.escape(', '.join(b.get('funcs') or [b['func']]))}</code> below in the sandbox; nothing is stored. "
                    "Public hosting is MOCKED.")
             shown = b["code"]
         return f"""<div class="card next"><div class="kicker">Your approval is needed ({len(pend)} waiting)</div>
@@ -462,8 +462,8 @@ def mvp_page(run_id: str):
 @app.post("/mvp/{run_id}", response_class=HTMLResponse)
 def mvp_run(run_id: str, text: str = Form(...)):
     b = _mvp_bundle(run_id)
-    res = sandbox.call(b["code"], b["func"], text)
-    return HTMLResponse(b["page"].replace(mvp_app.RESULT_MARK, mvp_app.result_html(res), 1))
+    results = [(f, sandbox.call(b["code"], f, text)) for f in b.get("funcs") or [b["func"]]]
+    return HTMLResponse(b["page"].replace(mvp_app.RESULT_MARK, mvp_app.result_html(results), 1))
 
 
 @app.post("/runs/{run_id}/retry")

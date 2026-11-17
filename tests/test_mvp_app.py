@@ -11,6 +11,8 @@ def test_entry_function_is_the_first_public_one_text_function():
     code = "def _h(x):\n    return x\n\ndef pair(a, b):\n    return a\n\ndef summarize(notes, max_words=300):\n    return notes\n"
     assert mvp_app.entry_function(code) == ("summarize", ["notes", "max_words"])
     assert mvp_app.entry_function("def f(a, b):\n    return a\n") is None
+    two = code + "\ndef questions(text, n=2):\n    return ['Q?']\n"
+    assert [f for f, _ in mvp_app.entry_functions(two)] == ["summarize", "questions"]
 
 
 def test_sandbox_call_runs_one_function_isolated():
