@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ExamReady AI: prototype</title>
+<style>
+body{font-family:system-ui,sans-serif;max-width:720px;margin:0 auto;padding:16px;color:#1d1d1f;background:#fafafa}
+.banner{background:#fff4e0;border:1px solid #e0a650;border-radius:8px;padding:8px 12px;font-size:.9rem}
+nav{display:flex;flex-wrap:wrap;gap:8px;margin:12px 0} nav a{font-size:.9rem}
+section{background:#fff;border:1px solid #e2e2e8;border-radius:10px;padding:16px;margin:12px 0}
+label{display:block;margin:8px 0;font-weight:600;font-size:.9rem} input{display:block;width:100%;box-sizing:border-box;padding:8px;margin-top:4px;border:1px solid #bbb;border-radius:6px}
+.btn{display:inline-block;margin-top:10px;padding:8px 14px;border-radius:6px;background:#3b3bd6;color:#fff;text-decoration:none;font-weight:600}
+.res{display:none;margin-top:12px;border-top:1px dashed #bbb;padding-top:8px} .res:target{display:block} .mut{color:#666}
+</style></head><body>
+<p class="banner">Clickable prototype for founder review. Nothing here is live: no data is saved and nothing is sent.</p>
+<h1>ExamReady AI</h1><p>Upload lecture PDFs/slides and instantly get concise exam‑ready summaries and practice questions.</p>
+<nav><a href='#s0'>1. Upload Lecture Material</a><a href='#s1'>2. Results</a></nav>
+<section id='s0'><h2>1. Upload Lecture Material</h2><p class='mut'>Allow the student to provide a PDF/PPT/DOCX for summarization and question generation</p><label>Lecture file (PDF, PPT, DOCX)<input disabled placeholder='Lecture file (PDF, PPT, DOCX)'></label><a class='btn' href='#r0'>Generate Summary &amp; Questions</a><div id='r0' class='res'><b>SAMPLE output (illustrative, not real data)</b><p>Summary:
+• Key concept A
+• Key concept B
+• Key concept C
+
+Questions:
+1. Explain concept A...
+2. What is the formula for B?... (etc.)</p><a href='#s1'>Next screen</a></div></section><section id='s1'><h2>2. Results</h2><p class='mut'>Display the generated summary and practice questions and let the user download them</p><a class='btn' href='#r1'>Download PDF</a><div id='r1' class='res'><b>SAMPLE output (illustrative, not real data)</b><p>--- ExamReady Summary ---
+• ...
+
+--- Practice Questions ---
+1. ...
+2. ...
+3. ...
+4. ...
+5. ...</p><a href='#s0'>Next screen</a></div></section>
+</body></html>
