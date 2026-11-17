@@ -11,13 +11,13 @@ pre{white-space:pre-wrap;word-wrap:break-word} .mut{color:var(--mut);font-size:.
 <h1>ExamReady AI</h1><p class="mut">Product vision: Upload lecture PDFs/slides and instantly get concise exam‑ready summaries and practice questions.</p>
 <p><a href="/mvp/48fc7649/guide">User guide</a>: what this MVP does today, how to use it, and what it does not do yet.</p>
 <div class="card"><p><b>What this MVP does today:</b> paste text, press Run, and it shows the result of
-<code>summarize_text</code> and <code>generate_questions</code> on your text.</p><p class="mut">As Student who has lecture PDFs, I want to upload the file and receive a concise summary, so that I can study the key points quickly.</p>
+<code>generate_summary</code> and <code>generate_questions</code> on your text.</p><p class="mut">As Student who has lecture PDFs, I want to upload the file and receive a concise summary, so that I can study the key points quickly.</p>
 <form method="post" action="/mvp/48fc7649">
 <label for="text">Paste your text</label>
 <textarea id="text" name="text" rows="10" maxlength="20000" required></textarea>
 <button>Run</button></form></div>
 <!--RESULT-->
 <p class="mut">MVP built by Founder Agents from code that passed 3/3 acceptance checks.
-Each request runs <code>summarize_text(text)</code>, <code>generate_questions(summary)</code> in an isolated sandbox with no file, network or process access.
+Each request runs <code>generate_summary(text)</code>, <code>generate_questions(text)</code> in an isolated sandbox with no file, network or process access.
 Nothing you paste is stored. Accounts, storage and public hosting are not part of this MVP.</p>
 </body></html>

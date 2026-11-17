@@ -4,8 +4,8 @@ Written by the pipeline when the MVP app was built (run `48fc7649`), from the MV
 
 ## What it does today
 
-- **summarize_text** (input: `text`): Create a bullet‑point summary.
-- **generate_questions** (input: `summary`): Generate *count* practice questions from a bullet‑point summary.
+- **generate_summary** (input: `text`): Return up to *max_sentences* bullet‑point sentences that best represent *text*.
+- **generate_questions** (input: `text`): Create *num* fill‑in‑the‑blank style questions from *text*.
 
 Product vision (not built yet): Upload lecture PDFs/slides and instantly get concise exam‑ready summaries and practice questions.
 
@@ -13,8 +13,7 @@ Product vision (not built yet): Upload lecture PDFs/slides and instantly get con
 
 1. Open the MVP app at `/mvp/48fc7649` (on this computer; public hosting is MOCKED).
 2. Paste your text into the box (up to 20,000 characters).
-3. Press **Run**. The result shows one section per step, in this order: `summarize_text`, `generate_questions`.
-4. `generate_questions` works on the result of the step before it, not on your raw text.
+3. Press **Run**. The result shows one section per step, in this order: `generate_summary`, `generate_questions`.
 
 ## Example (real output of this MVP)
 
@@ -24,22 +23,23 @@ Input: the product's own description and user stories, used as sample text.
 Upload lecture PDFs/slides and instantly get concise exam‑ready summaries and practice questions. As Student who has lecture PDFs, I want to upload the file and receive a concise summary, so that I can study the key points quickly. As Student who needs practice material, I want to get practice questions derived from the uploaded lecture, so that I can test my understanding before the exam. As Privacy‑concerned student, I want my uploaded file to be deleted after processing, so that my lecture material is not stored on the server.
 ```
 
-`summarize_text`:
+`generate_summary`:
 
 ```text
-  - Upload lecture PDFs/slides and instantly get concise exam‑ready summaries and practice questions.
-  - As Student who has lecture PDFs, I want to upload the file and receive a concise summary, so that I can study the key points quickly.
-  - As Student who needs practice material, I want to get practice questions derived from the uploaded lecture, so that I can test my understanding before the exam.
+  - - Upload lecture PDFs/slides and instantly get concise exam‑ready summaries and practice questions.
+  - - As Student who has lecture PDFs, I want to upload the file and receive a concise summary, so that I can study the key points quickly.
+  - - As Student who needs practice material, I want to get practice questions derived from the uploaded lecture, so that I can test my understanding before the exam.
+  - - As Privacy‑concerned student, I want my uploaded file to be deleted after processing, so that my lecture material is not stored on the server.
 ```
 
 `generate_questions`:
 
 ```text
-  - Explain the concept of Upload lecture PDFs/slides and.
-  - Explain the concept of As Student who has.
-  - Explain the concept of As Student who needs.
-  - Explain the concept of Upload lecture PDFs/slides and.
-  - Explain the concept of As Student who has.
+  - What does i refer to in the sentence: "As Student who has lecture PDFs, I want to upload the file and receive a concise summary, so that I can study the key points quickly."?
+  - What does lecture refer to in the sentence: "Upload lecture PDFs/slides and instantly get concise exam‑ready summaries and practice questions."?
+  - What does practice refer to in the sentence: "Upload lecture PDFs/slides and instantly get concise exam‑ready summaries and practice questions."?
+  - What does student refer to in the sentence: "As Student who has lecture PDFs, I want to upload the file and receive a concise summary, so that I can study the key points quickly."?
+  - What does want refer to in the sentence: "As Student who has lecture PDFs, I want to upload the file and receive a concise summary, so that I can study the key points quickly."?
 ```
 
 ## What was tested
@@ -49,9 +49,9 @@ Upload lecture PDFs/slides and instantly get concise exam‑ready summaries and 
 | US1 | Given a file is uploaded, when the summary is shown, then it contains at least three bullet‑point key concepts. | PASS |
 | US2 | Given the summary generation completes, when the process finishes, then a list of at least five practice questions is displayed. | PASS |
 | US2 | Given the questions are shown, when I view them, then each question references a concept mentioned in the summary. | PASS |
-| US1 | Given I am on the upload page, when I select a PDF file and click "Generate Summary & Questions", then a summary appears within 30 seconds. | DEFERRED (STUBBED): Timing and UI interaction cannot be verified with pure functions. |
-| US3 | Given a file has been processed, when the results page loads, then the server logs indicate the original file has been removed. | DEFERRED (STUBBED): Requires server‑side logging side‑effects, not representable in pure code. |
-| US3 | Given the file is deleted, when I attempt to access the original upload endpoint for that file, then I receive a 404 response. | DEFERRED (STUBBED): HTTP response handling depends on web framework and storage, outside pure function scope. |
+| US1 | Given I am on the upload page, when I select a PDF file and click "Generate Summary & Questions", then a summary appears within 30 seconds. | DEFERRED (STUBBED): no executable check was written for it (needs a user interface, storage, hosting or a real model call); listed by the orchestrator, not by the coder |
+| US3 | Given a file has been processed, when the results page loads, then the server logs indicate the original file has been removed. | DEFERRED (STUBBED): no executable check was written for it (needs a user interface, storage, hosting or a real model call); listed by the orchestrator, not by the coder |
+| US3 | Given the file is deleted, when I attempt to access the original upload endpoint for that file, then I receive a 404 response. | DEFERRED (STUBBED): no executable check was written for it (needs a user interface, storage, hosting or a real model call); listed by the orchestrator, not by the coder |
 
 ## What it does not do yet
 

@@ -2,7 +2,7 @@
 
 An open-source team of AI agents that takes a founder's brief (idea, skills, budget, time, target market, values) toward a validated digital product. It gathers real sources, labels everything else as an ASSUMPTION, sets evidence targets before testing, and recommends **stop** when the evidence is weak. The founder approves everything that is published, sent, spent or signed, and that rule lives in code (`app/approval.py`).
 
-In the committed demo run (`48fc7649`, an exam-summary app), the agents took one idea through all six phases at $0.00: sourced research, a demand test (0 of 120 sign-ups: PIVOT recommended, overruled to GO by the founder with both logged), a tested MVP with a user guide, signed pricing and policy drafts, a store page, and a learn gate that recommended **stop** on real numbers. Three other ideas stopped on weak evidence; a crypto idea was refused. Replay any recorded run without a model at `/replay/<run>` ([demo-run map](docs/demo-run.md)).
+In the committed demo run (`48fc7649`, an exam-summary app), the agents took one idea through all six phases at $0.00: sourced research, a demand test (0 of 120 sign-ups: PIVOT recommended, overruled to GO by the founder with both logged), a tested MVP with a user guide, signed pricing and policy drafts, a store page, and a learn gate that recommended **stop** on real numbers. Run `a8d5c936` shows the co-founder layer; three others stopped on weak evidence, a crypto idea was refused. Replay any run without a model at `/replay/<run>` ([demo-run map](docs/demo-run.md)).
 
 CI recomputes these on every push: run metrics from `decision_log.json` ([run_metrics.md](evals/run_metrics.md)), cited URLs must have been retrieved ([claims_audit.md](evals/claims_audit.md)), outputs must agree across phases ([consistency_audit.md](evals/consistency_audit.md)), and the guard must refuse 102 trick requests (English, Egyptian Arabic, Arabizi) and allow 27 normal ones ([red_team_report.md](evals/red_team_report.md)).
 
@@ -14,7 +14,7 @@ docker compose up
 
 Open http://localhost:8000, fill in a founder brief and press **Start Discover**. The run stops at every gate for your decision. The app opens at once while the open-weight model (`qwen3:8b`, ~5 GB) downloads; meanwhile replay a recorded run: http://localhost:8000/replay/48fc7649.
 
-Without Docker: install [Ollama](https://ollama.com), `ollama pull qwen3:8b`, then `pip install -r requirements.txt && uvicorn app.main:app`. Terminal version: `python -m app.cli run briefs/study-notes.json`. Tests: `python -m pytest -q` (no model or keys).
+Without Docker: install [Ollama](https://ollama.com), `ollama pull qwen3:8b`, then `pip install -r requirements.txt && uvicorn app.main:app`. Terminal version: `python -m app.cli run briefs/study-notes.json`. Tests: `python -m pytest -q` (no keys).
 
 ## What works and what is mocked
 
@@ -25,7 +25,7 @@ Rows marked **Working** with no note have real output in the committed demo runs
 | Brief intake + policy screen (excluded products, unsafe requests) | **Working** |
 | 1 Discover: research from free sources (Hacker News, Stack Exchange, Wikipedia, DuckDuckGo) and scored opportunities | **Working** |
 | 1 Discover: market definition and Mom Test interview plan with outreach draft | **Working** |
-| 1 Discover: co-founder layer: area check (local fit, resources, competitors; UNKNOWN in code without a source about the place), an honest verdict capped by the gate with the killer risk, fixes, cheapest tests and a launch window, and a funding scout (grants, accelerators, sponsors; fit % computed in code, unverified names flagged, no loans) | **Working** (added after the committed demo run) |
+| 1 Discover: co-founder layer: area check (local fit, resources, competitors; UNKNOWN in code without a source about the place), an honest verdict capped by the gate with the killer risk, fixes, cheapest tests and a launch window, and a funding scout (grants, accelerators, sponsors; fit % computed in code, unverified names flagged, no loans) | **Working** (run `a8d5c936`) |
 | Evidence ledger: every claim SOURCED (a retrieved URL) or labelled ASSUMPTION, enforced in code and audited in CI | **Working** |
 | 2 Validate: Lean Canvas, landing page with real sign-up form, targets locked by the founder before the test | **Working** |
 | 2 Validate: real interviews (notes, or an Arabic/English recording via open-weight Whisper) analysed by a Mom Test agent; quotes checked against the transcript in code; counts feed the demand gate | **Working** (added after the demo run; audio STUBBED with local Ollama) |

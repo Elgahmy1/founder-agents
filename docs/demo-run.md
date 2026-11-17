@@ -37,3 +37,17 @@ Run `066dfbad` (idea: a web app that turns a freelancer's messy time logs into a
 | Phase 1 evidence gate | [gate](../outputs/phase1_gate_decision-a-web-app-that-turns-a-f.md) |
 | Phase 2: Lean Canvas, landing page, demand test | [canvas](../outputs/phase2_step1_lean_canvas-a-web-app-that-turns-a-f.md), [landing page](../outputs/phase2_step2_landing_page-a-web-app-that-turns-a-f.html), [demand test](../outputs/phase2_step3_demand_test-a-web-app-that-turns-a-f.md) |
 | Phase 2 demand gate | [gate](../outputs/phase2_gate_decision-a-web-app-that-turns-a-f.md) |
+
+
+## Second committed run: Discover with a location (`a8d5c936`)
+
+Brief `briefs/egypt-freelancers.json` (an Arabic-first tool for Egyptian freelancers writing English proposals), run on `openai/gpt-oss-120b` after the co-founder layer was added. It shows the area check, the co-founder verdict capped by the gate, the launch window, and, when the verdict is strong or promising, the funding scout and the marketing plan.
+
+| Step | Output |
+|---|---|
+| Evidence gate with unproven assumptions (ASM IDs) | [output](../outputs/phase1_gate_decision-an-arabic-first-web-tool.md) |
+| Area check: local fit, resources, competitors | [output](../outputs/phase1_step0_area_check-an-arabic-first-web-tool.md) |
+| Opportunities with strongest alternative | [output](../outputs/phase1_step1_opportunities-an-arabic-first-web-tool.md) |
+| Market with strongest counter-evidence | [output](../outputs/phase1_step2_market-an-arabic-first-web-tool.md) |
+| Mom Test interview plan | [output](../outputs/phase1_step3_interview_plan-an-arabic-first-web-tool.md) |
+| Co-founder verdict, fixes and launch window | [output](../outputs/phase1_step4_cofounder_verdict-an-arabic-first-web-tool.md) |
