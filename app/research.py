@@ -114,6 +114,27 @@ def ddg_search(query: str, limit: int = 4) -> list[dict]:
     return out
 
 
+_STOP = set("with from that this what which their there about into over under your have more most best "
+             "tool tools app apps help helps using used make free 2025 2026 2027 startup startups".split())
+
+
+def _terms(query: str) -> list[str]:
+    """Content words of a query, cut to a 5-letter stem so 'freelancers' matches 'freelancing'."""
+    words = re.findall(r"[a-z\u0600-\u06ff][a-z0-9\u0600-\u06ff]{3,}", query.lower())
+    return list(dict.fromkeys(w[:5] for w in words if w not in _STOP))
+
+
+def relevant(query: str, title: str, snippet: str) -> bool:
+    """A result must share at least two content words with its query (one if the query has only one or two).
+    This drops results that matched a single word, e.g. a news article that only mentions the country."""
+    terms = _terms(query)
+    if not terms:
+        return True
+    text = f"{title} {snippet}".lower()
+    hits = sum(1 for t in terms if t in text)
+    return hits >= (1 if len(terms) <= 2 else 2)
+
+
 class Researcher:
     """Collects documents from free sources. Failures are recorded, not hidden."""
 
@@ -121,6 +142,7 @@ class Researcher:
         self.enabled = enabled
         self.max_sources = max_sources
         self.errors: list[str] = []
+        self.dropped: list[str] = []  # off-topic results removed before the agents see them
 
     SOURCES = (hn_search, stackexchange_search, wikipedia_search, ddg_search)
 
@@ -133,7 +155,11 @@ class Researcher:
                 found: list[dict] = []
                 for q in queries:
                     try:
-                        found.extend(fn(q))
+                        for d in fn(q):
+                            if relevant(q, d.get("title", ""), d.get("snippet", "")):
+                                found.append(d)
+                            else:
+                                self.dropped.append(d.get("url", ""))
                     except Exception as e:  # network blocked, rate limited, etc.
                         self.errors.append(f"{fn.__name__}('{q}'): {type(e).__name__}")
                 per_source.append(found)

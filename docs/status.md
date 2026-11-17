@@ -43,3 +43,4 @@ The step-by-step status behind the short table in the [README](../README.md#what
 | Claims audit: every `[source: URL]` in `outputs/` must be a URL a logged research action actually retrieved, plus SOURCED vs ASSUMPTION counts per output; [`evals/claims_audit.md`](../evals/claims_audit.md), checked in CI (38 sourced claims, 24 ASSUMPTION labels, 0 unretrieved URLs) | **Working** |
 
 - Funding scout (`app/agents/funding_scout.py`, `phase1_step5_funding`) and launch timing in the co-founder verdict. UI: technical items (files, approvals, report export, token use) moved into a collapsed Details section.
+- Research relevance filter (`research.relevant`): results that share fewer than two content words with their query are dropped before the agents see them (a real run for Egyptian freelancers had pulled Wikipedia pages about wars that only mentioned Egypt).
