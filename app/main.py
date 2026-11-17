@@ -176,7 +176,7 @@ def view_run(run_id: str):
     body.append(f"""<div class="card"><h2>Ask the team</h2><form method="post" action="/runs/{run_id}/ask">
 <textarea name="request" rows="2" placeholder="e.g. how should I find my first 10 interviewees?"></textarea><button>Ask</button></form></div>""")
     u = st.usage
-    body.append(f"<p class=mut>Model calls: {u.get('calls', 0)} · tokens: {u.get('prompt_tokens', 0) + u.get('completion_tokens', 0)} · cost: $0.00 (local model)</p>")
+    body.append(f"<p class=mut>Model calls: {u.get('calls', 0)} · tokens: {u.get('prompt_tokens', 0) + u.get('completion_tokens', 0)} · cost: $0.00 ({'free tier, no billing' if settings.provider == 'openai' else 'local model'})</p>")
     return page(st.brief["idea"][:40], "".join(body), refresh=bool(busy))
 
 
