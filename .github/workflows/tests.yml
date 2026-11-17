@@ -1,0 +1,22 @@
+name: tests
+on:
+  push:
+    branches: [main]
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -r requirements.txt
+      - name: Smoke tests (fake model, no network, no keys)
+        run: python -m pytest -q tests
+      - name: Red-team evaluation, guard only (no model calls)
+        run: python evals/run_red_team.py --guard-only
+      - name: Decision log has every required key
+        run: python -m app.cli validate-log
