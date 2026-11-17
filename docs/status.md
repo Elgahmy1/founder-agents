@@ -21,7 +21,7 @@ The step-by-step status behind the short table in the [README](../README.md#what
 | Approval queue (publish / send / spend / sign) | **Working** |
 | Decision log with required keys + tamper-evident hash chain | **Working** |
 | Red-team guard (fake reviews, urgency, income promises, impersonation, money, credentials, prompt injection; English + Arabic) | **Working** |
-| Red-team evaluation: 70 trick requests, 31 product ideas, 13 generated texts; report in [`evals/red_team_report.md`](../evals/red_team_report.md), 0 failures | **Working** |
+| Red-team evaluation: 90 trick requests and 24 normal requests (English and Arabic), 31 product ideas, 13 generated texts; report in [`evals/red_team_report.md`](../evals/red_team_report.md), 0 failures | **Working** |
 | Phase 3 Build: MVP spec (user stories, acceptance criteria, scoped features with hour estimates) | **Working** |
 | Phase 3 Build: clickable prototype from a safe template, published locally after founder approval | **Working** |
 | Phase 3 Build: acceptance tests + build gate (scope vs founder hours, traceability, testability, safety) | **Working** |

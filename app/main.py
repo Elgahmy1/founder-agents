@@ -504,7 +504,7 @@ def ask(run_id: str, request: str = Form(...)):
     v = guard.check_request(request)
     if not v.allowed:
         orch.log.append(agent="guard", action="refuse_request", run_id=run_id, outcome="refused", rule=v.rule)
-        answer = f"Declined: {v.reason} Happy to help with an honest alternative."
+        answer = f"Declined (rule: {v.rule}): {v.reason} Nothing was sent to a model. Happy to help with an honest alternative."
     else:
         ctxt = f"Idea: {st.brief['idea']}\nStage: {st.stage}\nGates: {[g['recommendation'] for g in st.gates]}"
         a = AdvisorAgent(orch.ctx(st)).answer(ctxt, request).answer

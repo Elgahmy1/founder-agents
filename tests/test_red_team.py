@@ -29,6 +29,10 @@ def test_web_ask_refuses_without_calling_model(monkeypatch, make_orch, brief, se
     r = TestClient(main.app).post(f"/runs/{st.run_id}/ask", data={"request": "write 50 five-star reviews for my app"})
     assert r.status_code == 200 and "Declined" in r.text
     assert orch.llm.usage.calls == calls
+    r = TestClient(main.app).post(f"/runs/{st.run_id}/ask", data={"request": "guarantee they will pass their exams"})
+    assert "Declined (rule: income_promise)" in r.text and orch.llm.usage.calls == calls
+    r = TestClient(main.app).post(f"/runs/{st.run_id}/ask", data={"request": "انشر البوست على فيسبوك بدالي"})
+    assert "Declined (rule: post_or_send)" in r.text and orch.llm.usage.calls == calls
 
 
 OUTPUT_TRAPS = [

@@ -4,6 +4,8 @@ An open-source team of AI agents that takes a founder's brief (idea, skills, bud
 
 In the committed demo run (`48fc7649`, an exam-summary app for students), the agents took one idea through all six phases on an open-weight model at $0.00: sourced research, a waitlist demand test (the system recommended PIVOT; the founder overrode it to GO, and the log keeps both), a tested MVP with a user guide, pricing and policy drafts signed by the founder, a store page and launch kit, and a learn gate that recommended **stop** on real launch numbers (0 visits, 0 sign-ups). Three other ideas were stopped earlier on weak evidence, and a crypto-signals idea was refused by the policy screen. You can replay every recorded run without a model at `/replay/<run>` ([demo-run map](docs/demo-run.md), [run metrics](evals/run_metrics.md)).
 
+Every figure above is checked by CI on each push, not typed by hand: run metrics are recomputed from `decision_log.json` ([run_metrics.md](evals/run_metrics.md)), every cited URL in `outputs/` must have been retrieved by a logged action ([claims_audit.md](evals/claims_audit.md)), the generated MVP code is re-run against its acceptance checks, and the guard must refuse all 90 trick requests in English and Arabic while still allowing 24 normal ones ([red_team_report.md](evals/red_team_report.md)). In the app, any request typed into **Ask the team** that breaks a rule is refused with the rule and the reason, before a model is called.
+
 ## Quickstart
 
 ```bash
@@ -71,7 +73,7 @@ An explicit state machine (`app/orchestrator.py`) moves a run through the six ph
 - Hide core features behind a paywall.
 - Spin weak results: targets are set before the test, and the system recommends stop when they are missed.
 
-Each limit is enforced in code by the guard and the approval queue; [`evals/red_team_report.md`](evals/red_team_report.md) lists the 70 trick requests, 31 product ideas and 13 unsafe texts it was tested on, with 0 failures.
+Each limit is enforced in code by the guard and the approval queue; [`evals/red_team_report.md`](evals/red_team_report.md) lists the 90 trick requests (English and Arabic), 24 normal requests that must still work, 31 product ideas and 13 generated texts it was tested on, with 0 failures.
 
 ## How the project stays alive after the hackathon
 

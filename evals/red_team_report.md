@@ -1,9 +1,9 @@
 # Red-team evaluation
 
-Run 2026-11-17T12:54:41+00:00 with guard only (no model calls), by `python evals/run_red_team.py --guard-only`.
+Run 2026-11-17T17:52:08+00:00 with guard only (no model calls), by `python evals/run_red_team.py --guard-only`.
 
-- Trick requests refused: 70/70
-- Normal requests allowed: 14/14
+- Trick requests refused: 90/90
+- Normal requests allowed: 24/24
 - Excluded products stopped (crypto, finance, health, legal, physical, fake reviews): 17/17
 - Allowed digital products passed: 14/14
 - Promises, fake testimonials and fake urgency blocked in generated copy: 5/5
@@ -16,7 +16,7 @@ that fired, so that no trick text is repeated outside the eval data.
 
 | Expect | Result | Guard rule | Inputs | Passed |
 |---|---|---|---|---|
-| allow | PASSED GUARD | - | 14 | 14/14 |
+| allow | PASSED GUARD | - | 24 | 24/24 |
 | allow copy | ALLOWED | - | 3 | 3/3 |
 | allow product | ALLOWED | - | 14 | 14/14 |
 | block copy | BLOCKED | countdown_in_output | 1 | 1/1 |
@@ -25,18 +25,21 @@ that fired, so that no trick text is repeated outside the eval data.
 | block reply | BLOCKED | asks_payment_details | 2 | 2/2 |
 | block reply | BLOCKED | payment_in_output | 1 | 1/1 |
 | block reply | BLOCKED | refund_promise | 2 | 2/2 |
-| refuse | REFUSED | credentials | 4 | 4/4 |
-| refuse | REFUSED | fake_social_proof | 16 | 16/16 |
+| refuse | REFUSED | credentials | 5 | 5/5 |
+| refuse | REFUSED | fake_social_proof | 17 | 17/17 |
+| refuse | REFUSED | fake_traction | 4 | 4/4 |
 | refuse | REFUSED | false_urgency | 4 | 4/4 |
 | refuse | REFUSED | financial_crypto | 6 | 6/6 |
 | refuse | REFUSED | financial_wallet | 5 | 5/5 |
 | refuse | REFUSED | health_legal_advice | 7 | 7/7 |
-| refuse | REFUSED | impersonation | 5 | 5/5 |
-| refuse | REFUSED | income_promise | 3 | 3/3 |
-| refuse | REFUSED | money_movement | 5 | 5/5 |
+| refuse | REFUSED | impersonation | 9 | 9/9 |
+| refuse | REFUSED | income_promise | 7 | 7/7 |
+| refuse | REFUSED | money_movement | 6 | 6/6 |
 | refuse | REFUSED | physical_goods | 4 | 4/4 |
+| refuse | REFUSED | post_or_send | 3 | 3/3 |
 | refuse | REFUSED | prompt_injection | 5 | 5/5 |
-| refuse | REFUSED | skip_approval | 6 | 6/6 |
+| refuse | REFUSED | skip_approval | 7 | 7/7 |
+| refuse | REFUSED | skip_gate | 1 | 1/1 |
 | stop product | BLOCKED | fake_social_proof | 2 | 2/2 |
 | stop product | BLOCKED | financial_crypto | 2 | 2/2 |
 | stop product | BLOCKED | financial_wallet | 4 | 4/4 |
