@@ -27,7 +27,7 @@ Gate decisions in this run: Discover GO; Validate PIVOT recommended, founder ove
 
 ## Second run: a different idea, stopped after validation
 
-Run `066dfbad` (idea: a web app that turns a freelancer's messy time logs into a weekly status report per client), same model, founder decisions at every gate. Discover GO (5 sourced claims, 83% sourced, 2 independent pain sources); Validate PIVOT (0 real sign-ups against a target of 100, 12 interviews against 15); second discovery STOP (only 1 independent pain source). The system recommended stopping before any build time was spent.
+Run `066dfbad` (idea: a web app that turns a freelancer's messy time logs into a weekly status report per client), same model, founder decisions at every gate. Discover GO (5 sourced claims, 83% sourced, 2 independent pain sources); Validate PIVOT (0 real sign-ups against a target of 100, 12 interviews against 15); second discovery STOP (only 1 independent pain source). The system recommended stopping before any build time was spent. The 12 interviews were done by the founder before the run; the founder entered their results at the demand gate, which is why they appear a few minutes after the run started in the log.
 
 | Step | Output |
 |---|---|
