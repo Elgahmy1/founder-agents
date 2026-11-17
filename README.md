@@ -14,7 +14,7 @@ Without Docker: install [Ollama](https://ollama.com), run `ollama pull qwen3:8b`
 
 ## What works and what is mocked
 
-Every **Working** row below has real output from the committed demo run: [docs/demo-run.md](docs/demo-run.md) maps each step to its file in `outputs/` and its gate decision.
+Every **Working** row below has real output from the committed demo runs: [docs/demo-run.md](docs/demo-run.md) maps each step to its file in `outputs/` and its gate decision (a full six-phase run, plus a second idea stopped after validation).
 
 | Step | Status |
 |---|---|
@@ -58,7 +58,8 @@ An explicit state machine (`app/orchestrator.py`) moves a run through the six ph
 
 - Default model: `qwen3:8b` (open weights) via [Ollama](https://ollama.com), running locally. Set `MODEL=gpt-oss:20b` (or any Ollama model) in `.env` to switch.
 - The committed demo run (`outputs/`, `decision_log.json`) used `openai/gpt-oss-120b` (open weights) on Groq's free tier, from a laptop without a GPU. Every model call in the log names the model it used.
-- Research: Hacker News Algolia API, Stack Exchange API, DuckDuckGo HTML results. No keys, no accounts.
+- Research: Hacker News Algolia API, Stack Exchange API, Wikipedia API, DuckDuckGo HTML results, interleaved so no single source dominates. No keys, no accounts.
+- If the free tier stays rate-limited, calls fall back to the local model (`FALLBACK_MODEL` in `.env.example`); the log records which model answered.
 - No GPU? Set `LLM_PROVIDER=openai` with a free-tier OpenAI-compatible endpoint that serves open-weight models (for example Groq's free tier with `openai/gpt-oss-120b`); see `.env.example`. The key stays in your untracked `.env`.
 - No paid service is used or required. If research sites are unreachable, the run continues and every claim is labelled ASSUMPTION.
 

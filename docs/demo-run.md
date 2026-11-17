@@ -24,3 +24,14 @@ The committed demo run (`48fc7649`, idea: a web app that turns lecture notes int
 | Phase 1 evidence gate on a weak idea (water-reminder app): repeat, then stop | [gate](../outputs/phase1_gate_decision-idea-a-mobile-app-that-r.md) |
 
 Gate decisions in this run: Discover GO; Validate PIVOT recommended, founder overrode to GO (logged); Build PIVOT (over scope), then GO; Commercial setup REPEAT, then GO; Launch GO; Operate and learn STOP on real launch numbers (0 visits, 0 sign-ups).
+
+## Second run: a different idea, stopped after validation
+
+Run `066dfbad` (idea: a web app that turns a freelancer's messy time logs into a weekly status report per client), same model, founder decisions at every gate. Discover GO (5 sourced claims, 83% sourced, 2 independent pain sources); Validate PIVOT (0 real sign-ups against a target of 100, 12 interviews against 15); second discovery STOP (only 1 independent pain source). The system recommended stopping before any build time was spent.
+
+| Step | Output |
+|---|---|
+| Phase 1: opportunities, market, interview plan | [opportunities](../outputs/phase1_step1_opportunities-a-web-app-that-turns-a-f.md), [market](../outputs/phase1_step2_market-a-web-app-that-turns-a-f.md), [interview plan](../outputs/phase1_step3_interview_plan-a-web-app-that-turns-a-f.md) |
+| Phase 1 evidence gate | [gate](../outputs/phase1_gate_decision-a-web-app-that-turns-a-f.md) |
+| Phase 2: Lean Canvas, landing page, demand test | [canvas](../outputs/phase2_step1_lean_canvas-a-web-app-that-turns-a-f.md), [landing page](../outputs/phase2_step2_landing_page-a-web-app-that-turns-a-f.html), [demand test](../outputs/phase2_step3_demand_test-a-web-app-that-turns-a-f.md) |
+| Phase 2 demand gate | [gate](../outputs/phase2_gate_decision-a-web-app-that-turns-a-f.md) |
