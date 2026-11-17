@@ -72,14 +72,44 @@ button:disabled{opacity:.5;cursor:wait}
 .steps li.ok{color:var(--ok)} .steps li.now{color:var(--fg);font-weight:700} .files li{margin:3px 0}
 @media (max-width:640px){.stepper{grid-template-columns:repeat(3,1fr)}}
 """
+CSS += """
+:root{--bg:#f4f5fb;--card:#ffffff;--line:#e4e6f0;--acc:#5b4bff;--acc2:#00b3a4;--fg:#14142b;--mut:#6b6f85;
+--shadow:0 1px 2px rgba(20,20,43,.06),0 8px 24px rgba(20,20,43,.06)}
+@media (prefers-color-scheme: dark){:root{--bg:#0d0e16;--card:#161826;--line:#262a3d;--acc:#8b7dff;--acc2:#2dd4bf;--fg:#eceef8;--mut:#9aa0b8;
+--shadow:0 1px 2px rgba(0,0,0,.4),0 8px 24px rgba(0,0,0,.35)}}
+body{font-family:Inter,"Segoe UI",system-ui,-apple-system,"Noto Sans Arabic",sans-serif;max-width:1040px;padding:0 20px 60px;line-height:1.55;
+background:radial-gradient(1200px 400px at 50% -200px,rgba(91,75,255,.14),transparent),var(--bg)}
+.top{position:sticky;top:0;z-index:40;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 0;margin-bottom:8px;
+backdrop-filter:blur(10px);background:color-mix(in srgb,var(--bg) 80%,transparent);border-bottom:1px solid var(--line)}
+.brand{font-weight:800;font-size:1.05rem;text-decoration:none;color:var(--fg);display:flex;align-items:center;gap:8px}
+.brand i{display:inline-block;width:26px;height:26px;border-radius:8px;background:linear-gradient(135deg,var(--acc),var(--acc2))}
+.top .model{font-size:.8rem;color:var(--mut)}
+h1{font-size:1.7rem;letter-spacing:-.02em;margin:18px 0 6px} h2{letter-spacing:-.01em}
+.card{border-radius:16px;padding:20px;box-shadow:var(--shadow);border-color:var(--line)}
+.next{border:0;background:linear-gradient(var(--card),var(--card)) padding-box,linear-gradient(135deg,var(--acc),var(--acc2)) border-box;
+border:2px solid transparent}
+button{border-radius:10px;padding:10px 16px;background:linear-gradient(135deg,var(--acc),color-mix(in srgb,var(--acc) 70%,var(--acc2)));
+box-shadow:0 4px 14px color-mix(in srgb,var(--acc) 35%,transparent);transition:transform .08s ease,box-shadow .2s ease}
+button:hover{transform:translateY(-1px);box-shadow:0 6px 18px color-mix(in srgb,var(--acc) 45%,transparent)}
+button:disabled{opacity:.6;transform:none}
+input,textarea,select{border-radius:10px;padding:10px 12px;transition:border-color .15s,box-shadow .15s}
+input:focus,textarea:focus,select:focus{outline:none;border-color:var(--acc);box-shadow:0 0 0 3px color-mix(in srgb,var(--acc) 25%,transparent)}
+.ph{border-radius:12px;padding:10px;box-shadow:var(--shadow)} .ph.cur{border:2px solid var(--acc)}
+table{border-radius:12px;overflow:hidden} th{font-size:.8rem;text-transform:uppercase;letter-spacing:.04em;color:var(--mut)}
+tr:hover td{background:color-mix(in srgb,var(--acc) 5%,transparent)}
+.tag{border-radius:99px;padding:2px 10px}
+details>summary{cursor:pointer;font-weight:600;padding:4px 0}
+pre{border:1px solid var(--line);border-radius:12px}
+"""
 
 
 def page(title: str, body: str, refresh: bool = False) -> HTMLResponse:
     meta = '<meta http-equiv="refresh" content="2">' if refresh else ""
     return HTMLResponse(f"""<!doctype html><html><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">{meta}<title>{html.escape(title)}</title>
-<style>{CSS}</style></head><body><p><a href="/">Founder Agents</a> · model <code>{html.escape(llm.model)}</code>
-{'' if llm.health() else '<span class="tag stop">model not reachable: check Ollama</span>'}</p>{body}
+<style>{CSS}</style></head><body><header class="top"><a class="brand" href="/"><i></i>Founder Agents</a>
+<span class="model">open-weight model <code>{html.escape(llm.model)}</code> · $0 per run
+{'' if llm.health() else ' <span class="tag stop">model not reachable: check Ollama or your .env</span>'}</span></header>{body}
 <script>document.querySelectorAll('form.once').forEach(f=>f.addEventListener('submit',e=>{{
 const b=e.submitter;if(b&&b.name){{const h=document.createElement('input');h.type='hidden';h.name=b.name;h.value=b.value;f.appendChild(h);}}
 setTimeout(()=>f.querySelectorAll('button').forEach(x=>x.disabled=true),0);}}));</script></body></html>""")
