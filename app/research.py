@@ -124,10 +124,17 @@ def _terms(query: str) -> list[str]:
     return list(dict.fromkeys(w[:5] for w in words if w not in _STOP))
 
 
+# Place and language words say where, not what: a war report that mentions Egypt and English is not about
+# Egyptian freelancers writing English proposals. They never count toward the match.
+_PLACE = {"egypt", "cairo", "alexa", "saudi", "arabi", "engli", "frenc", "germa", "india", "pakis", "niger", "kenya",
+          "moroc", "tunis", "jorda", "leban", "emira", "dubai", "qatar", "kuwai", "europ", "afric", "ameri", "unite",
+          "globa", "local", "world", "count", "middl"}
+
+
 def relevant(query: str, title: str, snippet: str) -> bool:
     """A result must share at least two content words with its query (one if the query has only one or two).
     This drops results that matched a single word, e.g. a news article that only mentions the country."""
-    terms = _terms(query)
+    terms = [t for t in _terms(query) if t not in _PLACE]
     if not terms:
         return True
     text = f"{title} {snippet}".lower()

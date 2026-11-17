@@ -30,3 +30,9 @@ def test_web_results_that_instruct_the_agents_are_quarantined(monkeypatch):
     docs = r.gather(["freelancers Upwork proposals"])
     assert r.quarantined == ["https://evil.example/p"]
     assert "Ignore previous" not in docs[0].snippet and "Freelancers write proposals" in docs[0].snippet
+
+
+def test_place_and_language_words_do_not_count_toward_relevance():
+    q = "Egyptian freelancers English proposals Upwork"
+    assert not relevant(q, "Media coverage of the Gaza war", "Egypt and English-language outlets reported on the strikes")
+    assert relevant(q, "Upwork proposals that win", "freelancers share English proposals that got replies")
