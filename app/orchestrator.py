@@ -953,12 +953,13 @@ class Orchestrator:
             names = [f for f, _ in funcs]
             sample = " ".join([mvp.one_line.rstrip(".") + "."] + [f"As {s.as_a}, I want {s.i_want.rstrip('.')}, so that "
                                                                    f"{s.so_that.rstrip('.')}." for s in mvp.user_stories])
+            sample, sample_label = mvp_app.example_input(checks, sample)
             example = mvp_app.run_functions(code, names, sample, sandbox.call)
             guide = mvp_app.render_user_guide(
                 run_id=run_id, product_name=mvp.product_name, one_line=mvp.one_line,
                 stories=[s.model_dump() for s in mvp.user_stories], out_of_scope=list(mvp.out_of_scope), funcs=funcs,
                 docs=mvp_app.function_docs(code), rows=mvp_app.criteria_rows(src.read_text(encoding="utf-8")),
-                checks_passed=passed, sample=sample, example=example)
+                checks_passed=passed, sample=sample, example=example, sample_label=sample_label)
             g = guard.check_output(guide)
             if not g.allowed:
                 raise ValueError(f"the user guide failed the output guard ({g.rule})")

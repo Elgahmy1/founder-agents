@@ -124,7 +124,7 @@ def result_html(results: list[tuple[str, dict]]) -> str:
         else:
             out = res.get("result")
             if isinstance(out, list) and all(isinstance(x, str) for x in out):
-                text = "\n".join(f"- {x}" for x in out)
+                text = "\n".join("- " + re.sub(r"^\s*[-*\u2022]\s+", "", x) for x in out)  # one bullet, never "- - "
             else:
                 text = out if isinstance(out, str) else json.dumps(out, indent=1, ensure_ascii=False, default=str)
             body = f"<pre>{html.escape(text)}</pre>"
@@ -152,18 +152,36 @@ def criteria_rows(md: str) -> list[tuple[str, str, str]]:
     return rows
 
 
+def example_input(checks: list[str], fallback: str) -> tuple[str, str]:
+    """(text, label) for the guide's example: the longest sample text the coder wrote in its acceptance checks
+    (real input the code was tested on), or the fallback when the checks have no text of a few sentences."""
+    best = ""
+    for c in checks:
+        try:
+            tree = ast.parse(c)
+        except SyntaxError:
+            continue
+        for n in ast.walk(tree):
+            if isinstance(n, ast.Constant) and isinstance(n.value, str) and len(n.value) > len(best):
+                best = n.value
+    if len(best) >= 120 and len(re.findall(r"[.!?](\s|$)", best)) >= 3:
+        return best.strip(), "the sample text the coder wrote in its acceptance checks (fictional, the same input the code was tested on)"
+    return fallback, "the product's own description and user stories, used as sample text"
+
+
 def _show(res: dict) -> str:
     if not res.get("ok"):
         return f"(error: {res.get('error')})"
     out = res.get("result")
     if isinstance(out, list):
-        return "\n".join(f"  - {x}" for x in out)
+        return "\n".join("  - " + re.sub(r"^\s*[-*\u2022]\s+", "", str(x)) for x in out)
     return "\n".join(f"  {line}" for line in str(out).splitlines())
 
 
 def render_user_guide(*, run_id: str, product_name: str, one_line: str, stories: list[dict], out_of_scope: list[str],
                       funcs: list[tuple[str, list[str]]], docs: dict[str, str], rows: list[tuple[str, str, str]],
-                      checks_passed: str, sample: str, example: list[tuple[str, dict]]) -> str:
+                      checks_passed: str, sample: str, example: list[tuple[str, dict]],
+                      sample_label: str = "the product's own description and user stories, used as sample text") -> str:
     """Phase 3 user docs for the MVP app, built in code from the run's own artifacts (MVP spec, tested code,
     acceptance results and a real sandbox run); no model call, so it cannot describe features the MVP lacks."""
     passed = [r for r in rows if r[2] == "PASS"]
@@ -183,7 +201,7 @@ def render_user_guide(*, run_id: str, product_name: str, one_line: str, stories:
     if chained:
         lines.append(f"4. {', '.join(f'`{f}`' for f in chained)} works on the result of the step before it, not on your raw text.")
     lines += ["", "## Example (real output of this MVP)", "",
-              "Input: the product's own description and user stories, used as sample text.", "", "```text", sample, "```", ""]
+              f"Input: {sample_label}.", "", "```text", sample, "```", ""]
     for f, res in example:
         lines += [f"`{f}`:", "", "```text", _show(res).rstrip(), "```", ""]
     lines += ["## What was tested", "", "| Story | Acceptance criterion | Result |", "|---|---|---|"]

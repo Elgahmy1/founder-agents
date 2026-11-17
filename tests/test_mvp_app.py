@@ -121,3 +121,19 @@ def test_list_results_are_chained_and_id_functions_are_not_offered():
     assert [f for f, _ in entry_functions(code)] == ["summarize", "questions"]
     res = dict(run_functions(code, ["summarize", "questions"], "Cells divide. They grow. They die.", sandbox.call))
     assert res["questions"]["result"] == ["Q: Cells divide.", "Q: They grow."]
+
+
+def test_results_never_show_a_double_bullet():
+    from app.mvp_app import result_html
+    html = result_html([("s", {"ok": True, "result": ["- A.", "B.", "• C."]})])
+    assert "- - " not in html and "- A." in html and "- C." in html
+    from app.mvp_app import _show
+    assert "- - " not in _show({"ok": True, "result": ["- A.", "B."]})
+
+
+def test_guide_example_uses_the_coders_sample_text_when_there_is_one():
+    from app.mvp_app import example_input
+    checks = ["text = 'Cells divide by mitosis. DNA is copied first. Then the cell splits into two. Each new cell has the same DNA as the parent cell had before.'\nassert f(text)"]
+    text, label = example_input(checks, "fallback")
+    assert text.startswith("Cells divide") and "acceptance checks" in label
+    assert example_input(["assert f('short')"], "fallback")[0] == "fallback"
