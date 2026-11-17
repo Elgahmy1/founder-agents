@@ -75,3 +75,16 @@ def test_web_button_runs_codegen(monkeypatch, make_orch, brief):
     assert "Generate and test the core code" in page
     orch.founder_generate_code(st.run_id)
     assert "1/1 acceptance checks passed" in c.get(f"/runs/{st.run_id}").text
+
+
+def test_checks_that_import_the_module_by_an_invented_name_still_run():
+    from app import sandbox
+    code = "def double(x):\n    return 2 * x\n"
+    checks = ["from my_core import double\nassert double(2) == 4",
+              "from my_core import double, missing\nassert double(1) == 2",
+              "import os\nassert double(0) == 0"]
+    res = sandbox.run(code, checks)
+    assert any("my_core" in p for p in res.static_problems)  # a name the module does not define still blocks
+    assert any("'os'" in p for p in res.static_problems)
+    res = sandbox.run(code, checks[:1])
+    assert res.ok and res.passed == 1

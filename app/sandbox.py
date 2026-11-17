@@ -98,7 +98,42 @@ def _limits():  # POSIX only: runs in the child before exec
     resource.setrlimit(resource.RLIMIT_FSIZE, (1 * 2**20, 1 * 2**20))
 
 
+def _top_level_names(code: str) -> set[str]:
+    try:
+        tree = ast.parse(code)
+    except SyntaxError:
+        return set()
+    names: set[str] = set()
+    for node in tree.body:
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
+            names.add(node.name)
+        elif isinstance(node, (ast.Assign, ast.AnnAssign)):
+            targets = node.targets if isinstance(node, ast.Assign) else [node.target]
+            names |= {t.id for t in targets if isinstance(t, ast.Name)}
+    return names
+
+
+def strip_self_imports(check: str, code: str) -> str:
+    """Checks run in the module's own namespace, so a check that imports the module's
+    functions under an invented module name (`from summary_core import summarize`) would
+    only trip the import allowlist. Such top-level lines are removed; nothing else changes."""
+    try:
+        tree = ast.parse(check)
+    except SyntaxError:
+        return check
+    defined = _top_level_names(code)
+    drop: set[int] = set()
+    for node in tree.body:
+        if (isinstance(node, ast.ImportFrom) and (node.module or "").split(".")[0] not in ALLOWED_IMPORTS
+                and all(a.name in defined and (a.asname in (None, a.name)) for a in node.names)):
+            drop |= set(range(node.lineno, (node.end_lineno or node.lineno) + 1))
+    if not drop:
+        return check
+    return "\n".join(line for i, line in enumerate(check.splitlines(), 1) if i not in drop)
+
+
 def run(code: str, checks: list[str]) -> SandboxResult:
+    checks = [strip_self_imports(c, code) for c in checks]
     problems = static_problems(code)
     for i, c in enumerate(checks, 1):
         problems += [f"check {i}: {p}" for p in static_problems(c)]

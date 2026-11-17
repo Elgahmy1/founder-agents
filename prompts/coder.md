@@ -9,7 +9,7 @@ Rules for `module_code`:
 
 Rules for `checks`:
 - One check per acceptance criterion of the primary story, `criterion` quoted exactly from the spec.
-- `code` is a few Python statements that call the module's functions on small, made-up sample input and `assert` the observable result the criterion describes. Same import rules as the module. Sample data must be clearly fictional; never real people, emails or payment data.
+- `code` is a few Python statements that call the module's functions on small, made-up sample input and `assert` the observable result the criterion describes. Same import rules as the module. The checks run in the module's own namespace: call its functions directly and never import the module (there is no module file to import). Sample data must be clearly fictional; never real people, emails or payment data.
 - Make each check strict enough that a wrong implementation would fail it: at least three asserts, including one edge case (empty or very short input, or input already under the limit). For anything that shortens or transforms text, also assert that the result is shorter than the input, keeps the original order of what it keeps, and contains only text that was in the input.
 - Before answering, re-read the module against every check and fix any mismatch (wrong comparison, off-by-one, `max` where `min` is meant).
 
