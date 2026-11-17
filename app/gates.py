@@ -181,3 +181,45 @@ def build_gate(*, stories: int, untestable_stories: list[str], untraced_features
     for c in failed:
         reasons.append(f"Failed: {c.name} (target {c.target}, actual {c.actual}).")
     return GateResult("build_gate", 3, rec, reasons, checks)
+
+
+@dataclass(frozen=True)
+class CommercialThresholds:
+    """Fixed before the pricer runs."""
+    min_comparables: int = 2
+    min_policy_sections: int = 3
+    max_attempts: int = 2
+
+
+def commercial_gate(*, free_tier_with_core: bool, comparables: int, sourced_comparables: int,
+                    paid_tiers_without_basis: int, policies_complete: list[str], policies_missing: list[str],
+                    guard_flags: list[str], privacy_covers_data: bool, attempt: int = 1,
+                    t: CommercialThresholds = CommercialThresholds()) -> GateResult:
+    checks = [
+        Check("Core feature in a free tier (no paywall on the core)", "yes", "yes" if free_tier_with_core else "no",
+              free_tier_with_core),
+        Check("Comparable products listed", f">= {t.min_comparables}", str(comparables), comparables >= t.min_comparables),
+        Check("Price basis disclosed (SOURCED or labelled ASSUMPTION)", "all paid tiers",
+              "all" if not paid_tiers_without_basis else f"{paid_tiers_without_basis} without basis",
+              not paid_tiers_without_basis),
+        Check("Policy drafts complete (terms, privacy, refund)", "3/3", f"{len(policies_complete)}/3", not policies_missing),
+        Check("Privacy draft lists the data the MVP handles", "yes", "yes" if privacy_covers_data else "no", privacy_covers_data),
+        Check("Guard flags in pricing and policies", "0", str(len(guard_flags)), not guard_flags),
+    ]
+    failed = [c for c in checks if not c.passed]
+    reasons: list[str] = []
+    if not failed:
+        rec = "go"
+        reasons.append("Core stays free, prices state their basis, and all three policy drafts are ready for the founder to sign.")
+        if sourced_comparables == 0:
+            reasons.append("No comparable price was found in a retrieved source: every price is an ASSUMPTION to test "
+                           "with the price test before launch.")
+    elif attempt >= t.max_attempts:
+        rec = "stop"
+        reasons.append(f"Commercial attempt {attempt}: the plan still fails required checks after a redraft.")
+    else:
+        rec = "repeat"
+        reasons.append("Redraft: the failed checks below are sent back to the pricer and policy drafter.")
+    for c in failed:
+        reasons.append(f"Failed: {c.name} (target {c.target}, actual {c.actual}).")
+    return GateResult("commercial_gate", 4, rec, reasons, checks)

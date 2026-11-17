@@ -180,6 +180,17 @@ def sanitize_source(text: str) -> str:
     return " ".join(p for p in parts if not INJECTION_IN_SOURCE.search(p))
 
 
+POLICY_PROMISE = re.compile(r"\b(we|i) (guarantee|promise)\b|\bguaranteed (results?|income|grades|success|returns?)\b", re.I)
+
+
+def check_policy(text: str) -> Verdict:
+    """Policy drafts legitimately say results are NOT guaranteed, so the generic
+    income rule is replaced by one that catches positive promises only."""
+    if POLICY_PROMISE.search(text):
+        return Verdict(False, "promise_in_policy", "Policy draft promised results.")
+    return _check(text, [r for r in OUTPUT_RULES if r[0] not in ("income_claim_in_output", "payment_in_output")])
+
+
 def check_output(text: str) -> Verdict:
     """Generated artifact before it may be queued for publishing or sending."""
     return _check(text, OUTPUT_RULES)

@@ -35,9 +35,8 @@ def test_build_phase_produces_spec_prototype_tests_and_go(make_orch, brief, sett
     _, q = orch.load(st.run_id)
     assert [i.title for i in q.pending()] == [f"Publish clickable prototype for review: {st.run_id}"]
     st = orch.founder_gate_decision(st.run_id, "go")
-    assert st.stage == "done"
+    assert st.stage == "p4_gate_wait", st.error
     assert not any(o.startswith("phase3_") and "STUBBED" in o for o in st.outputs)
-    assert any(o.startswith("phase4_") and "STUBBED" in o for o in st.outputs)
     assert not validate(orch.log.read())
 
 
@@ -114,6 +113,6 @@ def test_finished_run_can_start_build_only_after_demand_go(make_orch, brief):
     st.stage, st.mvp = "done", None
     st.gates = [g for g in st.gates if g["gate"] != "build_gate"]
     orch.save(st, q)
-    st = orch.founder_start_build(st.run_id)
+    st = orch.founder_continue(st.run_id)
     assert st.stage == "p3_gate_wait" and st.gates[-1]["gate"] == "build_gate"
-    assert any(e["action"] == "start_build" and e["approved_by"] == "founder" for e in orch.log.read())
+    assert any(e["action"] == "start_phase3" and e["approved_by"] == "founder" for e in orch.log.read())

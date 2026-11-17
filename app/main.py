@@ -30,7 +30,7 @@ STATUS = [
     ("Sending outreach messages (founder sends personally)", "MOCKED"),
     ("Phase 3 Build: MVP spec, clickable prototype, acceptance tests, build gate", "Working"),
     ("Phase 3 code generation in a sandbox", "STUBBED"),
-    ("Phase 4 Commercial setup", "STUBBED"),
+    ("Phase 4 Commercial setup: pricing with a free core tier, policy drafts, founder sign-off, commercial gate", "Working"),
     ("Phase 5 Launch, payments and delivery", "MOCKED / STUBBED"),
     ("Phase 6 Operate and learn", "STUBBED"),
 ]
@@ -139,10 +139,10 @@ def create_run(founder_name: str = Form("Founder"), idea: str = Form(...), skill
 
 
 PHASES = [(1, "Discover", "Working"), (2, "Validate", "Working"), (3, "Build", "Working"),
-          (4, "Commercial setup", "STUBBED"), (5, "Launch", "MOCKED"), (6, "Operate & learn", "STUBBED")]
+          (4, "Commercial setup", "Working"), (5, "Launch", "MOCKED"), (6, "Operate & learn", "STUBBED")]
 STAGE_PHASE = {"new": 1, "p1_running": 1, "p1_gate_wait": 1, "p2_running": 2, "p2_targets_wait": 2,
                "p2_collecting": 2, "p2_gate_wait": 2, "p3_running": 3, "p3_gate_wait": 3, "p3_6_stubbed": 3,
-               "p4_6_stubbed": 4, "done": 6, "stopped": 0}
+               "p4_6_stubbed": 4, "p4_running": 4, "p4_gate_wait": 4, "p5_6_stubbed": 5, "done": 6, "stopped": 0}
 OUTCOME_HELP = {
     "go": "Move on to the next phase.",
     "repeat": "Run this phase again (new research or a longer test).",
@@ -159,7 +159,7 @@ def _stepper(st: RunState) -> str:
         if stopped_at is not None:
             cls = "done" if n < stopped_at else ("stopped" if n == stopped_at else "off")
         elif st.stage == "done":
-            cls = "done" if n <= (3 if st.mvp else 2) else "stub"
+            cls = "done" if n <= (4 if st.pricing else 3 if st.mvp else 2) else "stub"
         else:
             cls = "done" if n < cur else ("cur" if n == cur else ("stub" if status != "Working" else "off"))
         label = "" if status == "Working" else f"<small>{status}</small>"
@@ -199,6 +199,9 @@ def _next_step(st: RunState, q, run_id: str) -> str:
         verb = {"publish": "publish", "send": "send", "spend": "spend", "sign": "sign"}[i.kind]
         why = ("Approving only marks it ready for <b>you</b> to send yourself; the system sends nothing (MOCKED)."
                if i.kind == "send" else "Approving puts the page live on this computer only; public hosting is MOCKED.")
+        if i.kind == "sign":
+            why = ("Approving records your sign-off in the decision log. Nothing is published or charged; "
+                   "these are drafts to review with a lawyer before launch.")
         if i.kind == "publish" and "prototype" in i.title:
             why = (f"Approving lets you click through the prototype at <a href='/proto/{run_id}' target='_blank'>/proto/{run_id}</a>"
                    " on this computer. Nothing is deployed (public hosting is MOCKED).")
@@ -207,13 +210,19 @@ def _next_step(st: RunState, q, run_id: str) -> str:
 <pre>{html.escape(i.content[:3000])}</pre><form method="post" action="/runs/{run_id}/approvals/{i.id}" class="once">
 <input name="note" placeholder="Note (optional)"><div class="row"><button name="approve" value="1">Approve</button>
 <button class="rej" name="approve" value="0">Reject</button></div></form></div>"""
-    if st.stage in ("p1_gate_wait", "p2_gate_wait", "p3_gate_wait"):
+    if st.stage in ("p1_gate_wait", "p2_gate_wait", "p3_gate_wait", "p4_gate_wait"):
         g = st.gates[-1]
         rec = g["recommendation"]
+        unsigned = st.stage == "p4_gate_wait" and any(
+            i.executor == "sign_commercial" and i.status not in ("executed", "superseded") for i in q.items)
+        if st.stage == "p4_gate_wait" and not any(i.executor == "sign_commercial" and i.status != "superseded" for i in q.items):
+            unsigned = True
         btns = "".join(
             f"<button name='decision' value='{o}' class='opt {o}{' rec' if o == rec else ''}'><b>{o.upper()}"
             f"{' (recommended)' if o == rec else ''}</b><small>{OUTCOME_HELP[o]}</small></button>"
-            for o in ("go", "repeat", "pivot", "stop"))
+            for o in ("go", "repeat", "pivot", "stop") if not (o == "go" and unsigned))
+        if unsigned:
+            btns += "<p class=mut>GO needs your approval of the pricing and your sign-off on all three policy drafts.</p>"
         return f"""<div class="card next"><div class="kicker">Your decision is needed: Phase {g['phase']} gate</div>
 <h2>The system recommends <span class="{rec}">{rec.upper()}</span></h2>{_gate_table(g)}
 <form method="post" action="/runs/{run_id}/gate" class="once"><input name="note" placeholder="Why? (optional, saved in the log)">
@@ -239,14 +248,17 @@ Sign-ups so far (counted by the app, never typed in): <b>{orch.signups(run_id)}<
         return ("<div class='card next end'><div class='kicker'>Run ended</div><h2 class='stop'>STOP</h2>"
                 + (_gate_table(g) if g else "") + "<p>Stopping saved your time and money. Everything is in the decision log.</p></div>")
     if st.stage == "done":
-        built = "Discover, Validate and Build" if st.mvp else "Discover and Validate"
-        rest = "4-6" if st.mvp else "3-6"
+        built = ("Discover, Validate, Build and Commercial setup" if st.pricing else
+                 "Discover, Validate and Build" if st.mvp else "Discover and Validate")
+        rest = "5-6" if st.pricing else "4-6" if st.mvp else "3-6"
         proto = (f" <a href='/proto/{run_id}' target='_blank'>Open the prototype</a>."
                  if (settings.data_dir / "sites" / run_id / "prototype.html").exists() else "")
-        can_build = not st.mvp and any(g["gate"] == "demand_gate" and g.get("founder_decision") == "go" for g in st.gates)
-        build_btn = (f"<form method='post' action='/runs/{run_id}/build' class='once'><p>This run finished before Phase 3 Build "
-                     "was available. You passed its demand gate, so it can be built now.</p><button>Run Phase 3 Build</button></form>"
-                     if can_build else "")
+        passed = {g["gate"] for g in st.gates if g.get("founder_decision") == "go"}
+        nxt = (3, "Build") if (not st.mvp and "demand_gate" in passed) else \
+              (4, "Commercial setup") if (st.mvp and not st.pricing and "build_gate" in passed) else None
+        build_btn = (f"<form method='post' action='/runs/{run_id}/build' class='once'><p>This run finished before Phase {nxt[0]} "
+                     f"was available. You passed the gate before it, so it can continue now.</p>"
+                     f"<button>Run Phase {nxt[0]} {nxt[1]}</button></form>" if nxt else "")
         return (f"<div class='card next end'><div class='kicker'>Run finished</div><h2 class='go'>{built} complete</h2>"
                 f"<p>Phases {rest} are STUBBED in this prototype: their reports below describe what would happen next.{proto}</p>{build_btn}</div>")
     return ""
@@ -332,10 +344,10 @@ def results(run_id: str, interviews_done: int = Form(...), pain_confirmed: int =
 def build(run_id: str):
     def go():
         try:
-            orch.founder_start_build(run_id)
+            orch.founder_continue(run_id)
         except ValueError:
             pass  # not eligible; the page shows the current state
-    _bg(run_id, "Building the MVP spec and prototype", go)
+    _bg(run_id, "Running the next phase", go)
     return RedirectResponse(f"/runs/{run_id}", status_code=303)
 
 

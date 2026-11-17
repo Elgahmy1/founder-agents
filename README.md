@@ -8,7 +8,7 @@ An open-source team of AI agents that takes a founder's brief (idea, skills, bud
 docker compose up
 ```
 
-Then open http://localhost:8000, fill in a founder brief and press **Start Discover**. The run goes Discover → Validate → Build, and stops at every gate for your decision. The first start downloads the open-weight model (about 5 GB for `qwen3:8b`), so it takes a few minutes once.
+Then open http://localhost:8000, fill in a founder brief and press **Start Discover**. The run goes Discover → Validate → Build → Commercial setup, and stops at every gate for your decision. The first start downloads the open-weight model (about 5 GB for `qwen3:8b`), so it takes a few minutes once.
 
 Without Docker: install [Ollama](https://ollama.com), run `ollama pull qwen3:8b`, then `pip install -r requirements.txt && uvicorn app.main:app`. A terminal version is available with `python -m app.cli run briefs/study-notes.json`.
 
@@ -37,7 +37,8 @@ Without Docker: install [Ollama](https://ollama.com), run `ollama pull qwen3:8b`
 | Phase 3 Build: clickable prototype from a safe template, published locally after founder approval | **Working** |
 | Phase 3 Build: acceptance tests + build gate (scope vs founder hours, traceability, testability, safety) | **Working** |
 | Phase 3 Build: generating and running the MVP's code in a sandbox | **STUBBED** |
-| Phase 4 Commercial setup (price, policies) | **STUBBED** |
+| Phase 4 Commercial setup: tiered pricing with the core feature always free; comparable prices SOURCED or labelled ASSUMPTION | **Working** |
+| Phase 4 Commercial setup: terms, privacy and refund policy DRAFTS, each signed off by the founder; commercial gate | **Working** |
 | Phase 5 Launch: store page, launch posts | **STUBBED** |
 | Phase 5 Launch: payment → delivery, refunds, idempotency, reconciliation | **MOCKED** (logic runs on mock events, no provider) |
 | Phase 6 Operate and learn | **STUBBED** |
@@ -75,6 +76,6 @@ Link to be added.
 ## How the project stays alive after the hackathon
 
 - Maintainers: Mohamed (@Elgahmy1) and contributors; MIT licensed.
-- Roadmap: phase 3 code generation in a sandbox, then phases 4-6, in the order of [ARCHITECTURE.md](ARCHITECTURE.md#roadmap).
-- Community: [CONTRIBUTING.md](CONTRIBUTING.md) lists first contributions (guard rules, research tools, phase 4-6 agents, translations); red-team prompts in `evals/` run in `tests/` and live via `python evals/run_red_team.py`.
+- Roadmap: phase 3 code generation in a sandbox, then phases 5-6, in the order of [ARCHITECTURE.md](ARCHITECTURE.md#roadmap).
+- Community: [CONTRIBUTING.md](CONTRIBUTING.md) lists first contributions (guard rules, research tools, phase 5-6 agents, translations); red-team prompts in `evals/` run in `tests/` and live via `python evals/run_red_team.py`.
 - Funding: runs on free local models, so there is no hosting bill to cover; grants or sponsorship would pay for maintainer time, never for paywalling features.

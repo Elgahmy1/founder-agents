@@ -6,7 +6,7 @@ then stops and waits. Phases 1-2 are built; phases 3-6 are STUBBED.
 
 Stages:
   new -> p1_running -> p1_gate_wait -> p2_running -> p2_targets_wait
-      -> p2_collecting -> p2_gate_wait -> p3_running -> p3_gate_wait -> p4_6_stubbed -> done
+      -> p2_collecting -> p2_gate_wait -> p3_running -> p3_gate_wait -> p4_running -> p4_gate_wait -> p5_6_stubbed -> done
   any gate can end in: stopped
 """
 from __future__ import annotations
@@ -27,6 +27,8 @@ from app.agents.market_analyst import Market, MarketAnalystAgent
 from app.agents.marketer import LandingCopy, MarketerAgent
 from app.agents.researcher import ResearcherAgent
 from app.agents.builder import BuilderAgent, MvpSpec
+from app.agents.policy_drafter import PolicyDrafterAgent, PolicyDrafts
+from app.agents.pricer import PricerAgent, PricingPlan
 from app.agents.scout import Opportunities, Opportunity, ScoutAgent
 from app.agents.strategist import LeanCanvas, StrategistAgent
 from app.agents.stubs import STUB_PHASES, stub_report
@@ -34,8 +36,8 @@ from app.approval import ApprovalItem, ApprovalQueue
 from app.brief import FounderBrief
 from app.config import Settings
 from app.decision_log import DecisionLog
-from app.evidence import Ledger, resolve
-from app.gates import OUTCOMES, DemandTargets, GateResult, build_gate, demand_gate, discover_gate
+from app.evidence import Ledger, RawClaim, resolve
+from app.gates import OUTCOMES, DemandTargets, GateResult, build_gate, commercial_gate, demand_gate, discover_gate
 from app.prototype import prototype_is_safe, render_prototype
 from app.landing import render_landing
 from app.llm import LLM
@@ -77,6 +79,8 @@ P2_STEPS = ["Strategist: drafting the Lean Canvas", "Marketer: writing landing-p
             "Analyst: proposing demand-test targets"]
 P3_STEPS = ["Builder: scoping the MVP (user stories, features, screens)", "Builder: rendering the clickable prototype",
             "QA: checking acceptance criteria, scope and safety", "Gate: build gate"]
+P4_STEPS = ["Pricer: tiers from comparable products", "Policy drafter: terms, privacy and refund drafts",
+            "Gate: commercial gate"]
 
 
 def slugify(s: str, n: int = 24) -> str:
@@ -101,6 +105,9 @@ class RunState:
     demand_plan: dict | None = None
     mvp: dict | None = None
     build_feedback: str | None = None
+    pricing: dict | None = None
+    policies: dict | None = None
+    commercial_feedback: str | None = None
     targets: dict | None = None
     results: dict | None = None
     gates: list[dict] = field(default_factory=list)
@@ -165,6 +172,7 @@ class Orchestrator:
             "publish_landing_local": self._publish_landing_local,
             "send_outreach_mock": self._send_outreach_mock,
             "publish_prototype_local": self._publish_prototype_local,
+            "sign_commercial": self._sign_commercial,
         })
 
     # ---------- executors (only reachable through an approved item) ----------
@@ -183,6 +191,10 @@ class Orchestrator:
         (d / "prototype.html").write_text(item.content, encoding="utf-8")
         return (f"Prototype available at {self.settings.public_base_url}/proto/{run_id} on this computer "
                 "(public hosting is MOCKED)")
+
+    def _sign_commercial(self, item: ApprovalItem) -> str:
+        return ("Signed off by the founder (recorded in the decision log). Nothing was published: policies and prices "
+                "go live only with the store page in Phase 5 (STUBBED). Review with a lawyer before launch.")
 
     def _send_outreach_mock(self, item: ApprovalItem) -> str:
         return "MOCKED: message marked approved for the founder to send personally; the system sent nothing"
@@ -242,7 +254,9 @@ class Orchestrator:
                 self._phase2(st, q)
             elif st.stage == "p3_running":
                 self._phase3(st, q)
-            elif st.stage in ("p4_6_stubbed", "p3_6_stubbed"):
+            elif st.stage == "p4_running":
+                self._phase4(st, q)
+            elif st.stage in ("p5_6_stubbed", "p4_6_stubbed", "p3_6_stubbed"):
                 self._stubs(st)
         except Exception as e:  # surface, never hide
             st.error = f"{type(e).__name__}: {e}"
@@ -428,6 +442,63 @@ class Orchestrator:
             q.submit("publish", f"Publish clickable prototype for review: {st.run_id}", page, "publish_prototype_local", 3)
         st.stage = "p3_gate_wait"
 
+    # ---------- phase 4: Commercial setup (price + policy drafts) ----------
+    def _phase4(self, st: RunState, q: ApprovalQueue) -> None:
+        brief = FounderBrief(**st.brief)
+        ctx = self.ctx(st)
+        st.error = None
+        docs = self.docs(st)
+        canvas = LeanCanvas(**st.canvas)
+        spec = MvpSpec(**st.mvp)
+        self._step(st, P4_STEPS, 0)
+        plan = PricerAgent(ctx).price(brief, canvas, spec, docs, st.commercial_feedback,
+                                      (st.market or {}).get("alternatives", []))
+        st.pricing = plan.model_dump()
+        led = Ledger.from_list(st.ledger)
+        pclaims = led.add(resolve(plan.claims, docs))
+        comps = [resolve([RawClaim(text=f"{c.product}: {c.pricing_note}", source_ids=c.source_ids)], docs)[0]
+                 for c in plan.comparables]
+        st.ledger = led.to_list()
+        self.write_output(st, "phase4_step1_pricing.md", _pricing_md(plan, pclaims, comps))
+
+        self._step(st, P4_STEPS, 1)
+        pol = PolicyDrafterAgent(ctx).draft(brief, spec, plan)
+        st.policies = pol.model_dump()
+        self.write_output(st, "phase4_step2_policies.md", _policies_md(pol))
+
+        self._step(st, P4_STEPS, 2)
+        flags = []
+        for text in [plan.rationale, plan.price_test, *[t.name + " " + " ".join(t.includes) for t in plan.tiers]]:
+            v = guard.check_output(text)
+            if not v.allowed and v.rule != "payment_in_output":
+                flags.append(v.rule)
+        for p in (pol.terms, pol.privacy, pol.refund):
+            v = guard.check_policy(" ".join(p.sections))
+            if not v.allowed:
+                flags.append(v.rule)
+        core = spec.must_have[0].name.lower()
+        free = [t for t in plan.tiers if t.price_usd_per_month == 0]
+        free_core = any(core in " ".join(t.includes).lower() or _overlap(core, " ".join(t.includes)) for t in free)
+        paid = [t for t in plan.tiers if t.price_usd_per_month > 0]
+        complete = [k for k, p in (("terms", pol.terms), ("privacy", pol.privacy), ("refund", pol.refund))
+                    if len(p.sections) >= 3]
+        g = commercial_gate(
+            free_tier_with_core=free_core, comparables=len(plan.comparables),
+            sourced_comparables=sum(1 for c in comps if c.status == "SOURCED"),
+            paid_tiers_without_basis=0 if (not paid or comps) else len(paid),
+            policies_complete=complete, policies_missing=[k for k in ("terms", "privacy", "refund") if k not in complete],
+            guard_flags=flags, privacy_covers_data=bool(pol.data_collected),
+            attempt=1 + sum(1 for x in st.gates if x["gate"] == "commercial_gate"))
+        st.gates.append(g.to_dict())
+        self.log.append(agent="gate", action="commercial_gate", run_id=st.run_id, outcome=g.recommendation, phase=4)
+        self.write_output(st, "phase4_gate_decision.md", g.md())
+        q.supersede("sign_commercial")
+        if not flags:
+            q.submit("sign", f"Approve pricing: {st.run_id}", _pricing_md(plan, pclaims, comps), "sign_commercial", 4)
+            for k in ("terms", "privacy", "refund"):
+                q.submit("sign", f"Sign off {k} policy draft: {st.run_id}", _policy_md(getattr(pol, k)), "sign_commercial", 4)
+        st.stage = "p4_gate_wait"
+
     def _stubs(self, st: RunState) -> None:
         for p in STUB_PHASES:
             self.write_output(st, f"phase{p.phase}_step1_{slugify(p.name, 20)}-STUBBED.md", stub_report(p))
@@ -443,7 +514,7 @@ class Orchestrator:
         if decision not in OUTCOMES:
             raise ValueError(f"decision must be one of {OUTCOMES}")
         st, q = self.load(run_id)
-        if st.stage not in ("p1_gate_wait", "p2_gate_wait", "p3_gate_wait"):
+        if st.stage not in ("p1_gate_wait", "p2_gate_wait", "p3_gate_wait", "p4_gate_wait"):
             raise ValueError(f"no gate is waiting (stage={st.stage})")
         from app.gates import Check
         g_full = st.gates[-1]
@@ -474,9 +545,20 @@ class Orchestrator:
             else:
                 st.tried.append(st.chosen)
                 st.stage = "p1_running"
+        elif phase == 4:
+            if decision == "go":
+                signs = [i for i in q.items if i.executor == "sign_commercial" and i.status != "superseded"]
+                if not signs or any(i.status != "executed" for i in signs):
+                    raise ValueError("GO needs the founder to approve the pricing and sign off all three policy drafts first")
+                st.stage = "p5_6_stubbed"
+            else:  # repeat or pivot: redraft with the failed checks
+                failed = [c for c in gr.checks if not c.passed]
+                st.commercial_feedback = "\n".join([f"- {c.name}: target {c.target}, got {c.actual}" for c in failed]
+                                                   + ([f"- Founder note: {note}"] if note else []))
+                st.stage = "p4_running"
         else:  # phase 3 build gate
             if decision == "go":
-                st.stage = "p4_6_stubbed"
+                st.stage = "p4_running"
             else:  # repeat: rebuild with the failed checks; pivot: rebuild a smaller MVP
                 failed = [c for c in gr.checks if not c.passed]
                 st.build_feedback = "\n".join(
@@ -485,23 +567,30 @@ class Orchestrator:
                     + ([f"- Founder note: {note}"] if note else []))
                 st.stage = "p3_running"
         self.save(st, q)
-        if st.stage in ("p1_running", "p2_running", "p3_running", "p4_6_stubbed"):
+        if st.stage in ("p1_running", "p2_running", "p3_running", "p4_running", "p5_6_stubbed"):
             return self.advance(run_id)
         return st
 
-    def founder_start_build(self, run_id: str) -> RunState:
-        """Runs finished before Phase 3 was built (phase 3 was STUBBED then) can run Build,
-        but only if the founder chose GO at that run's demand gate."""
+    def founder_continue(self, run_id: str) -> RunState:
+        """Runs that finished while a later phase was still STUBBED can continue into the
+        phase that is built now, but only past gates the founder passed with GO."""
         with self.lock(run_id):
             st, q = self.load(run_id)
-            go2 = any(g["gate"] == "demand_gate" and g.get("founder_decision") == "go" for g in st.gates)
-            if st.stage != "done" or st.mvp or not go2:
-                raise ValueError("Build can start only on a finished run whose demand gate the founder passed")
-            self.log.append(agent="founder", action="start_build", approved_by="founder", run_id=run_id,
-                            outcome="go", phase=3)
-            st.stage = "p3_running"
+            passed = {g["gate"] for g in st.gates if g.get("founder_decision") == "go"}
+            if st.stage != "done":
+                raise ValueError("only a finished run can continue")
+            if not st.mvp and "demand_gate" in passed:
+                st.stage, phase = "p3_running", 3
+            elif st.mvp and not st.pricing and "build_gate" in passed:
+                st.stage, phase = "p4_running", 4
+            else:
+                raise ValueError("nothing to continue: the next phase needs a gate the founder passed with GO")
+            self.log.append(agent="founder", action=f"start_phase{phase}", approved_by="founder", run_id=run_id,
+                            outcome="go", phase=phase)
             self.save(st, q)
             return self._advance(run_id)
+
+    founder_start_build = founder_continue
 
     def founder_lock_targets(self, run_id: str, approve: bool, note: str | None = None) -> RunState:
         with self.lock(run_id):
@@ -618,6 +707,32 @@ def _acceptance_md(spec: MvpSpec, untestable: list[str], untraced: list[str], sa
         f"- Stories without a testable criterion: {', '.join(untestable) or 'none'}",
         f"- Features not traced to a story: {', '.join(untraced) or 'none'}",
         f"- Prototype safety problems: {', '.join(safety) or 'none'}"]) + "\n"
+
+
+def _overlap(a: str, b: str) -> bool:
+    words = {w for w in re.findall(r"[a-z]{4,}", a.lower())}
+    return bool(words & set(re.findall(r"[a-z]{4,}", b.lower())))
+
+
+def _pricing_md(plan: PricingPlan, claims, comps) -> str:
+    return "\n".join([
+        "# Phase 4, step 1: Pricing proposal (no payment is configured or taken)", "",
+        "| Tier | USD / month | Includes | For |", "|---|---|---|---|",
+        *[f"| {t.name} | {t.price_usd_per_month:g} | {', '.join(t.includes)} | {t.who_for} |" for t in plan.tiers],
+        "", "## Comparable products", *[f"- {c.md()}" for c in comps],
+        "", f"Rationale: {plan.rationale}", "", f"How to test willingness to pay without taking money: {plan.price_test}",
+        "", "## Claims", *[f"- {c.md()}" for c in claims]]) + "\n"
+
+
+def _policy_md(p) -> str:
+    return "\n\n".join([f"## {p.title} (DRAFT: review with a lawyer before launch; not legal advice)", *p.sections])
+
+
+def _policies_md(pol: PolicyDrafts) -> str:
+    return "\n".join([
+        "# Phase 4, step 2: Policy drafts (DRAFT, for the founder to review and sign off)", "",
+        "Data the MVP handles: " + ", ".join(pol.data_collected), "",
+        _policy_md(pol.terms), "", _policy_md(pol.privacy), "", _policy_md(pol.refund)]) + "\n"
 
 
 def _canvas_md(name: str, c: LeanCanvas, claims) -> str:

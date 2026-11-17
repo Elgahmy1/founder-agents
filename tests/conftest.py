@@ -14,6 +14,8 @@ sys.path.insert(0, str(ROOT))
 from app.agents.advisor import Advice  # noqa: E402
 from app.agents.analyst import DemandTestPlan, GateMemo  # noqa: E402
 from app.agents.builder import MvpSpec  # noqa: E402
+from app.agents.policy_drafter import PolicyDrafts  # noqa: E402
+from app.agents.pricer import PricingPlan  # noqa: E402
 from app.agents.interviewer import InterviewPlan  # noqa: E402
 from app.agents.market_analyst import Market  # noqa: E402
 from app.agents.marketer import LandingCopy  # noqa: E402
@@ -64,6 +66,24 @@ class FakeLLM:
                              "sample_output": "chlorophyll, ATP, stomata"}],
                 "tech_stack": ["Python", "FastAPI", "Ollama"], "risks": ["summaries may be wrong"]}
 
+    free_tier = True
+    policy_extra = ""
+
+    def pricing(self):
+        tiers = [{"name": "Pro", "price_usd_per_month": 4, "includes": ["Key terms", "PDF export"], "who_for": "heavy users"}]
+        if self.free_tier:
+            tiers.insert(0, {"name": "Free", "price_usd_per_month": 0, "includes": ["Paste and summarize"], "who_for": "every student"})
+        return {"tiers": tiers,
+                "comparables": [{"product": "Notion", "pricing_note": "unknown", "source_ids": []},
+                                {"product": "Obsidian", "pricing_note": "students use obsidian for lecture notes", "source_ids": ["S3"]}],
+                "rationale": "Keep the core free; charge for volume.", "price_test": "Ask about past spending on study tools.",
+                "claims": [{"text": "Students use Notion and Obsidian for notes", "source_ids": ["S3"]}]}
+
+    def policies(self):
+        pol = lambda t: {"title": t, "sections": ["What this covers.", "What we do.", "Contact." + self.policy_extra]}
+        return {"terms": pol("Terms of use"), "privacy": pol("Privacy policy"), "refund": pol("Refund policy"),
+                "data_collected": ["uploaded notes (deleted after processing)", "email if given"]}
+
     def structured(self, system, user, schema):
         self.usage.calls += 1
         c = [{"text": "Students struggle organizing lecture notes before exams", "source_ids": ["S1"]},
@@ -95,6 +115,8 @@ class FakeLLM:
             GateMemo: {"summary": "s", "what_we_learned": [], "next_steps": []},
             Advice: {"answer": "Talk to 10 students this week."},
             MvpSpec: self.mvp(),
+            PricingPlan: self.pricing(),
+            PolicyDrafts: self.policies(),
         }[schema]
         return schema.model_validate(data)
 
