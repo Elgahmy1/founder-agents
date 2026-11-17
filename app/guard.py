@@ -105,7 +105,7 @@ EXCLUDED_PRODUCT_RULES: list[tuple[str, str, list[str]]] = [
      [r"\b(medical diagnos\w*|diagnose (patients|illness|disease)|symptom checker|medical advice|treatment plan|prescri\w*|therap(y|ist) bot|mental health advice|diet plan for (diabetes|disease)|legal advice|lawyer bot|contract review for clients|immigration advice)\b",
       r"\b(divorce|custody|lawsuit|sue|visa) (papers|filings?|cases?|advice|lawyer)\b|\blegal (options|consultations?|counsel)\b|\bwrites? (your|their) (divorce|will|lawsuit|legal)\b",
       r"\b(cure|cures|curing|reverse|reverses|treat|treats|treating) (diabetes|cancer|depression|anxiety|disease|illness|adhd|obesity)\b",
-      r"\b(diet|meal|nutrition) plans? (to|that) (cure|treat|reverse)\b|\btherapy (chatbot|bot|app)\b|\breplac\w* (a |your )?(therapist|doctor|psychiatrist|psychologist)\b|\bdiagnos\w*\b"]),
+      r"\b(diet|meal|nutrition) plans? (to|that) (cure|treat|reverse)\b|\btherapy (chatbot|bot|app)\b|\b(chatbot|bot|app|ai)\b[^.]{0,30}\b(therapy|counsel\w*)\b[^.]{0,20}\b(depression|anxiety|trauma|ptsd|addiction|eating disorders?)\b|\b(treat|cure|heal)\w* (depression|anxiety|ptsd|addiction)\b|\breplac\w* (a |your )?(therapist|doctor|psychiatrist|psychologist)\b|\bdiagnos\w*\b"]),
 ]
 
 # Things that must never appear in a generated artifact the founder may publish.
@@ -172,9 +172,20 @@ def check_request(text: str) -> Verdict:
     return Verdict(True)
 
 
+# A product whose purpose is fake reviews, fake urgency or promised income is excluded too, not only the request.
+PRODUCT_PURPOSE_RULES = [r for r in REQUEST_RULES + ARABIC_RULES if r[0] == "income_promise"] + [
+    ("fake_social_proof", "A product that fakes reviews, ratings, followers or sign-ups is excluded.",
+     [r"\b(fake|fabricated|made[- ]up|bought|paid|invented)\s+(\w+[- ]?){0,2}(reviews?|ratings?|testimonials?|followers|sign-?ups|likes)\b",
+      r"\bwrit\w*\s+(\d+\s+)?(five|5)[- ]star reviews?\b", r"\b(review|rating)s? farm\b",
+      r"\b(buy|sell)\w*\s+(\w+\s+){0,2}(followers|likes|reviews|ratings)\b"])]
+
+
 def check_product(idea_text: str) -> Verdict:
-    v = _check(idea_text, EXCLUDED_PRODUCT_RULES)
-    return v if not v.allowed else _check(idea_text, EXCLUDED_AR)
+    for rules in (EXCLUDED_PRODUCT_RULES, EXCLUDED_AR, PRODUCT_PURPOSE_RULES):
+        v = _check(idea_text, rules)
+        if not v.allowed:
+            return v
+    return Verdict(True)
 
 
 INJECTION_IN_SOURCE = re.compile(

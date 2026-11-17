@@ -330,6 +330,8 @@ def view_run(run_id: str):
         body.append("<div class='card'><h2>Approval history</h2><table>" + "".join(
             f"<tr><td>{i.kind}</td><td>{html.escape(i.title)}</td><td>{i.status}</td><td>{html.escape(i.result or '')}</td></tr>"
             for i in done) + "</table></div>")
+    body.append(f"<p><a href='/runs/{run_id}/export'>Download the full run report (Markdown)</a>: brief, gates, your "
+                "decisions, approvals, decision log and outputs in one file.</p>")
     body.append(f"""<div class="card"><h2>Ask the team</h2><form method="post" action="/runs/{run_id}/ask" class="once">
 <textarea name="request" rows="2" placeholder="e.g. how should I find my first 10 interviewees?"></textarea><button>Ask</button></form></div>""")
     u = st.usage
@@ -412,6 +414,19 @@ def ask(run_id: str, request: str = Form(...)):
         answer = a2 + ("\n\n(Some lines were removed by the safety guard.)" if removed else "")
     return page("Answer", f"<div class=card><h2>Your request</h2><p>{html.escape(request)}</p><h2>Answer</h2>"
                           f"<pre>{html.escape(answer)}</pre><a href='/runs/{run_id}'>Back to run</a></div>")
+
+
+@app.get("/runs/{run_id}/export")
+def export_run(run_id: str):
+    """The founder's own copy of the run as one Markdown file. Built from saved state; no model call."""
+    from app.report import build_run_report
+    try:
+        st, q = orch.load(run_id)
+    except FileNotFoundError:
+        raise HTTPException(404)
+    md = build_run_report(st, q, orch.log.read(), settings.outputs_dir)
+    return PlainTextResponse(md, media_type="text/markdown; charset=utf-8",
+                             headers={"Content-Disposition": f"attachment; filename=founder-agents-{st.slug}-{run_id}.md"})
 
 
 @app.get("/outputs/{name}", response_class=PlainTextResponse)

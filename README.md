@@ -33,6 +33,7 @@ Without Docker: install [Ollama](https://ollama.com), run `ollama pull qwen3:8b`
 | Approval queue (publish / send / spend / sign) | **Working** |
 | Decision log with required keys + tamper-evident hash chain | **Working** |
 | Red-team guard (fake reviews, urgency, income promises, impersonation, money, credentials, prompt injection; English + Arabic) | **Working** |
+| Red-team evaluation: 70 trick requests, 31 product ideas, 13 generated texts; report in [`evals/red_team_report.md`](evals/red_team_report.md), 0 failures | **Working** |
 | Phase 3 Build: MVP spec (user stories, acceptance criteria, scoped features with hour estimates) | **Working** |
 | Phase 3 Build: clickable prototype from a safe template, published locally after founder approval | **Working** |
 | Phase 3 Build: acceptance tests + build gate (scope vs founder hours, traceability, testability, safety) | **Working** |
@@ -44,6 +45,7 @@ Without Docker: install [Ollama](https://ollama.com), run `ollama pull qwen3:8b`
 | Phase 5 Launch: payment → delivery, refunds, idempotency, reconciliation | **MOCKED** (real logic runs on mock events inside the launch gate; no provider) |
 | Phase 6 Operate and learn: launch results vs the targets locked before launch (sign-ups counted by the app), support reply drafts for real feedback, learn gate (persevere / repeat / pivot / stop), learning memo | **Working** |
 | Phase 6: sending support replies; usage analytics | **MOCKED** (founder sends replies personally and enters store visits from their own analytics) |
+| Founder export: the whole run (brief, gates, decisions, approvals, decision log, outputs) as one Markdown file, no model call | **Working** |
 
 ## Architecture
 
@@ -75,6 +77,8 @@ About $0.00 per run (open-weight model, local via Ollama or Groq free tier; the 
 - Help with physical goods, financial, investment or crypto products, or health or legal advice products.
 - Hide any of its own features behind a paywall.
 - Spin weak results: gate targets are set before the test, and the system recommends stop when they are missed.
+
+Each limit is checked in code by the guard and the approval queue; [`evals/red_team_report.md`](evals/red_team_report.md) shows every trick request, excluded product and unsafe text the guard was tested on, with 0 failures.
 
 ## How the project stays alive after the hackathon
 

@@ -63,3 +63,18 @@ def test_landing_page_never_contains_scripts_or_payment_fields(make_orch, brief,
     html = (settings.outputs_dir / next(n for n in st.outputs if n.startswith("phase2_step2"))).read_text()
     low = html.lower()
     assert "<script" not in low and "card" not in low and "type=\"password\"" not in low
+
+
+def test_guard_only_red_team_eval_has_no_failures(tmp_path, monkeypatch):
+    """The committed evals/red_team_prompts.json passes the guard with zero failures (no model is called)."""
+    import json
+    from pathlib import Path
+    from app import guard
+    d = json.loads((Path(__file__).resolve().parent.parent / "evals" / "red_team_prompts.json").read_text(encoding="utf-8"))
+    assert all(not guard.check_request(p).allowed for p in d["must_refuse"])
+    assert all(guard.check_request(p).allowed for p in d["must_allow"])
+    assert all(not guard.check_product(p).allowed for p in d["products_must_stop"])
+    assert all(guard.check_product(p).allowed for p in d["products_must_pass"])
+    assert all(not guard.check_output(p).allowed for p in d["outputs_must_block"])
+    assert all(not guard.check_support_reply(p).allowed for p in d["support_replies_must_block"])
+    assert all(guard.check_support_reply(p).allowed for p in d["outputs_must_pass"])

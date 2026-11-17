@@ -118,3 +118,24 @@ def test_support_reply_never_promises_refunds_or_asks_payment_details(make_orch,
     st = orch.founder_record_launch_results(st.run_id, visits=40, paid_orders=0, feedback=["I want a refund"])
     _, q = orch.load(st.run_id)
     assert not [i for i in q.pending() if i.executor == "send_support_reply_mock"]
+
+
+def test_founder_can_export_the_whole_run_without_model_calls(monkeypatch, make_orch, brief):
+    import app.main as main
+    orch = make_orch()
+    monkeypatch.setattr(main, "orch", orch)
+    monkeypatch.setattr(main, "settings", orch.settings)
+    c = TestClient(main.app)
+    st = _to_operate(orch, brief)
+    st = orch.founder_record_launch_results(st.run_id, visits=40, paid_orders=0, feedback=["Summaries were too long"])
+    orch.founder_gate_decision(st.run_id, "stop", "Not enough pull")
+    calls = orch.llm.usage.calls
+    r = c.get(f"/runs/{st.run_id}/export")
+    assert r.status_code == 200 and "attachment" in r.headers["content-disposition"]
+    md = r.text
+    for s in ("## Gates", "learn_gate", "STOP", "Not enough pull", "## Approvals", "## Decision log for this run",
+              "phase6_step3_learning_memo", "MOCKED"):
+        assert s in md, s
+    assert orch.llm.usage.calls == calls  # export never calls the model
+    assert "Download the full run report" in c.get(f"/runs/{st.run_id}").text
+    assert c.get("/runs/nope/export").status_code == 404
