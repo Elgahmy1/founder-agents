@@ -38,9 +38,46 @@ flowchart LR
     end
 ```
 
+### Run state machine (`app/orchestrator.py`)
+
+Each run is one JSON state file; the stage only moves forward through code paths that check the founder's input.
+
+```mermaid
+stateDiagram-v2
+    [*] --> new
+    new --> stopped: policy screen fails
+    new --> p1_running
+    p1_running --> p1_gate_wait: evidence gate computed
+    p1_gate_wait --> p1_running: founder picks repeat / pivot
+    p1_gate_wait --> stopped: founder picks stop
+    p1_gate_wait --> p2_running: founder picks go
+    p2_running --> p2_targets_wait: targets proposed
+    p2_targets_wait --> p2_collecting: founder locks targets
+    p2_collecting --> p2_gate_wait: founder enters real results
+    p2_gate_wait --> p2_running: repeat
+    p2_gate_wait --> p1_running: pivot
+    p2_gate_wait --> stopped: stop
+    p2_gate_wait --> p3_6_stubbed: go
+    p3_6_stubbed --> done
+```
+
 ## Phases
 
 ### Phase 1: Discover (built)
+
+```mermaid
+flowchart LR
+    BR[brief] --> R[researcher: 3 queries]
+    R --> SRC[(HN / Stack Exchange / DDG / founder URLs<br/>sanitized, ids S1..Sn)]
+    SRC --> SC[scout: opportunities + scores]
+    SRC --> MA[market_analyst: ICP, segments]
+    SC --> LED[evidence ledger]
+    MA --> LED
+    SC --> IV[interviewer: Mom Test plan + outreach draft]
+    IV --> AQ[approval queue: send]
+    LED --> G1{evidence gate}
+```
+
 - **Core step:** Find opportunities.
 - **Agents:** `researcher` (plans queries, gathers sources), `scout` (find and score opportunities), `market_analyst` (define the market), `interviewer` (Mom Test plan).
 - **Tools:** Hacker News Algolia API, Stack Exchange API, DuckDuckGo HTML, founder-supplied URLs (`app/research.py`). All free, no keys.
@@ -49,6 +86,21 @@ flowchart LR
 - **Output:** `phase1_step1_opportunities-*.md`, `phase1_step2_market-*.md`, `phase1_step3_interview_plan-*.md`, `phase1_gate_decision-*.md`.
 
 ### Phase 2: Validate (built)
+
+```mermaid
+flowchart LR
+    LED[Phase 1 evidence] --> ST[strategist: Lean Canvas, riskiest assumptions]
+    ST --> MK[marketer: copy only]
+    MK --> GU[guard per line + safe template]
+    GU --> AQ[approval queue: publish]
+    AQ -- founder approves --> LP["/lp/&lt;run&gt; with real sign-up form"]
+    ST --> AN[analyst: proposes targets]
+    AN --> LOCK[founder locks targets before results]
+    LP --> RES[real sign-ups + founder-entered interview results]
+    LOCK --> G2{demand gate}
+    RES --> G2
+```
+
 - **Core step:** Design the business.
 - **Agents:** `strategist` (Lean Canvas), `marketer` (landing-page copy), `analyst` (demand targets).
 - **Method:** the Lean Canvas orders the riskiest assumptions. The marketer writes copy only; our template renders the page, so it cannot carry scripts, timers, testimonials, traction numbers or payment fields, and each line is re-checked by the guard. Publishing is a `publish` item; after approval the page is served at `/lp/<run>` and its form counts real sign-ups. The analyst proposes targets (sign-ups in N days, interviews, share confirming the problem); the founder locks them **before** results exist. The founder then enters real interview results; sign-ups come only from the form.
@@ -121,9 +173,12 @@ sequenceDiagram
 - **Payment triggers delivery:** only a provider `payment_succeeded` event grants access; the system never takes payment itself.
 - **Refund revokes access:** `refund_succeeded` flips access off for that order. Refunds are issued by the founder in their provider; we react to the event.
 - **Idempotency:** each provider event id is processed once; a webhook retry returns `duplicate_ignored`, and an order already delivered is never delivered twice.
+- **Roadmap item:** the mock keeps processed event ids in memory; the real handler stores them with the order so a retry after a restart is still ignored.
 - **Reconciliation:** every paid order has a matching payment of the same amount; sum of (amount − fee) over non-refunded orders equals payouts; mismatches are reported, not auto-corrected.
 
 ## Data flow
+
+Trust boundaries: web text is untrusted (sanitized by `guard.sanitize_source`, wrapped as evidence only); model output is untrusted (schema-checked, then `guard.check_output`); only the founder's clicks move money-free actions out of the system.
 
 ```
 brief ──> guard ──> researcher ──> [S1..Sn sources] ──> scout / market_analyst / strategist
@@ -157,4 +212,4 @@ Persistence is plain files (JSON, CSV, Markdown) so runs are inspectable and por
 2. Phase 4: pricer with sourced comparables; policy drafts with a "review with a lawyer" sign gate.
 3. Phase 5: store page and launch posts as approval items; webhook handler for a real provider in the founder's own account (founder-configured, never our keys).
 4. Phase 6: metrics dashboard from real product events; persevere-or-pivot memo.
-5. Community: more free research tools, more red-team prompts in `evals/`, translations (Arabic first).
+5. Community: more free research tools, more red-team prompts in `evals/` (runner: `python evals/run_red_team.py`), translations (Arabic first). See [CONTRIBUTING.md](CONTRIBUTING.md).

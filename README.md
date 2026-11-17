@@ -32,7 +32,7 @@ Without Docker: install [Ollama](https://ollama.com), run `ollama pull qwen3:8b`
 | Phase 2 demand gate (go / repeat / pivot / stop) + founder decision | **Working** |
 | Approval queue (publish / send / spend / sign) | **Working** |
 | Decision log with required keys + tamper-evident hash chain | **Working** |
-| Red-team guard (fake reviews, urgency, income promises, impersonation, money, credentials) | **Working** |
+| Red-team guard (fake reviews, urgency, income promises, impersonation, money, credentials, prompt injection; English + Arabic) | **Working** |
 | Phase 3 Build | **STUBBED** |
 | Phase 4 Commercial setup (price, policies) | **STUBBED** |
 | Phase 5 Launch: store page, launch posts | **STUBBED** |
@@ -73,5 +73,5 @@ Link to be added.
 
 - Maintainers: Mohamed (@Elgahmy1) and contributors; MIT licensed.
 - Roadmap: build out phases 3-6 in the order of [ARCHITECTURE.md](ARCHITECTURE.md#roadmap), starting with the Build agent in a sandbox.
-- Community: issues labelled `good first issue` for new agents, research tools and guard rules; red-team prompts in `evals/` welcome.
+- Community: [CONTRIBUTING.md](CONTRIBUTING.md) lists first contributions (guard rules, research tools, phase 3-6 agents, translations); red-team prompts in `evals/` run in `tests/` and live via `python evals/run_red_team.py`.
 - Funding: runs on free local models, so there is no hosting bill to cover; grants or sponsorship would pay for maintainer time, never for paywalling features.
