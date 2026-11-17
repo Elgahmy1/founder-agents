@@ -4,7 +4,7 @@ Primary user story US1: as Student who has lecture PDFs, I want to upload the fi
 
 Written by the coder agent and run by `app/sandbox.py`: static allowlist (pure standard library, no file, network or process access) and a separate isolated Python process with a time limit. Nothing here is published or deployed. User interface, storage, hosting and the real model call are not generated (STUBBED for this step).
 
-**Result: 2/2 acceptance checks passed after one repair.**
+**Result: 2/2 acceptance checks passed.**
 
 | Acceptance criterion | Check | Result |
 |---|---|---|
@@ -13,53 +13,47 @@ Written by the coder agent and run by `app/sandbox.py`: static allowlist (pure s
 
 ## Notes
 
-[removed by guard]
+Implemented a deterministic extractive summarizer that scores sentences by word frequency and returns the top sentences as bullet points. Functions operate purely on provided text; PDF extraction, UI, storage, and real AI model calls are out of scope for this MVP.
 
 ## core.py
 
 ```python
 import re
+from collections import Counter
 from typing import List
 
-def _split_sentences(text: str) -> List[str]:
-    """Very simple sentence splitter based on punctuation."""
-    # Split on period, exclamation, question marks followed by space or end.
-    sentences = re.split(r'(?<=[.!?])\s+', text.strip())
-    return [s.strip() for s in sentences if s]
+def _sentence_split(text: str) -> List[str]:
+    """Split text into sentences using punctuation."""
+    pattern = r'(?<=[.!?])\s+'
+    return [s.strip() for s in re.split(pattern, text) if s.strip()]
 
-def _score_sentence(sentence: str) -> int:
-    """Score a sentence for importance. Here we use length as a proxy."""
-    return len(sentence)
+def _word_frequencies(text: str) -> Counter:
+    """Return word frequency ignoring a small stop‑word list and punctuation."""
+    stop = {"the", "and", "of", "to", "a", "in", "for", "on", "with", "as", "is", "it", "by", "an", "or", "at", "from"}
+    words = re.findall(r'\b\w+\b', text.lower())
+    return Counter(w for w in words if w not in stop)
 
-def generate_summary(text: str, min_bullets: int = 3) -> str:
-    """Return a concise summary consisting of at least *min_bullets* bullet points.
-
-    The implementation is deterministic: it selects the longest sentences from the
-    input text and formats each as a bullet ("- "). This mimics an extractive
-    summariser without calling any external model.
+def generate_summary(text: str, max_sentences: int = 5) -> str:
     """
-    sentences = _split_sentences(text)
+    Produce an extractive summary as bullet points.
+    Sentences are scored by word frequency; the top `max_sentences`
+    are returned in their original order.
+    """
+    if not text:
+        return ""
+    sentences = _sentence_split(text)
     if not sentences:
-        return "- No content to summarize."
-    # Rank sentences by length (longer often contain more info).
-    ranked = sorted(sentences, key=_score_sentence, reverse=True)
-    selected = ranked[:max(min_bullets, len(ranked))]
-    bullets = "\n".join(f"- {s}" for s in selected)
-    return bullets
-
-def generate_questions(text: str, count: int = 3) -> List[str]:
-    """Create simple practice questions from the summary.
-
-    For each of the first *count* sentences we turn the statement into a question
-    by prefixing "What is" and removing the final period if present.
-    This is a placeholder for a real LLM‑based generator.
-    """
-    sentences = _split_sentences(text)
-    questions = []
-    for s in sentences[:count]:
-        q = s.rstrip('.!?')
-        questions.append(f"What is {q}?" )
-    return questions
+        return ""
+    freqs = _word_frequencies(text)
+    scored = []
+    for idx, sent in enumerate(sentences):
+        words = re.findall(r'\b\w+\b', sent.lower())
+        score = sum(freqs.get(w, 0) for w in words)
+        scored.append((score, idx, sent))
+    top_n = sorted(scored, key=lambda x: (-x[0], x[1]))[:max_sentences]
+    top_n_sorted = sorted(top_n, key=lambda x: x[1])
+    bullets = ["- " + s for _, _, s in top_n_sorted]
+    return "\n".join(bullets)
 ```
 
 ## Checks
@@ -67,34 +61,33 @@ def generate_questions(text: str, count: int = 3) -> List[str]:
 Check 1 (US1): Given I am on the upload page, when I select a PDF file and click "Generate Summary & Questions", then a summary appears within 30 seconds.
 
 ```python
-from __future__ import annotations
-from typing import List
-# Import the functions from the module code above (they are in the same namespace here)
-sample_text = (
-    "Machine learning is a field of artificial intelligence that uses statistical techniques "
-    "to give computer systems the ability to "
-    "learn from data, without being explicitly programmed. "
-    "Supervised learning uses labeled data, while unsupervised learning works with unlabeled data. "
-    "Reinforcement learning involves an agent interacting with an environment to achieve a goal."
-)
-summary = generate_summary(sample_text)
-assert isinstance(summary, str), "Summary should be a string"
-# Rough proxy for speed: the summary should be reasonably short.
-assert len(summary) < 1000, "Summary is unexpectedly large, implying heavy processing"
+sample = "Artificial intelligence is a field of computer science. It aims to create machines that can learn. Recent advances have improved natural language processing. Applications include translation, summarization, and question answering."
+summary = generate_summary(sample, max_sentences=3)
+assert isinstance(summary, str)
+assert summary != ""
+assert summary.startswith("-")
+# edge case: empty input should yield empty string
+assert generate_summary("") == ""
 ```
 
 Check 2 (US1): Given a file is uploaded, when the summary is shown, then it contains at least three bullet‑point key concepts.
 
 ```python
-sample_text = (
-    "Python is an interpreted, high-level programming language. "
-    "It supports multiple programming paradigms, including procedural, object‑oriented, and functional programming. "
-    "Python's standard library is extensive, offering modules for networking, web services, operating system interaction, and more. "
-    "The language emphasizes readability with its use of significant whitespace. "
-    "Python is widely used in data science, web development, automation, and scientific computing."
+text = (
+    "Machine learning provides systems the ability to automatically learn. "
+    "Supervised learning uses labeled data to train models. "
+    "Unsupervised learning finds hidden patterns without labels. "
+    "Reinforcement learning trains agents via rewards. "
+    "Deep learning uses neural networks with many layers. "
+    "These techniques power modern AI applications."
 )
-summary = generate_summary(sample_text)
-# Count bullet lines starting with '- '
-bullets = [line for line in summary.split('\n') if line.startswith('- ')]
-assert len(bullets) >= 3, f"Expected at least 3 bullet points, got {len(bullets)}"
+summary = generate_summary(text, max_sentences=5)
+lines = [l for l in summary.splitlines() if l.startswith("-")]
+assert len(lines) >= 3
+for line in lines:
+    assert line[2:] in text
+assert len(summary) < len(text)
+# edge case: short input with fewer than three sentences
+short = "Data science combines statistics and programming."
+assert generate_summary(short, max_sentences=5) == "- Data science combines statistics and programming."
 ```
