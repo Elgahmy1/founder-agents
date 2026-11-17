@@ -372,3 +372,7 @@ Persistence is plain files (JSON, CSV, Markdown) so runs are inspectable and por
 ## Carry-forward between phases
 
 `app/carry.py` collects the co-founder's killer risk and first two suggested changes, the area check's positioning and, once interviews exist, each interview's first red flag and current workaround. The Lean Canvas (Phase 2) and the MVP spec (Phase 3) get them in their prompt and must answer each in `carried_forward`; `carry.check` sends the draft back once when an item has no concrete answer, and the output's "Risk and evidence carried forward" table shows each answer or **not addressed**.
+
+## Counter-evidence and assumption IDs
+
+The researcher always adds two disconfirming queries (free alternatives, failed predecessors). The market analyst must fill `counter_evidence`; an empty one is sent back once by the critic, and the output shows "Strongest counter-evidence" resolved through the evidence ledger. `evidence.assumption_ids` numbers every unsourced claim (ASM-01...) in ledger order; every later gate output lists them under "Unproven assumptions before you choose GO", and the gate card shows them.

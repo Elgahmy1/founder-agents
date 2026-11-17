@@ -60,6 +60,23 @@ def resolve(raw: list[RawClaim], docs: list[Doc]) -> list[Claim]:
     return out
 
 
+def assumption_ids(ledger: list[dict]) -> list[tuple[str, str]]:
+    """Stable IDs for every claim the run could not source, in the order they entered the ledger: ASM-01, ASM-02...
+    They stay open across phases, and every later gate shows them before the founder chooses GO."""
+    out = [c["text"] for c in ledger if c.get("status") == "ASSUMPTION"]
+    return [(f"ASM-{i:02d}", t) for i, t in enumerate(dict.fromkeys(out), 1)]
+
+
+def assumptions_md(ledger: list[dict], limit: int = 8) -> str:
+    ids = assumption_ids(ledger)
+    if not ids:
+        return ""
+    rows = [f"- **{i}** {t}" for i, t in ids[:limit]]
+    more = [f"- ... and {len(ids) - limit} more in the run's evidence ledger"] if len(ids) > limit else []
+    return "\n".join(["", "## Unproven assumptions before you choose GO", "",
+                      f"{len(ids)} claim(s) in this run have no retrieved source yet. A GO keeps building on them:", *rows, *more, ""])
+
+
 class Ledger:
     def __init__(self) -> None:
         self.claims: list[Claim] = []

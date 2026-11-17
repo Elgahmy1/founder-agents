@@ -20,3 +20,5 @@ jobs:
         run: python evals/run_red_team.py --guard-only
       - name: Decision log has every required key
         run: python -m app.cli validate-log
+      - name: Cross-artifact consistency audit (MOCKED never counted as traction, caps hold, DEFERRED disclosed)
+        run: python evals/consistency_audit.py

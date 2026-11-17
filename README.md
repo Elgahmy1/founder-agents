@@ -2,9 +2,9 @@
 
 An open-source team of AI agents that takes a founder's brief (idea, skills, budget, time, target market, values) toward a validated digital product. It gathers real sources, labels everything else as an ASSUMPTION, sets evidence targets before testing, and recommends **stop** when the evidence is weak. The founder approves everything that is published, sent, spent or signed, and that rule lives in code (`app/approval.py`).
 
-In the committed demo run (`48fc7649`, an exam-summary app), the agents took one idea through all six phases at $0.00: sourced research, a demand test (0 of 120 sign-ups: PIVOT recommended, overruled to GO by the founder with both logged), a tested MVP with a user guide, signed pricing and policy drafts, a store page, and a learn gate that recommended **stop** on real numbers. Three other ideas stopped on weak evidence and a crypto idea was refused. Replay any recorded run without a model at `/replay/<run>` ([demo-run map](docs/demo-run.md)).
+In the committed demo run (`48fc7649`, an exam-summary app), the agents took one idea through all six phases at $0.00: sourced research, a demand test (0 of 120 sign-ups: PIVOT recommended, overruled to GO by the founder with both logged), a tested MVP with a user guide, signed pricing and policy drafts, a store page, and a learn gate that recommended **stop** on real numbers. Three other ideas stopped on weak evidence; a crypto idea was refused. Replay any recorded run without a model at `/replay/<run>` ([demo-run map](docs/demo-run.md)).
 
-CI recomputes these on every push: run metrics from `decision_log.json` ([run_metrics.md](evals/run_metrics.md)), every cited URL must have been retrieved ([claims_audit.md](evals/claims_audit.md)), the MVP code re-runs its checks, and the guard must refuse 102 trick requests (English, Egyptian Arabic, Arabizi) and allow 27 normal ones ([red_team_report.md](evals/red_team_report.md)).
+CI recomputes these on every push: run metrics from `decision_log.json` ([run_metrics.md](evals/run_metrics.md)), cited URLs must have been retrieved ([claims_audit.md](evals/claims_audit.md)), outputs must agree across phases ([consistency_audit.md](evals/consistency_audit.md)), and the guard must refuse 102 trick requests (English, Egyptian Arabic, Arabizi) and allow 27 normal ones ([red_team_report.md](evals/red_team_report.md)).
 
 ## Quickstart
 
@@ -18,7 +18,7 @@ Without Docker: install [Ollama](https://ollama.com), `ollama pull qwen3:8b`, th
 
 ## What works and what is mocked
 
-Rows marked **Working** without a note have real output in the committed demo runs ([map](docs/demo-run.md), [full table](docs/status.md)).
+Rows marked **Working** with no note have real output in the committed demo runs ([map](docs/demo-run.md), [full table](docs/status.md)).
 
 | Step | Status |
 |---|---|
@@ -52,9 +52,9 @@ A state machine (`app/orchestrator.py`) moves a run through six phases and stops
 ## Models and free resources
 
 - Default: `qwen3:8b` (open weights) via [Ollama](https://ollama.com), locally. Any Ollama model works (`MODEL=gpt-oss:20b` in `.env`).
-- No GPU: `LLM_PROVIDER=openai` with a free tier serving open weights, e.g. Groq with `openai/gpt-oss-120b` (used for the committed demo runs; key in your untracked `.env`). A used-up limit fails fast and falls back to the local model; the log records which model answered.
+- No GPU: `LLM_PROVIDER=openai` with a free tier serving open weights, e.g. Groq with `openai/gpt-oss-120b` (used for the committed demo runs; key in your untracked `.env`). A used-up limit falls back to the local model; the log names the model.
 - Research: Hacker News, Stack Exchange, Wikipedia and DuckDuckGo, no keys; off-topic results are dropped, and if sources are unreachable claims are labelled ASSUMPTION.
-- No paid service is used or required.
+- No paid service is needed.
 
 ## Cost per run
 

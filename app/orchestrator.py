@@ -259,6 +259,9 @@ class Orchestrator:
     def write_output(self, st: RunState, name: str, content: str) -> str:
         stem, ext = name.rsplit(".", 1)
         fname = f"{stem}-{st.slug}.{ext}"
+        if re.match(r"phase\d_gate_decision$", stem) and st.ledger:
+            from app.evidence import assumptions_md
+            content = content.rstrip("\n") + "\n" + assumptions_md(st.ledger)
         self.settings.outputs_dir.mkdir(parents=True, exist_ok=True)
         (self.settings.outputs_dir / fname).write_text(content, encoding="utf-8")
         if fname not in st.outputs:
@@ -406,11 +409,15 @@ class Orchestrator:
         market = MarketAnalystAgent(ctx).define_market(brief, opp, docs)
         st.market = market.model_dump()
         mclaims = ledger.add(resolve(market.claims, docs))
+        counter = ledger.add(resolve(market.counter_evidence, docs))
         self.write_output(st, "phase1_step2_market.md", "\n".join([
             f"# Phase 1, step 2: Define the market for '{opp.name}'", "",
             f"- Ideal customer: {market.ideal_customer}", f"- Segments: {', '.join(market.segments)}",
             f"- Where they gather: {', '.join(market.where_they_gather)}", f"- Alternatives: {', '.join(market.alternatives)}",
-            "", "## Claims", *[f"- {c.md()}" for c in mclaims], "", "## Unknowns (to learn in interviews)",
+            "", "## Claims", *[f"- {c.md()}" for c in mclaims],
+            "", "## Strongest counter-evidence (searched for on purpose)",
+            *([f"- {c.md()}" for c in counter] or ["- none found in this run's sources: treat demand as unproven"]),
+            "", "## Unknowns (to learn in interviews)",
             *[f"- {u}" for u in market.unknowns]]) + "\n")
 
         self._step(st, P1_STEPS, 3)

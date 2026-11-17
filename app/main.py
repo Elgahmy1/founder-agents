@@ -266,7 +266,7 @@ views you open from this dashboard are not counted.</p>
                      if st.stage == "p5_gate_wait" else
                      "<p class=mut>GO needs your approval of the pricing and your sign-off on all three policy drafts.</p>")
         return f"""<div class="card next"><div class="kicker">Your decision is needed: Phase {g['phase']} gate</div>
-<h2>The system recommends <span class="{rec}">{rec.upper()}</span></h2>{_gate_table(g)}{_verdict_html(st) if g['phase'] == 1 else ''}
+<h2>The system recommends <span class="{rec}">{rec.upper()}</span></h2>{_gate_table(g)}{_assumptions_html(st)}{_verdict_html(st) if g['phase'] == 1 else ''}
 <form method="post" action="/runs/{run_id}/gate" class="once"><input name="note" placeholder="Why? (required if you overrule the recommendation; saved in the log)">
 <div class="opts">{btns}</div></form><p class=mut>You can overrule the system. If you do, the log records both the recommendation and your decision.</p></div>"""
     if st.stage == "p2_targets_wait" and st.demand_plan:
@@ -405,6 +405,16 @@ def gate(run_id: str, decision: str = Form(...), note: str = Form("")):
 def targets(run_id: str, approve: str = Form(...)):
     _bg(run_id, "Updating targets", orch.founder_lock_targets, run_id, approve == "1")
     return RedirectResponse(f"/runs/{run_id}", status_code=303)
+
+
+def _assumptions_html(st) -> str:
+    from app.evidence import assumption_ids
+    ids = assumption_ids(st.ledger or [])
+    if not ids:
+        return ""
+    items = "".join(f"<li><b>{i}</b> {html.escape(t)}</li>" for i, t in ids[:5])
+    more = f"<li class=mut>... and {len(ids) - 5} more (see the gate output)</li>" if len(ids) > 5 else ""
+    return (f"<details><summary><b>{len(ids)} unproven assumption(s)</b> a GO would build on</summary><ul>{items}{more}</ul></details>")
 
 
 def _verdict_html(st) -> str:
