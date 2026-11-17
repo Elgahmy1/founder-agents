@@ -43,7 +43,7 @@ flowchart LR
 ### Phase 1: Discover (built)
 - **Core step:** Find opportunities.
 - **Agents:** `researcher` (plans queries, gathers sources), `scout` (find and score opportunities), `market_analyst` (define the market), `interviewer` (Mom Test plan).
-- **Tools:** Hacker News Algolia API, Reddit public search, DuckDuckGo HTML, founder-supplied URLs (`app/research.py`). All free, no keys.
+- **Tools:** Hacker News Algolia API, Stack Exchange API, DuckDuckGo HTML, founder-supplied URLs (`app/research.py`). All free, no keys.
 - **Method:** the researcher turns the brief into 3 queries; sources get ids (`S1`...). The scout derives up to 3 opportunities from the founder's idea and scores each 1-5 on pain, founder fit, feasibility within budget and hours, reach and differentiation against current alternatives. The market analyst defines the ideal customer, segments, where they gather and the unknowns. The interviewer writes a Mom Test script (past behaviour, no pitching) with an observable "problem confirmed" rule, plus an outreach draft signed by the founder, queued as a `send` item.
 - **Evidence rule (code):** `app/evidence.py` keeps a citation only if the source id was retrieved in this run and the source text shares key terms with the claim. Otherwise the claim is labelled `ASSUMPTION`.
 - **Output:** `phase1_step1_opportunities-*.md`, `phase1_step2_market-*.md`, `phase1_step3_interview_plan-*.md`, `phase1_gate_decision-*.md`.

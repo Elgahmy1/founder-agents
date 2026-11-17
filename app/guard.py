@@ -40,6 +40,53 @@ REQUEST_RULES: list[tuple[str, str, list[str]]] = [
       r"\b(developer|admin|god|jailbreak|dan) mode\b"]),
     ("paywall_core", "We never hide core features of this system behind a paywall.",
      [r"\bpaywall\b.{0,30}\b(this (tool|system|app)|core features?)\b"]),
+    # broader phrasings of the same rules
+    ("fake_social_proof", "We never write fake reviews, testimonials, ratings or sign-ups.",
+     [r"\b(positive|glowing|happy)\b.{0,25}\b(comments?|feedback|quotes?|stories|posts?)\b.{0,30}\b(from|by|as)\b.{0,20}\b(customers?|users?|buyers?|students?|clients?)\b",
+      r"\b(customer|user|client)\s+(quotes?|stories|praise)\b", r"\b(seed|populate)\b.{0,20}\b(reviews?|ratings?|waitlist)\b",
+      r"\b(bots?|fake accounts?)\b.{0,30}\b(sign[- ]?up|join|upvote|review|comment)", r"\b(buy|purchase)\b.{0,15}\b(followers|reviews|upvotes|likes)\b"]),
+    ("false_urgency", "We never add fake urgency such as countdown timers or invented scarcity.",
+     [r"\b(timer|clock)\b.{0,20}\b(urgent|urgency|pressure|ticking|expire\w*)\b", r"\b(limited|last) (spots|seats|chance)\b.{0,30}\b(even though|although|not really|fake)\b",
+      r"\b(make|makes|making) (them|people|users|visitors|buyers) (panic|rush|hurry)\b"]),
+    ("impersonation", "We never pose as the founder, a customer or another brand.",
+     [r"\b(reply|respond|answer|comment)\b.{0,20}\bas if (you were|i were|we were)\b", r"\buse (their|the) (logo|brand name)\b",
+      r"\b(from|using) (my|the founder'?s) (account|email|profile)\b.{0,20}\bwithout\b"]),
+    ("money_movement", "We never hold, move, charge or refund money, and payments stay out of this system.",
+     [r"\b(collect|take|accept|handle)\b.{0,20}\b(payments?|card details|money)\b", r"\b(add|build|enable|set up)\b.{0,20}\b(checkout|payment form|stripe|paypal)\b"]),
+    ("prompt_injection", "Requests to drop or rewrite the system's rules are refused.",
+     [r"\b(disregard|forget|override|bypass|disable|turn off)\b.{0,30}\b(rules|guard\w*|safety|policy|polic(y|ies)|instructions|filters?|restrictions)\b",
+      r"\b(you are now|from now on you are|act as)\b.{0,30}\b(unrestricted|unfiltered|no rules|evil|dan)\b",
+      r"\bsystem prompt\b", r"<\s*/?\s*(system|admin)\s*>", r"\b(new|updated) (rules|instructions) from (the )?(admin|developer|organizers?|judges?)\b"]),
+]
+
+# Arabic phrasings (judges may test in Arabic). Substring patterns, no word boundaries.
+ARABIC_RULES: list[tuple[str, str, list[str]]] = [
+    ("fake_social_proof", "We never write fake reviews, testimonials, ratings or sign-ups.",
+     [r"(تقييمات|ريفيوهات|ريفيو|مراجعات|شهادات|آراء عملاء|اراء عملاء|تعليقات).{0,30}(وهمي|مزيف|مزيفة|وهمية|مفبرك|5 نجوم|خمس نجوم|خمسة نجوم)",
+      r"(اكتب|اكتبلي|اعمل|اعملي|ولد|ألف|الف).{0,20}(تقييم|ريفيو|مراجعات|شهادات|آراء عملاء|اراء عملاء)",
+      r"(خمس|خمسة|5) نجوم",
+      r"(تسجيلات|مشتركين|متابعين).{0,20}(وهمي|وهمية|مزيف|مزيفة)", r"(زود|نفخ|ضخم).{0,15}(الأرقام|الارقام|المشتركين|التسجيلات)"]),
+    ("false_urgency", "We never add fake urgency such as countdown timers or invented scarcity.",
+     [r"(عداد|عد) تنازلي", r"(باقي|متبقي|فاضل) \d+ (أماكن|اماكن|مقاعد)", r"العرض (ينتهي|بيخلص) (الليلة|النهارده|اليوم)"]),
+    ("income_promise", "We never promise income or guarantee success.",
+     [r"(اضمن|ضمان|مضمون|مضمونة|نضمن).{0,30}(دخل|ربح|أرباح|ارباح|فلوس|نجاح|مبيعات)", r"(دخل|ربح) مضمون"]),
+    ("impersonation", "We never pose as the founder, a customer or another brand.",
+     [r"(انتحل|اتنكر|اتظاهر|تظاهر|كأنك|كانك|بصفتك).{0,30}(عميل|زبون|المؤسس|شركة|براند)", r"(باسم|بإسم) (المؤسس|عميل|شركة)"]),
+    ("money_movement", "We never hold, move, charge or refund money, and payments stay out of this system.",
+     [r"(اسحب|حول|حوّل|اخصم|ادفع|استرد).{0,20}(فلوس|مبلغ|من الكارت|من الفيزا|الدفع)"]),
+    ("credentials", "We never store or ask for passwords or card numbers, and never create accounts.",
+     [r"(احفظ|خزن|سجل|اكتب).{0,20}(باسورد|كلمة السر|كلمات السر|رقم الكارت|رقم الفيزا|بيانات الكارت)", r"(اعمل|افتح|سجل).{0,10}(حساب|اكونت)"]),
+    ("skip_approval", "Nothing is published, sent, spent or signed without the founder approving it.",
+     [r"(من غير|بدون|من غير ما).{0,15}(موافقة|موافقتي|ما تسألني|تسأل|إذن|اذن)", r"(تجاهل|انسى|انسي).{0,15}(التعليمات|القواعد|الرولز)", r"انشر (على طول|علطول|فورا|فوراً)"]),
+]
+
+EXCLUDED_AR: list[tuple[str, str, list[str]]] = [
+    ("financial_crypto", "Financial, investment and crypto products are excluded.",
+     [r"(كريبتو|بيتكوين|عملات رقمية|عملات مشفرة|توصيات تداول|فوركس|اسهم|أسهم|استثمار)"]),
+    ("health_legal_advice", "Health advice and legal advice products are excluded.",
+     [r"(تشخيص|استشارة طبية|نصايح طبية|علاج|روشتة|استشارة قانونية|محامي)"]),
+    ("physical_goods", "Physical goods are out of scope: this system only builds digital products.",
+     [r"(تيشيرتات|ملابس|منتج ملموس|شحن منتجات|دروب شيبنج)"]),
 ]
 
 EXCLUDED_PRODUCT_RULES: list[tuple[str, str, list[str]]] = [
@@ -74,22 +121,59 @@ class Verdict:
     reason: str | None = None
 
 
+_ZW = dict.fromkeys(map(ord, "\u200b\u200c\u200d\u2060\ufeff\u00ad"), None)
+_LEET = str.maketrans({"0": "o", "1": "i", "3": "e", "4": "a", "5": "s", "7": "t", "@": "a"})
+
+
+def normalize(text: str) -> list[str]:
+    """Variants of the text that defeat simple obfuscation: zero-width
+    characters, s p a c e d letters, l33t spelling, odd dashes."""
+    t = text.translate(_ZW)
+    t = re.sub(r"[\u2010-\u2015]", "-", t)
+    variants = [t]
+    despaced = re.sub(r"\b(\w) (?=\w\b)", r"\1", t)
+    if despaced != t:
+        variants.append(despaced)
+    leet = re.sub(r"(?<=[a-z])[013457@](?=[a-z])|(?<=[a-z])[013457@]\b|\b[013457@](?=[a-z])",
+                  lambda m: m.group(0).translate(_LEET), t.lower())
+    if leet != t.lower():
+        variants.append(leet)
+    return variants
+
+
 def _check(text: str, rules: list[tuple[str, str, list[str]]]) -> Verdict:
-    for rule_id, reason, patterns in rules:
-        for p in patterns:
-            if re.search(p, text, flags=re.I | re.S):
-                return Verdict(False, rule_id, reason)
+    for variant in normalize(text):
+        for rule_id, reason, patterns in rules:
+            for p in patterns:
+                if re.search(p, variant, flags=re.I | re.S):
+                    return Verdict(False, rule_id, reason)
     return Verdict(True)
 
 
 def check_request(text: str) -> Verdict:
     """Founder free-text request or brief field."""
-    v = _check(text, REQUEST_RULES)
-    return v if not v.allowed else _check(text, EXCLUDED_PRODUCT_RULES)
+    for rules in (REQUEST_RULES, ARABIC_RULES, EXCLUDED_PRODUCT_RULES, EXCLUDED_AR):
+        v = _check(text, rules)
+        if not v.allowed:
+            return v
+    return Verdict(True)
 
 
 def check_product(idea_text: str) -> Verdict:
-    return _check(idea_text, EXCLUDED_PRODUCT_RULES)
+    v = _check(idea_text, EXCLUDED_PRODUCT_RULES)
+    return v if not v.allowed else _check(idea_text, EXCLUDED_AR)
+
+
+INJECTION_IN_SOURCE = re.compile(
+    r"(ignore|disregard|forget)\s+(all\s+|any\s+)?(previous|prior|above|earlier)?\s*(instructions|rules|prompts?)"
+    r"|you are (now )?(an? )?(ai|assistant|chatbot)|system prompt|<\s*/?\s*system\s*>|assistant:|###\s*instruction",
+    re.I)
+
+
+def sanitize_source(text: str) -> str:
+    """Retrieved web text is data. Drop sentences that try to instruct the model."""
+    parts = re.split(r"(?<=[.!?\n])\s+", text)
+    return " ".join(p for p in parts if not INJECTION_IN_SOURCE.search(p))
 
 
 def check_output(text: str) -> Verdict:

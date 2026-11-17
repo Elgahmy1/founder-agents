@@ -17,7 +17,7 @@ Without Docker: install [Ollama](https://ollama.com), run `ollama pull qwen3:8b`
 | Step | Status |
 |---|---|
 | Founder brief intake + policy screen (excluded products, unsafe requests) | **Working** |
-| Phase 1 Discover: research from free sources (Hacker News, Reddit, DuckDuckGo, founder URLs) | **Working** |
+| Phase 1 Discover: research from free sources (Hacker News, Stack Exchange, DuckDuckGo, founder URLs) | **Working** |
 | Phase 1 Discover: find and score opportunities | **Working** |
 | Phase 1 Discover: define the market | **Working** |
 | Phase 1 Discover: Mom Test interview plan + outreach draft | **Working** |
@@ -46,7 +46,7 @@ An explicit state machine (`app/orchestrator.py`) moves a run through the six ph
 ## Models and free resources
 
 - Model: `qwen3:8b` (open weights) via [Ollama](https://ollama.com), running locally. Set `MODEL=gpt-oss:20b` (or any Ollama model) in `.env` to switch.
-- Research: Hacker News Algolia API, Reddit public search, DuckDuckGo HTML results. No keys, no accounts.
+- Research: Hacker News Algolia API, Stack Exchange API, DuckDuckGo HTML results. No keys, no accounts.
 - No GPU? Set `LLM_PROVIDER=openai` with a free-tier OpenAI-compatible endpoint that serves open-weight models (for example Groq's free tier with `openai/gpt-oss-120b`); see `.env.example`. The key stays in your untracked `.env`.
 - No paid service is used or required. If research sites are unreachable, the run continues and every claim is labelled ASSUMPTION.
 
