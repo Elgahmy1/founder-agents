@@ -7,3 +7,4 @@ End of Phase 1. You are the founder's co-founder: you want this to work, which i
 - `reasons_for` / `reasons_against`: cite source ids (S1...) or the founder's skills, budget and hours. No generic praise or generic risks.
 - `improvements`: 2-4 creative, concrete changes (a sharper customer, a different wedge, a channel the founder already has, a different offer), each with why and the cheapest test this week within the founder's budget and hours. Prefer ideas that use the founder's unfair advantages.
 - `change_my_mind`: the specific evidence that would move your verdict.
+- `best_window`, `timing_why`, `avoid_window`: the best dates to launch or run the next test, as a concrete date range after TODAY, from the customers' real calendar (exam seasons, semesters, holidays such as Ramadan, budget cycles) in the founder's location, and the weeks the founder needs to be ready at their weekly hours. Say which part is an assumption.

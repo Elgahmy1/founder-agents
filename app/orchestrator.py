@@ -132,6 +132,7 @@ class RunState:
     targets: dict | None = None
     results: dict | None = None
     area: dict | None = None  # Phase 1 step 0: area check where the founder will sell
+    funding: dict | None = None  # Phase 1: possible funders and sponsors (strong or promising ideas only)
     verdict: dict | None = None  # Phase 1: co-founder verdict (capped by the evidence gate)
     interviews: list = field(default_factory=list)  # Phase 2: analysed customer interviews (transcripts stay in data/)
     gates: list[dict] = field(default_factory=list)
@@ -429,10 +430,10 @@ class Orchestrator:
                         outcome=g.recommendation, phase=1)
         self.write_output(st, "phase1_gate_decision.md", g.md())
         if excluded.allowed:
-            self._cofounder_verdict(st, ctx, brief, opp, market, ledger, g)
+            self._cofounder_verdict(st, ctx, brief, opp, market, ledger, g, q)
         st.stage = "p1_gate_wait"
 
-    def _cofounder_verdict(self, st, ctx, brief, opp, market, ledger, g) -> None:
+    def _cofounder_verdict(self, st, ctx, brief, opp, market, ledger, g, q=None) -> None:
         """End of Phase 1: an honest co-founder verdict and concrete improvements, capped by the evidence gate."""
         from app.agents import cofounder as cf
         if g.recommendation == "stop" and any("excluded" in r.lower() for r in g.reasons):
@@ -447,6 +448,25 @@ class Orchestrator:
         self.log.append(agent="critic", action="cap_cofounder_verdict", run_id=st.run_id, phase=1,
                         outcome=v.verdict, detail=note or "verdict within what the evidence gate allows")
         self.write_output(st, "phase1_step4_cofounder_verdict.md", cf.render_md(v, note, opp.name))
+        if v.verdict in ("strong", "promising") and q is not None:
+            self._funding(st, ctx, brief, opp, v, q)
+
+    def _funding(self, st, ctx, brief, opp, v, q) -> None:
+        """Strong or promising ideas only: who could fund or sponsor it near the founder, with a draft email."""
+        from app.agents import funding_scout as fs
+        place = brief.location or brief.target_market
+        queries = [f"startup grants {place} 2026", f"startup accelerator {place} {opp.name}"[:90],
+                   f"student entrepreneurship competition {place}"]
+        docs = self.researcher.gather(queries)
+        self.log.append(agent="researcher", action="gather_funding_sources", sources=[d.url for d in docs], run_id=st.run_id,
+                        queries=queries, source_count=len(docs), phase=1)
+        plan = fs.FundingScoutAgent(ctx).plan(brief, f"{opp.name}: {opp.problem} / {opp.digital_product}", v.one_line, docs)
+        rows, dropped = fs.verify(plan, docs)
+        st.funding = {"funders": rows, "email_to": plan.email_to}
+        self.log.append(agent="critic", action="verify_funders", run_id=st.run_id, phase=1, outcome=f"{len(rows)} funders",
+                        detail=f"{sum(1 for r in rows if r['verified'])} found in sources, {len(dropped)} lenders dropped")
+        self.write_output(st, "phase1_step5_funding.md", fs.render_md(rows, dropped, plan, brief.location))
+
 
     # ---------- phase 2: Validate ----------
     def _phase2(self, st: RunState, q: ApprovalQueue) -> None:

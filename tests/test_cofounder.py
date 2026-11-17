@@ -25,6 +25,7 @@ def test_phase1_writes_the_verdict_and_the_gate_card_shows_it(make_orch, brief, 
     st = orch.start(brief)
     out = (settings.outputs_dir / next(o for o in st.outputs if o.startswith("phase1_step4_cofounder_verdict"))).read_text(encoding="utf-8")
     assert "How to make it stronger" in out and "Cheapest test this week" in out
+    assert "## When to launch" in out and "1-20 December 2026" in out
     assert st.verdict["verdict"] in ("strong", "promising")
     _, q = orch.load(st.run_id)
     for i in q.pending():

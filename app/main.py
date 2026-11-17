@@ -334,10 +334,11 @@ def view_run(run_id: str):
             + (f", you chose <b class='{g['founder_decision']}'>{g['founder_decision'].upper()}</b>"
                + (" <span class='tag repeat'>override</span>" if g['founder_decision'] != g['recommendation'] else "")
                if g.get('founder_decision') else "") + "</p>" for g in past) + "</div>")
+    tech = []
     if st.outputs:
-        body.append("<div class='card'><h2>What the agents produced</h2><ul class='files'>" + "".join(
+        tech.append("<h3>What the agents produced</h3><ul class='files'>" + "".join(
             f"<li><a href='/outputs/{o}' target='_blank'>{o}</a>{' ' + tag('STUBBED') if 'STUBBED' in o else ''}</li>"
-            for o in st.outputs) + "</ul></div>")
+            for o in st.outputs) + "</ul>")
     if st.ledger:
         n_s = sum(1 for c in st.ledger if c["status"] == "SOURCED")
         n = len(st.ledger)
@@ -345,17 +346,16 @@ def view_run(run_id: str):
                     f"<p>{n_s} claims backed by a real source · {n - n_s} labelled ASSUMPTION</p></div>")
     done = [i for i in q.items if i.status != "pending"]
     if done:
-        body.append("<div class='card'><h2>Approval history</h2><table>" + "".join(
+        tech.append("<h3>Approval history</h3><table>" + "".join(
             f"<tr><td>{i.kind}</td><td>{html.escape(i.title)}</td><td>{i.status}</td><td>{html.escape(i.result or '')}</td></tr>"
-            for i in done) + "</table></div>")
+            for i in done) + "</table>")
     if st.mvp and not busy:
         c = st.code
         res = (f"Last run: <b class='{'go' if c['ok'] else 'stop'}'>{c['passed']}/{c['total']} acceptance checks passed</b> "
                "(see phase3_step4_code above). " if c else "")
         body.append("<div class='card'><h2>MVP core code (Phase 3, sandbox)</h2>"
-                    f"<p>{res}The coder agent writes core functions for every user story and one check per acceptance "
-                    "criterion; the sandbox runs them with no file, network or process access. Nothing is published, "
-                    "and your gates and decisions do not change. Uses 1-2 model calls.</p>"
+                    f"<p>{res}The coder agent writes the core functions and a check for each acceptance criterion, "
+                    "then runs them in a locked sandbox. Nothing is published.</p>"
                     f"<form method=post action='/runs/{run_id}/code' class='once'><button>"
                     f"{'Generate again' if c else 'Generate and test the core code'}</button></form></div>")
         if c and c.get("ok"):
@@ -365,17 +365,16 @@ def view_run(run_id: str):
                         + (f"<p><b class='go'>Running:</b> <a href='/mvp/{run_id}' target='_blank'>open the MVP app</a>. "
                            f"Each request runs <code>{html.escape(m['func'])}</code> in the sandbox.</p>" if live and m else
                            "<p>Waiting for your approval above to publish it on this computer.</p>" if m else "")
-                        + "<p>Wraps the core code that passed all its acceptance checks in a small working web app: our "
-                        "template with one form, and each request runs the tested code in the sandbox. The checks are re-run "
-                        "first. No model call. Publishing it on this computer needs your approval.</p>"
+                        + "<p>Turns the tested code into a small web app with one form. Publishing it needs your approval.</p>"
                         f"<form method=post action='/runs/{run_id}/mvp' class='once'><button>"
                         f"{'Rebuild the MVP app' if m else 'Build the MVP app'}</button></form></div>")
-    body.append(f"<p><a href='/runs/{run_id}/export'>Download the full run report (Markdown)</a>: brief, gates, your "
-                "decisions, approvals, decision log and outputs in one file.</p>")
     body.append(f"""<div class="card"><h2>Ask the team</h2><form method="post" action="/runs/{run_id}/ask" class="once">
 <textarea name="request" rows="2" placeholder="e.g. how should I find my first 10 interviewees?"></textarea><button>Ask</button></form></div>""")
     u = st.usage
-    body.append(f"<p class=mut>Model calls: {u.get('calls', 0)} · tokens: {u.get('prompt_tokens', 0) + u.get('completion_tokens', 0)} · cost: $0.00 ({'free tier, no billing' if settings.provider == 'openai' else 'local model'})</p>")
+    tech.append(f"<p><a href='/runs/{run_id}/export'>Download the full run report (Markdown)</a>: brief, gates, your "
+                "decisions, approvals, decision log and outputs in one file.</p>")
+    tech.append(f"<p class=mut>Model calls: {u.get('calls', 0)} · tokens: {u.get('prompt_tokens', 0) + u.get('completion_tokens', 0)} · cost: $0.00 ({'free tier, no billing' if settings.provider == 'openai' else 'local model'})</p>")
+    body.append("<details class='card'><summary><b>Details</b> (files, approvals, report, cost)</summary>" + "".join(tech) + "</details>")
     return page(st.brief["idea"][:40], "".join(body), refresh=bool(busy))
 
 
@@ -419,7 +418,24 @@ def _verdict_html(st) -> str:
     return (f"<div class=card><h3>Your co-founder's verdict: <span class='{cls}'>{v['verdict'].replace('_', ' ').upper()}</span></h3>"
             f"<p>{html.escape(v['one_line'])}</p>" + (f"<p class=mut>{html.escape(v['cap_note'])}</p>" if v.get("cap_note") else "")
             + f"<p><b>Most likely to kill it:</b> {html.escape(v['killer_risk'])}</p><p><b>How to make it stronger:</b></p><ul>{ideas}</ul>"
-            f"<p class=mut>What would change my mind: {html.escape(v['change_my_mind'])}</p></div>")
+            + (f"<p><b>Best time:</b> {html.escape(v.get('best_window', ''))}: {html.escape(v.get('timing_why', ''))}"
+               f" <i>Avoid: {html.escape(v.get('avoid_window') or 'none')}</i></p>" if v.get("best_window") else "")
+            + f"<p class=mut>What would change my mind: {html.escape(v['change_my_mind'])}</p>" + _funding_html(st) + "</div>")
+
+
+def _funding_html(st) -> str:
+    f = getattr(st, "funding", None)
+    if not f or not f.get("funders"):
+        return ""
+    rows = "".join(
+        f"<tr><td>{html.escape(r['name'])}{'' if r['verified'] else ' <span class=tag>UNVERIFIED</span>'}</td>"
+        f"<td>{r['kind'].replace('_', ' ')}</td><td><b>{str(r['fit']) + '%' if r['fit'] is not None else '?'}</b></td>"
+        f"<td>{html.escape(r['history'])}</td><td>{html.escape('; '.join(r['criteria_missed']) or '-')}</td>"
+        f"<td>{html.escape(r['contact']) if r['contact'] else 'their official site'}</td></tr>" for r in f["funders"])
+    return ("<h3>Who could fund or sponsor this</h3><p class=mut>Fit = share of their criteria you meet today (not a chance of "
+            "being funded). No banks or loans. A draft email is in phase1_step5_funding.</p>"
+            "<table><tr><th>Funder</th><th>Type</th><th>Fit</th><th>History</th><th>Still missing</th><th>Apply</th></tr>"
+            + rows + "</table>")
 
 
 def _interviews_html(st, run_id: str) -> str:

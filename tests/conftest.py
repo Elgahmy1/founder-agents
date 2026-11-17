@@ -15,6 +15,7 @@ sys.path.insert(0, str(ROOT))
 from app.agents.interview_analyst import InterviewAnalysis
 from app.agents.cofounder import CofounderVerdict
 from app.agents.area_analyst import AreaCheck
+from app.agents.funding_scout import FundingPlan
 from app.agents.advisor import Advice  # noqa: E402
 from app.agents.analyst import DemandTestPlan, GateMemo  # noqa: E402
 from app.agents.builder import MvpSpec  # noqa: E402
@@ -150,6 +151,16 @@ class FakeLLM:
                              "rationale": "ASSUMPTION: 5% conversion"},
             GateMemo: {"summary": "s", "what_we_learned": [], "next_steps": []},
             Advice: {"answer": "Talk to 10 students this week."},
+            FundingPlan: {"funders": [
+                {"name": "Notion for Startups", "kind": "sponsor", "what_they_fund": "credits for student tools", "history": "runs since 2019",
+                 "criteria_met": ["student focus", "early stage"], "criteria_missed": ["incorporated company"],
+                 "apply_via": "https://example.com/notion-vs-obsidian", "source_ids": ["S3"]},
+                {"name": "Imaginary Founders Fund", "kind": "grant", "what_they_fund": "edtech", "history": "unknown",
+                 "criteria_met": ["edtech"], "criteria_missed": [], "apply_via": "hello@imaginary.example", "source_ids": []},
+                {"name": "City Bank Startup Loans", "kind": "sponsor", "what_they_fund": "small business loans", "history": "-",
+                 "criteria_met": [], "criteria_missed": [], "apply_via": "", "source_ids": []}],
+                          "email_to": "Notion for Startups", "email_subject": "Student exam-notes tool: are we eligible?",
+                          "email_body": "Hi, I'm Mohamed. I am testing a tool that turns lecture notes into exam summaries for university students in Egypt. Two sources show the pain; demand is unproven. Are student-built tools eligible for your credits? — Mohamed"},
             AreaCheck: {"location": "Egypt", "fit": "good", "why": "Large public universities with crowded lectures; Arabic and English slides.",
                         "local_factors": ["Exams are mostly in English for STEM", "Students share notes in course WhatsApp groups"],
                         "resources": [{"need": "Arabic interface", "available": "partly", "note": "S1 mentions bilingual notes"},
@@ -164,7 +175,9 @@ class FakeLLM:
                                "improvements": [{"change": "practice questions in the professor's exam style", "why": "ChatGPT cannot see past exams",
                                                  "cheapest_test": "5 students, 2 of the founder's 15 weekly hours, $0"},
                                                 {"change": "start with one course", "why": "reach within $100", "cheapest_test": "post in one course group"}],
-                               "change_my_mind": "3 of 5 students say ChatGPT already solves it"},
+                               "change_my_mind": "3 of 5 students say ChatGPT already solves it",
+                               "best_window": "1-20 December 2026", "timing_why": "3 weeks before January finals; 2 weeks to build at 15 h/week",
+                               "avoid_window": "the exam weeks themselves"},
             InterviewAnalysis: {"language": "English", "problem_confirmed": True,
                                 "why": "She rewrites notes for hours before every exam, which meets the rule.",
                                 "current_workaround": "rewrites slides by hand into a notebook",

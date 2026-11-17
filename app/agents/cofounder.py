@@ -31,6 +31,11 @@ class CofounderVerdict(BaseModel):
     killer_risk: str = Field(description="The single thing most likely to kill it")
     improvements: list[Improvement] = Field(min_length=2, max_length=4)
     change_my_mind: str = Field(description="The evidence that would move the verdict up or down")
+    best_window: str = Field(default="", description="The best dates to launch or test, as a concrete range after TODAY "
+                             "(e.g. '1-20 December 2026'), from the customers' calendar and the founder's hours")
+    timing_why: str = Field(default="", description="Why that window: the customers' calendar (exams, seasons, budgets, "
+                            "holidays) and how many weeks the founder needs to be ready at their weekly hours")
+    avoid_window: str = Field(default="", description="Dates to avoid and why, or 'none'")
 
 
 def cap_verdict(v: CofounderVerdict, gate_recommendation: str, best_score: float) -> tuple[CofounderVerdict, str | None]:
@@ -50,7 +55,8 @@ class CofounderAgent(Agent):
     role = "cofounder"
 
     def verdict(self, brief, opp_json: str, market_json: str, ledger_md: str, gate_md: str) -> CofounderVerdict:
-        user = (f"FOUNDER BRIEF\n{brief.as_text()}\n\nCHOSEN OPPORTUNITY\n{opp_json}\n\nMARKET\n{market_json}\n\n"
+        from datetime import date
+        user = (f"TODAY: {date.today().isoformat()}\n\nFOUNDER BRIEF\n{brief.as_text()}\n\nCHOSEN OPPORTUNITY\n{opp_json}\n\nMARKET\n{market_json}\n\n"
                 f"EVIDENCE (claims with sources or ASSUMPTION)\n{ledger_md}\n\nEVIDENCE GATE\n{gate_md}")
         return self.ask("cofounder_verdict", user, CofounderVerdict, critique=lambda d: problems(d, brief))
 
@@ -66,6 +72,9 @@ def render_md(v: CofounderVerdict, cap_note: str | None, opp_name: str) -> str:
     lines += ["", f"**Most likely to kill it:** {v.killer_risk}", "", "## How to make it stronger", "",
               "| Change | Why | Cheapest test this week |", "|---|---|---|"]
     lines += [f"| {i.change} | {i.why} | {i.cheapest_test} |".replace("\n", " ") for i in v.improvements]
+    if v.best_window:
+        lines += ["", "## When to launch", "", f"- **Best window:** {v.best_window}", f"- **Why:** {v.timing_why}",
+                  f"- **Avoid:** {v.avoid_window or 'none'}"]
     lines += ["", f"**What would change my mind:** {v.change_my_mind}", "",
               "Written by the co-founder agent after the evidence gate. It cannot be more positive than the evidence: "
               "the gate's recommendation caps the verdict in code, and the founder still decides.", ""]
