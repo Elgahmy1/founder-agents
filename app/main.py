@@ -28,7 +28,8 @@ STATUS = [
     ("Phase 2 Validate: Lean Canvas, landing page, demand targets, demand gate", "Working"),
     ("Landing page public hosting (served locally only)", "MOCKED"),
     ("Sending outreach messages (founder sends personally)", "MOCKED"),
-    ("Phase 3 Build", "STUBBED"),
+    ("Phase 3 Build: MVP spec, clickable prototype, acceptance tests, build gate", "Working"),
+    ("Phase 3 code generation in a sandbox", "STUBBED"),
     ("Phase 4 Commercial setup", "STUBBED"),
     ("Phase 5 Launch, payments and delivery", "MOCKED / STUBBED"),
     ("Phase 6 Operate and learn", "STUBBED"),
@@ -137,10 +138,11 @@ def create_run(founder_name: str = Form("Founder"), idea: str = Form(...), skill
     return RedirectResponse(f"/runs/{st.run_id}", status_code=303)
 
 
-PHASES = [(1, "Discover", "Working"), (2, "Validate", "Working"), (3, "Build", "STUBBED"),
+PHASES = [(1, "Discover", "Working"), (2, "Validate", "Working"), (3, "Build", "Working"),
           (4, "Commercial setup", "STUBBED"), (5, "Launch", "MOCKED"), (6, "Operate & learn", "STUBBED")]
 STAGE_PHASE = {"new": 1, "p1_running": 1, "p1_gate_wait": 1, "p2_running": 2, "p2_targets_wait": 2,
-               "p2_collecting": 2, "p2_gate_wait": 2, "p3_6_stubbed": 3, "done": 6, "stopped": 0}
+               "p2_collecting": 2, "p2_gate_wait": 2, "p3_running": 3, "p3_gate_wait": 3, "p3_6_stubbed": 3,
+               "p4_6_stubbed": 4, "done": 6, "stopped": 0}
 OUTCOME_HELP = {
     "go": "Move on to the next phase.",
     "repeat": "Run this phase again (new research or a longer test).",
@@ -157,7 +159,7 @@ def _stepper(st: RunState) -> str:
         if stopped_at is not None:
             cls = "done" if n < stopped_at else ("stopped" if n == stopped_at else "off")
         elif st.stage == "done":
-            cls = "done" if n <= 2 else "stub"
+            cls = "done" if n <= (3 if st.mvp else 2) else "stub"
         else:
             cls = "done" if n < cur else ("cur" if n == cur else ("stub" if status != "Working" else "off"))
         label = "" if status == "Working" else f"<small>{status}</small>"
@@ -197,12 +199,15 @@ def _next_step(st: RunState, q, run_id: str) -> str:
         verb = {"publish": "publish", "send": "send", "spend": "spend", "sign": "sign"}[i.kind]
         why = ("Approving only marks it ready for <b>you</b> to send yourself; the system sends nothing (MOCKED)."
                if i.kind == "send" else "Approving puts the page live on this computer only; public hosting is MOCKED.")
+        if i.kind == "publish" and "prototype" in i.title:
+            why = (f"Approving lets you click through the prototype at <a href='/proto/{run_id}' target='_blank'>/proto/{run_id}</a>"
+                   " on this computer. Nothing is deployed (public hosting is MOCKED).")
         return f"""<div class="card next"><div class="kicker">Your approval is needed ({len(pend)} waiting)</div>
 <h2>Do you want to {verb} this? {html.escape(i.title.split(':')[0])}</h2><p class=mut>{why}</p>
 <pre>{html.escape(i.content[:3000])}</pre><form method="post" action="/runs/{run_id}/approvals/{i.id}" class="once">
 <input name="note" placeholder="Note (optional)"><div class="row"><button name="approve" value="1">Approve</button>
 <button class="rej" name="approve" value="0">Reject</button></div></form></div>"""
-    if st.stage in ("p1_gate_wait", "p2_gate_wait"):
+    if st.stage in ("p1_gate_wait", "p2_gate_wait", "p3_gate_wait"):
         g = st.gates[-1]
         rec = g["recommendation"]
         btns = "".join(
@@ -234,8 +239,12 @@ Sign-ups so far (counted by the app, never typed in): <b>{orch.signups(run_id)}<
         return ("<div class='card next end'><div class='kicker'>Run ended</div><h2 class='stop'>STOP</h2>"
                 + (_gate_table(g) if g else "") + "<p>Stopping saved your time and money. Everything is in the decision log.</p></div>")
     if st.stage == "done":
-        return ("<div class='card next end'><div class='kicker'>Run finished</div><h2 class='go'>Discover and Validate complete</h2>"
-                "<p>Phases 3-6 are STUBBED in this prototype: their reports below describe what would happen next.</p></div>")
+        built = "Discover, Validate and Build" if st.mvp else "Discover and Validate"
+        rest = "4-6" if st.mvp else "3-6"
+        proto = (f" <a href='/proto/{run_id}' target='_blank'>Open the prototype</a>."
+                 if (settings.data_dir / "sites" / run_id / "prototype.html").exists() else "")
+        return (f"<div class='card next end'><div class='kicker'>Run finished</div><h2 class='go'>{built} complete</h2>"
+                f"<p>Phases {rest} are STUBBED in this prototype: their reports below describe what would happen next.{proto}</p></div>")
     return ""
 
 
@@ -254,7 +263,7 @@ def view_run(run_id: str):
                     f"<form method=post action='/runs/{run_id}/retry' class='once'><button>Try this step again</button></form></div>")
     else:
         body.append(_next_step(st, q, run_id))
-    past = [g for g in st.gates[:-1]] if not busy and st.stage in ("p1_gate_wait", "p2_gate_wait") else st.gates
+    past = [g for g in st.gates[:-1]] if not busy and st.stage in ("p1_gate_wait", "p2_gate_wait", "p3_gate_wait") else st.gates
     if past and not (not busy and st.stage == "stopped"):
         body.append("<div class='card'><h2>Gate history</h2>" + "".join(
             f"<p><b>Phase {g['phase']} {g['gate']}</b>: system said <b class='{g['recommendation']}'>{g['recommendation'].upper()}</b>"
@@ -350,6 +359,14 @@ def landing(run_id: str):
     p = settings.data_dir / "sites" / Path(run_id).name / "index.html"
     if not p.exists():
         raise HTTPException(404, "Not published: the founder has not approved this page.")
+    return HTMLResponse(p.read_text(encoding="utf-8"))
+
+
+@app.get("/proto/{run_id}", response_class=HTMLResponse)
+def prototype(run_id: str):
+    p = settings.data_dir / "sites" / Path(run_id).name / "prototype.html"
+    if not p.exists():
+        raise HTTPException(404, "Not published: the founder has not approved this prototype.")
     return HTMLResponse(p.read_text(encoding="utf-8"))
 
 

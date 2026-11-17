@@ -2,7 +2,7 @@
 
 ## Overview
 
-Founder Agents is a team of single-purpose agents coordinated by an explicit state machine. A run starts from a founder brief, passes a policy screen, then moves phase by phase. Every phase ends in a gate: a recommendation computed from thresholds fixed in advance (or tests passing), followed by the founder's decision: **go**, **repeat**, **pivot** or **stop**. Agents only draft; anything that leaves the system (publish, send, spend, sign) becomes an item in the approval queue, and the only code path that executes it refuses unless the founder approved it. All agent actions append to `decision_log.json`. Phases 1-2 are built; phases 3-6 are designed here and STUBBED or MOCKED in the prototype.
+Founder Agents is a team of single-purpose agents coordinated by an explicit state machine. A run starts from a founder brief, passes a policy screen, then moves phase by phase. Every phase ends in a gate: a recommendation computed from thresholds fixed in advance (or tests passing), followed by the founder's decision: **go**, **repeat**, **pivot** or **stop**. Agents only draft; anything that leaves the system (publish, send, spend, sign) becomes an item in the approval queue, and the only code path that executes it refuses unless the founder approved it. All agent actions append to `decision_log.json`. Phases 1-3 are built (phase 3 up to a clickable prototype and acceptance tests; code generation is STUBBED); phases 4-6 are designed here and STUBBED or MOCKED in the prototype.
 
 ```mermaid
 flowchart LR
@@ -19,7 +19,9 @@ flowchart LR
     G2 -- pivot --> D
     G2 -- stop --> STOP
     G2 -- go --> BU[3 Build]
-    BU --> G3{Tests + founder}
+    BU --> G3{Build gate: scope, testability, safety}
+    G3 -- pivot: smaller MVP --> BU
+    G3 -- stop --> STOP
     G3 -- go --> C[4 Commercial setup]
     C --> G4{Founder signs off}
     G4 -- go --> L[5 Launch: sell, deliver]
@@ -57,8 +59,12 @@ stateDiagram-v2
     p2_gate_wait --> p2_running: repeat
     p2_gate_wait --> p1_running: pivot
     p2_gate_wait --> stopped: stop
-    p2_gate_wait --> p3_6_stubbed: go
-    p3_6_stubbed --> done
+    p2_gate_wait --> p3_running: go
+    p3_running --> p3_gate_wait: build gate computed
+    p3_gate_wait --> p3_running: repeat / pivot (feedback from failed checks)
+    p3_gate_wait --> stopped: stop
+    p3_gate_wait --> p4_6_stubbed: go
+    p4_6_stubbed --> done
 ```
 
 ## Phases
@@ -106,11 +112,29 @@ flowchart LR
 - **Method:** the Lean Canvas orders the riskiest assumptions. The marketer writes copy only; our template renders the page, so it cannot carry scripts, timers, testimonials, traction numbers or payment fields, and each line is re-checked by the guard. Publishing is a `publish` item; after approval the page is served at `/lp/<run>` and its form counts real sign-ups. The analyst proposes targets (sign-ups in N days, interviews, share confirming the problem); the founder locks them **before** results exist. The founder then enters real interview results; sign-ups come only from the form.
 - **Output:** `phase2_step1_lean_canvas-*.md`, `phase2_step2_landing_page-*.html`, `phase2_step3_demand_test-*.md`, `phase2_gate_decision-*.md`.
 
-### Phase 3: Build (STUBBED)
+### Phase 3: Build (built up to prototype; code generation STUBBED)
+
+```mermaid
+flowchart LR
+    CV[Lean Canvas + validated opportunity] --> BU[builder: MVP spec]
+    BU --> US[user stories + acceptance criteria]
+    BU --> FE[must-have features + hour estimates]
+    BU --> SC[screens]
+    SC --> TP[our template + guard per line]
+    TP --> PR[clickable prototype: no scripts, forms, passwords, external links]
+    US --> QA[qa checks in code]
+    FE --> QA
+    PR --> QA
+    QA --> G3{build gate}
+    PR --> AQ[approval queue: publish] -- founder approves --> PX["/proto/&lt;run&gt;"]
+```
+
 - **Core step:** Build the product.
-- **Agents:** `builder` (generates the MVP in a sandboxed workspace from the Lean Canvas solution), `qa_tester` (writes and runs tests), `doc_writer` (user docs).
-- **Tools:** a local code model via Ollama, a container sandbox with no network by default, pytest/playwright.
-- **Gate:** tests pass and the founder approves the release candidate. Failing tests → repeat; scope beyond budget/hours → pivot to a smaller MVP.
+- **Agents:** `builder` (`app/agents/builder.py`, prompt `prompts/builder.md`) writes the MVP spec; `qa_tester` is deterministic code in `app/orchestrator.py` and `app/prototype.py`.
+- **Method:** the builder scopes the smallest MVP that tests the riskiest assumption: 2-5 user stories with "Given/when/then" acceptance criteria, must-have features that name the stories they serve, hour estimates against the founder's budget (hours/week × 4), explicit out-of-scope items, a free open-source stack, and up to 4 screens. Our template (`app/prototype.py`) renders the screens as a clickable prototype navigated with CSS `:target` only; password, PIN, card and bank fields are dropped, every model line passes the output guard, and sample outputs are labelled illustrative. Publishing it is a `publish` approval item; after approval it is served at `/proto/<run>` on the founder's machine.
+- **Build gate (`app/gates.py: build_gate`, thresholds fixed before the builder runs):** ≥2 user stories; every story has a testable criterion; every feature traces to a story; ≤6 must-have features; estimated hours ≤ budget; prototype passes structural safety checks; the guard removed nothing. Safety failure → **repeat**; over scope → **pivot** to a smaller MVP (failed checks are fed back to the builder); still over scope on the second attempt → **stop**; all pass → **go**.
+- **Output:** `phase3_step1_mvp_spec-*.md`, `phase3_step2_prototype-*.html`, `phase3_step3_acceptance_tests-*.md`, `phase3_gate_decision-*.md`.
+- **STUBBED:** generating and running the MVP's code in a no-network sandbox (roadmap item 1). The acceptance criteria are written so they can become that sandbox's tests.
 
 ### Phase 4: Commercial setup (STUBBED)
 - **Core step:** Set the price and policies.
@@ -135,7 +159,7 @@ flowchart LR
 | Policy screen | Excluded product types; unsafe requests | stop |
 | Phase 1 evidence gate | ≥3 sourced claims; ≥40% of claims sourced; ≥2 independent sources showing the pain; best opportunity score ≥3/5 | go / repeat / pivot / stop |
 | Phase 2 demand gate | Waitlist sign-ups ≥ target in window; interviews ≥ target; share confirming the problem ≥ target | go / repeat / pivot / stop |
-| Phase 3 build gate | Tests pass; founder approves | go / repeat / pivot |
+| Phase 3 build gate | ≥2 stories; all stories testable; all features traced; ≤6 must-haves; hours ≤ founder budget; prototype safe | go / repeat / pivot / stop |
 | Phase 4 commercial gate | Founder approves price and signs each policy | go / repeat |
 | Phase 5 launch gate | Launch targets; payment test log passes | go / repeat / pivot / stop |
 | Phase 6 learn gate | Retention and refund targets | persevere / pivot / stop |
@@ -145,6 +169,7 @@ flowchart LR
 - Every opportunity the scout proposes is screened again in code; excluded ones (for example a wallet or crypto tracker drifting out of an allowed brief) are marked EXCLUDED and never chosen, and if none is left the run stops.
 - Discover: three or more evidence checks fail, or no source shows the pain and the opportunity scores below 3/5.
 - Discover, second pass: after one repeat or pivot, still fewer than 2 independent sources show the pain. One retry is allowed; a second failing pass is a stop, not another retry.
+- Build: scope still exceeds the founder's hours after one smaller-MVP rebuild.
 - Validate: interviews are complete but fewer than half the target share confirm the problem, or sign-ups are under 25% of target and interviews also miss.
 - Example: target 100 sign-ups in 14 days, 12 arrive and interviews miss → **stop**, not "promising early traction".
 
@@ -201,15 +226,17 @@ Persistence is plain files (JSON, CSV, Markdown) so runs are inspectable and por
 
 | Component | Status |
 |---|---|
-| Orchestrator state machine, phases 1-2 agents, evidence ledger, gates 1-2, approval queue, guard, decision log, web UI, CLI | Built |
+| Orchestrator state machine, phases 1-3 agents, evidence ledger, gates 1-3, approval queue, guard, decision log, web UI, CLI | Built |
 | Landing page publishing | Built locally; public hosting MOCKED |
 | Outreach sending | MOCKED (founder sends personally) |
 | Payment → delivery, refunds, idempotency, reconciliation | MOCKED events, real logic |
-| Phase 3 Build, Phase 4 Commercial setup, Phase 5 store page and posts, Phase 6 Operate | STUBBED (reports in `outputs/` when a run reaches them) |
+| Phase 3 Build: MVP spec, clickable prototype, acceptance tests, build gate | Built |
+| Phase 3 code generation and test execution in a sandbox | STUBBED |
+| Phase 4 Commercial setup, Phase 5 store page and posts, Phase 6 Operate | STUBBED (reports in `outputs/` when a run reaches them) |
 
 ## Roadmap
 
-1. Phase 3: builder agent in a no-network container sandbox, with tests as the gate.
+1. Phase 3: generate the MVP's code from the spec in a no-network container sandbox, and turn the acceptance criteria into the tests that gate it.
 2. Phase 4: pricer with sourced comparables; policy drafts with a "review with a lawyer" sign gate.
 3. Phase 5: store page and launch posts as approval items; webhook handler for a real provider in the founder's own account (founder-configured, never our keys).
 4. Phase 6: metrics dashboard from real product events; persevere-or-pivot memo.

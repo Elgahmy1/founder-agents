@@ -1,4 +1,4 @@
-"""Phases 3-6 agents. STUBBED in this prototype: each one records what it
+"""Phases 4-6 agents (phase 3 Build is built: app/agents/builder.py). STUBBED in this prototype: each one records what it
 would do and which gate it would hit, without calling a model or any
 external service. See ARCHITECTURE.md for the full design."""
 from __future__ import annotations
@@ -17,11 +17,6 @@ class StubPhase:
 
 
 STUB_PHASES = (
-    StubPhase(3, "Build", "Build the product", ("builder", "qa_tester", "doc_writer"),
-              ("Generate the MVP from the Lean Canvas solution in a sandboxed workspace",
-               "Write and run tests; the build gate passes only when tests pass",
-               "Write user docs"),
-              "tests pass + founder approves the release candidate"),
     StubPhase(4, "Commercial setup", "Set the price and policies", ("pricer", "policy_drafter"),
               ("Propose price points from sourced comparables (or labelled assumptions)",
                "Draft terms, privacy and refund policies, marked DRAFT for founder or lawyer review"),

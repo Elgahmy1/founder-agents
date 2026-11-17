@@ -6,7 +6,7 @@ then stops and waits. Phases 1-2 are built; phases 3-6 are STUBBED.
 
 Stages:
   new -> p1_running -> p1_gate_wait -> p2_running -> p2_targets_wait
-      -> p2_collecting -> p2_gate_wait -> p3_6_stubbed -> done
+      -> p2_collecting -> p2_gate_wait -> p3_running -> p3_gate_wait -> p4_6_stubbed -> done
   any gate can end in: stopped
 """
 from __future__ import annotations
@@ -26,6 +26,7 @@ from app.agents.interviewer import InterviewerAgent, InterviewPlan
 from app.agents.market_analyst import Market, MarketAnalystAgent
 from app.agents.marketer import LandingCopy, MarketerAgent
 from app.agents.researcher import ResearcherAgent
+from app.agents.builder import BuilderAgent, MvpSpec
 from app.agents.scout import Opportunities, Opportunity, ScoutAgent
 from app.agents.strategist import LeanCanvas, StrategistAgent
 from app.agents.stubs import STUB_PHASES, stub_report
@@ -34,7 +35,8 @@ from app.brief import FounderBrief
 from app.config import Settings
 from app.decision_log import DecisionLog
 from app.evidence import Ledger, resolve
-from app.gates import OUTCOMES, DemandTargets, GateResult, demand_gate, discover_gate
+from app.gates import OUTCOMES, DemandTargets, GateResult, build_gate, demand_gate, discover_gate
+from app.prototype import prototype_is_safe, render_prototype
 from app.landing import render_landing
 from app.llm import LLM
 from app.research import Doc, Researcher
@@ -73,6 +75,8 @@ P1_STEPS = ["Researcher: searching free sources", "Scout: finding and scoring op
             "Gate: checking evidence against targets"]
 P2_STEPS = ["Strategist: drafting the Lean Canvas", "Marketer: writing landing-page copy",
             "Analyst: proposing demand-test targets"]
+P3_STEPS = ["Builder: scoping the MVP (user stories, features, screens)", "Builder: rendering the clickable prototype",
+            "QA: checking acceptance criteria, scope and safety", "Gate: build gate"]
 
 
 def slugify(s: str, n: int = 24) -> str:
@@ -95,6 +99,8 @@ class RunState:
     canvas: dict | None = None
     landing: dict | None = None
     demand_plan: dict | None = None
+    mvp: dict | None = None
+    build_feedback: str | None = None
     targets: dict | None = None
     results: dict | None = None
     gates: list[dict] = field(default_factory=list)
@@ -159,6 +165,7 @@ class Orchestrator:
         return ApprovalQueue(self.log, run_id, {
             "publish_landing_local": self._publish_landing_local,
             "send_outreach_mock": self._send_outreach_mock,
+            "publish_prototype_local": self._publish_prototype_local,
         })
 
     # ---------- executors (only reachable through an approved item) ----------
@@ -169,6 +176,14 @@ class Orchestrator:
         (d / "index.html").write_text(item.content, encoding="utf-8")
         return (f"Published locally at {self.settings.public_base_url}/lp/{run_id} "
                 "(public hosting is MOCKED: nothing was deployed to the internet)")
+
+    def _publish_prototype_local(self, item: ApprovalItem) -> str:
+        run_id = item.title.split(":")[-1].strip()
+        d = self.sites_dir / run_id
+        d.mkdir(parents=True, exist_ok=True)
+        (d / "prototype.html").write_text(item.content, encoding="utf-8")
+        return (f"Prototype available at {self.settings.public_base_url}/proto/{run_id} on this computer "
+                "(public hosting is MOCKED)")
 
     def _send_outreach_mock(self, item: ApprovalItem) -> str:
         return "MOCKED: message marked approved for the founder to send personally; the system sent nothing"
@@ -226,7 +241,9 @@ class Orchestrator:
                 self._phase1(st, q)
             elif st.stage == "p2_running":
                 self._phase2(st, q)
-            elif st.stage == "p3_6_stubbed":
+            elif st.stage == "p3_running":
+                self._phase3(st, q)
+            elif st.stage in ("p4_6_stubbed", "p3_6_stubbed"):
                 self._stubs(st)
         except Exception as e:  # surface, never hide
             st.error = f"{type(e).__name__}: {e}"
@@ -369,6 +386,48 @@ class Orchestrator:
             "The system never creates sign-ups."]) + "\n")
         st.stage = "p2_targets_wait"
 
+    # ---------- phase 3: Build (MVP spec + clickable prototype) ----------
+    def _phase3(self, st: RunState, q: ApprovalQueue) -> None:
+        brief = FounderBrief(**st.brief)
+        ctx = self.ctx(st)
+        st.error = None
+        opp = Opportunity(**st.opportunities[st.chosen])
+        canvas = LeanCanvas(**st.canvas)
+        self._step(st, P3_STEPS, 0)
+        spec = BuilderAgent(ctx).mvp_spec(brief, opp, canvas, st.build_feedback)
+        st.mvp = spec.model_dump()
+        self.write_output(st, "phase3_step1_mvp_spec.md", _mvp_md(spec, brief))
+
+        self._step(st, P3_STEPS, 1)
+        page, removed = render_prototype(spec)
+        self.write_output(st, "phase3_step2_prototype.html", page)
+        if removed:
+            self.log.append(agent="guard", action="scrub_prototype", run_id=st.run_id, outcome="scrubbed",
+                            detail=", ".join(removed))
+
+        self._step(st, P3_STEPS, 2)
+        story_ids = {u.id for u in spec.user_stories}
+        untestable = [u.id for u in spec.user_stories if not any(_testable(a) for a in u.acceptance)]
+        untraced = [f.name for f in spec.must_have if not (set(f.story_ids) & story_ids)]
+        total = round(sum(f.estimate_hours for f in spec.must_have), 1)
+        safety = prototype_is_safe(page)
+        self.write_output(st, "phase3_step3_acceptance_tests.md", _acceptance_md(spec, untestable, untraced, safety))
+        self.log.append(agent="qa_tester", action="check_mvp", run_id=st.run_id, outcome="checked",
+                        detail=f"{len(untestable)} untestable stories, {len(untraced)} untraced features, {total}h, "
+                               f"{len(safety)} safety problems")
+
+        self._step(st, P3_STEPS, 3)
+        g = build_gate(stories=len(spec.user_stories), untestable_stories=untestable, untraced_features=untraced,
+                       must_have=len(spec.must_have), total_hours=total, hours_per_week=brief.hours_per_week,
+                       safety_problems=safety, guard_removed=removed,
+                       attempt=1 + sum(1 for x in st.gates if x["gate"] == "build_gate"))
+        st.gates.append(g.to_dict())
+        self.log.append(agent="gate", action="build_gate", run_id=st.run_id, outcome=g.recommendation, phase=3)
+        self.write_output(st, "phase3_gate_decision.md", g.md())
+        if not safety:
+            q.submit("publish", f"Publish clickable prototype for review: {st.run_id}", page, "publish_prototype_local", 3)
+        st.stage = "p3_gate_wait"
+
     def _stubs(self, st: RunState) -> None:
         for p in STUB_PHASES:
             self.write_output(st, f"phase{p.phase}_step1_{slugify(p.name, 20)}-STUBBED.md", stub_report(p))
@@ -384,7 +443,7 @@ class Orchestrator:
         if decision not in OUTCOMES:
             raise ValueError(f"decision must be one of {OUTCOMES}")
         st, q = self.load(run_id)
-        if st.stage not in ("p1_gate_wait", "p2_gate_wait"):
+        if st.stage not in ("p1_gate_wait", "p2_gate_wait", "p3_gate_wait"):
             raise ValueError(f"no gate is waiting (stage={st.stage})")
         from app.gates import Check
         g_full = st.gates[-1]
@@ -407,16 +466,26 @@ class Orchestrator:
             else:  # pivot to the next-best opportunity
                 st.tried.append(st.chosen)
                 st.stage = "p1_running"
-        else:
+        elif phase == 2:
             if decision == "go":
-                st.stage = "p3_6_stubbed"
+                st.stage = "p3_running"
             elif decision == "repeat":
                 st.stage = "p2_collecting"
             else:
                 st.tried.append(st.chosen)
                 st.stage = "p1_running"
+        else:  # phase 3 build gate
+            if decision == "go":
+                st.stage = "p4_6_stubbed"
+            else:  # repeat: rebuild with the failed checks; pivot: rebuild a smaller MVP
+                failed = [c for c in gr.checks if not c.passed]
+                st.build_feedback = "\n".join(
+                    [f"- {c.name}: target {c.target}, got {c.actual}" for c in failed]
+                    + (["- Cut scope: a smaller MVP with fewer must-have features."] if decision == "pivot" else [])
+                    + ([f"- Founder note: {note}"] if note else []))
+                st.stage = "p3_running"
         self.save(st, q)
-        if st.stage in ("p1_running", "p2_running", "p3_6_stubbed"):
+        if st.stage in ("p1_running", "p2_running", "p3_running", "p4_6_stubbed"):
             return self.advance(run_id)
         return st
 
@@ -500,6 +569,41 @@ def _interview_md(p: InterviewPlan) -> str:
         f"Problem counts as confirmed if: {p.pain_confirmed_if}", "",
         "## Outreach draft (queued for founder approval; the founder sends it personally)", "",
         p.outreach_message]) + "\n"
+
+
+_TESTABLE = re.compile(r"\b(given|when|then|shows?|displays?|returns?|saves?|within|at least|contains?|lists?|appears?|can see|is able to|\d)\b", re.I)
+
+
+def _testable(criterion: str) -> bool:
+    return len(criterion.split()) >= 4 and bool(_TESTABLE.search(criterion))
+
+
+def _mvp_md(spec: MvpSpec, brief: FounderBrief) -> str:
+    total = sum(f.estimate_hours for f in spec.must_have)
+    return "\n".join([
+        f"# Phase 3, step 1: MVP spec for '{spec.product_name}'", "", spec.one_line, "",
+        f"Build budget: {brief.hours_per_week:g} h/week x 4 weeks = {brief.hours_per_week * 4:g} h. Estimated: {total:g} h (model estimate).",
+        "", "## User stories",
+        *[f"- **{u.id}** As {u.as_a}, I want {u.i_want}, so that {u.so_that}.\n" + "\n".join(f"  - [ ] {a}" for a in u.acceptance)
+          for u in spec.user_stories],
+        "", "## Must-have features", "| Feature | Stories | Hours | Description |", "|---|---|---|---|",
+        *[f"| {f.name} | {', '.join(f.story_ids)} | {f.estimate_hours:g} | {f.description} |" for f in spec.must_have],
+        "", "## Out of scope for the MVP", *[f"- {x}" for x in spec.out_of_scope],
+        "", "## Tech stack (free, open source)", *[f"- {x}" for x in spec.tech_stack],
+        "", "## Risks", *[f"- {x}" for x in spec.risks],
+        "", "Code generation in a sandbox is STUBBED: this phase produces the spec, a clickable prototype and acceptance tests."]) + "\n"
+
+
+def _acceptance_md(spec: MvpSpec, untestable: list[str], untraced: list[str], safety: list[str]) -> str:
+    rows = [f"| {u.id} | {a} | {'testable' if _testable(a) else 'NOT testable'} |" for u in spec.user_stories for a in u.acceptance]
+    return "\n".join([
+        "# Phase 3, step 3: Acceptance tests and QA checks", "",
+        "Each criterion below becomes a test the founder (or a later automated build) runs against the MVP.", "",
+        "| Story | Acceptance criterion | Check |", "|---|---|---|", *rows, "",
+        "## QA results (computed in code)",
+        f"- Stories without a testable criterion: {', '.join(untestable) or 'none'}",
+        f"- Features not traced to a story: {', '.join(untraced) or 'none'}",
+        f"- Prototype safety problems: {', '.join(safety) or 'none'}"]) + "\n"
 
 
 def _canvas_md(name: str, c: LeanCanvas, claims) -> str:

@@ -13,6 +13,7 @@ sys.path.insert(0, str(ROOT))
 
 from app.agents.advisor import Advice  # noqa: E402
 from app.agents.analyst import DemandTestPlan, GateMemo  # noqa: E402
+from app.agents.builder import MvpSpec  # noqa: E402
 from app.agents.interviewer import InterviewPlan  # noqa: E402
 from app.agents.market_analyst import Market  # noqa: E402
 from app.agents.marketer import LandingCopy  # noqa: E402
@@ -44,6 +45,25 @@ class FakeLLM:
         self.usage = Usage()
         self.strong = strong
 
+    mvp_hours = 8.0       # per feature; tests raise it to force an over-scope build gate
+    mvp_extra_inputs: list = []
+
+    def mvp(self):
+        return {"product_name": "Exam Notes", "one_line": "Turn lecture notes into exam summaries.",
+                "user_stories": [
+                    {"id": "US1", "as_a": "a student", "i_want": "to paste my lecture notes", "so_that": "I can get a summary",
+                     "acceptance": ["Given pasted notes, when I press Summarize, then a summary of at most 300 words appears"]},
+                    {"id": "US2", "as_a": "a student", "i_want": "to see key terms", "so_that": "I can revise fast",
+                     "acceptance": ["Given a summary, the page lists at least 5 key terms"]}],
+                "must_have": [{"name": "Paste and summarize", "description": "text box + summary", "story_ids": ["US1"], "estimate_hours": self.mvp_hours},
+                              {"name": "Key terms", "description": "extract terms", "story_ids": ["US2"], "estimate_hours": self.mvp_hours}],
+                "out_of_scope": ["accounts", "mobile app"],
+                "screens": [{"title": "Paste notes", "purpose": "Input", "inputs": ["Lecture notes", *self.mvp_extra_inputs],
+                             "action": "Summarize", "sample_output": "Summary: photosynthesis converts light to energy..."},
+                            {"title": "Key terms", "purpose": "Revise", "inputs": [], "action": "Show terms",
+                             "sample_output": "chlorophyll, ATP, stomata"}],
+                "tech_stack": ["Python", "FastAPI", "Ollama"], "risks": ["summaries may be wrong"]}
+
     def structured(self, system, user, schema):
         self.usage.calls += 1
         c = [{"text": "Students struggle organizing lecture notes before exams", "source_ids": ["S1"]},
@@ -74,6 +94,7 @@ class FakeLLM:
                              "rationale": "ASSUMPTION: 5% conversion"},
             GateMemo: {"summary": "s", "what_we_learned": [], "next_steps": []},
             Advice: {"answer": "Talk to 10 students this week."},
+            MvpSpec: self.mvp(),
         }[schema]
         return schema.model_validate(data)
 

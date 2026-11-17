@@ -47,7 +47,7 @@ def run(path: str) -> None:
             d = ask("Approve?", ("y", "n"))
             note = input("Note (optional): ").strip() or None
             st = orch.approve(st.run_id, item.id, d == "y", note)
-        if st.stage in ("p1_gate_wait", "p2_gate_wait"):
+        if st.stage in ("p1_gate_wait", "p2_gate_wait", "p3_gate_wait"):
             g = st.gates[-1]
             print(f"\nGATE {g['gate']} -> system recommends {g['recommendation'].upper()}")
             for c in g["checks"]:

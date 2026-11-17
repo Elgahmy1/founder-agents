@@ -131,3 +131,53 @@ def demand_gate(targets: DemandTargets, *, signups: int, interviews_done: int, p
         rec, why = "repeat", ["Close to target; extend the test window once, without changing the target."]
     why += [f"Failed: {c.name} (target {c.target}, actual {c.actual})" for c in fails]
     return GateResult("demand_gate", 2, rec, why, checks)
+
+
+@dataclass(frozen=True)
+class BuildThresholds:
+    """Fixed before the builder runs."""
+    weeks: int = 4                 # build budget = founder hours/week x weeks
+    max_must_have: int = 6         # more than this is not an MVP
+    min_stories: int = 2
+    max_attempts: int = 2          # one rebuild allowed, then stop
+
+
+def build_gate(*, stories: int, untestable_stories: list[str], untraced_features: list[str],
+               must_have: int, total_hours: float, hours_per_week: float, safety_problems: list[str],
+               guard_removed: list[str], attempt: int = 1, t: BuildThresholds = BuildThresholds()) -> GateResult:
+    budget = hours_per_week * t.weeks
+    checks = [
+        Check("User stories", f">= {t.min_stories}", str(stories), stories >= t.min_stories),
+        Check("Stories with testable acceptance criteria", "all", f"{stories - len(untestable_stories)}/{stories}",
+              not untestable_stories),
+        Check("Must-have features traced to a story", "all", f"{must_have - len(untraced_features)}/{must_have}",
+              not untraced_features),
+        Check("Must-have features (MVP size)", f"<= {t.max_must_have}", str(must_have), must_have <= t.max_must_have),
+        Check("Estimated build hours", f"<= {budget:g} ({hours_per_week:g} h/week x {t.weeks})", f"{total_hours:g}",
+              total_hours <= budget),
+        Check("Prototype safety (no scripts, forms, passwords, external links)", "0 problems",
+              ", ".join(safety_problems) or "0", not safety_problems),
+        Check("Guard removed lines from prototype", "0", str(len(guard_removed)), not guard_removed),
+    ]
+    failed = [c for c in checks if not c.passed]
+    over_scope = total_hours > budget or must_have > t.max_must_have
+    reasons: list[str] = []
+    if not failed:
+        rec = "go"
+        reasons.append("Scope fits the founder's hours, every feature traces to a story and every story can be tested.")
+    elif safety_problems:
+        rec = "repeat"
+        reasons.append("The prototype failed a safety check; it must be rebuilt before anyone sees it.")
+    elif over_scope and attempt >= t.max_attempts:
+        rec = "stop"
+        reasons.append(f"Build attempt {attempt}: scope still exceeds the founder's {budget:g} hours after a rebuild. "
+                       "The MVP cannot be built within the stated time.")
+    elif over_scope:
+        rec = "pivot"
+        reasons.append(f"Scope exceeds the {budget:g}-hour budget: cut to a smaller MVP rather than shrink estimates.")
+    else:
+        rec = "repeat"
+        reasons.append("Fix the failed checks (testable criteria, traceability) and rebuild.")
+    for c in failed:
+        reasons.append(f"Failed: {c.name} (target {c.target}, actual {c.actual}).")
+    return GateResult("build_gate", 3, rec, reasons, checks)
