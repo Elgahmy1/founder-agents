@@ -68,6 +68,13 @@ def _read_json(p: Path):
             time.sleep(0.05 * (i + 1))
 
 
+P1_STEPS = ["Researcher: searching free sources", "Scout: finding and scoring opportunities",
+            "Market analyst: defining the market", "Interviewer: writing the Mom Test plan",
+            "Gate: checking evidence against targets"]
+P2_STEPS = ["Strategist: drafting the Lean Canvas", "Marketer: writing landing-page copy",
+            "Analyst: proposing demand-test targets"]
+
+
 def slugify(s: str, n: int = 24) -> str:
     return re.sub(r"[^a-z0-9]+", "-", s.lower()).strip("-")[:n].strip("-") or "run"
 
@@ -107,6 +114,10 @@ class Orchestrator:
         self.runs_dir = settings.data_dir / "runs"
         self.sites_dir = settings.data_dir / "sites"
         self._run_locks: dict[str, threading.RLock] = {}
+        self.progress: dict[str, dict] = {}  # run_id -> {"steps": [...], "current": i}
+
+    def _step(self, st: RunState, steps: list[str], i: int) -> None:
+        self.progress[st.run_id] = {"steps": steps, "current": i}
 
     def lock(self, run_id: str) -> threading.RLock:
         """One writer per run: agent steps and founder actions never interleave,
@@ -220,6 +231,7 @@ class Orchestrator:
         except Exception as e:  # surface, never hide
             st.error = f"{type(e).__name__}: {e}"
             self.log.append(agent="orchestrator", action="step_failed", run_id=st.run_id, outcome="error", detail=st.error)
+        self.progress.pop(st.run_id, None)
         self.save(st, q)
         return st
 
@@ -231,10 +243,12 @@ class Orchestrator:
         st.iterations += 1
         if not st.docs:
             self.researcher.errors = []
+            self._step(st, P1_STEPS, 0)
             st.docs = [d.__dict__ for d in ResearcherAgent(ctx).gather(brief, self.researcher)]
         docs = self.docs(st)
 
         if not st.opportunities:
+            self._step(st, P1_STEPS, 1)
             opps = ScoutAgent(ctx).find_opportunities(brief, docs)
             st.opportunities = [o.model_dump() for o in opps.opportunities]
         opps = [Opportunity(**o) for o in st.opportunities]
@@ -258,6 +272,7 @@ class Orchestrator:
         st.chosen = next((i for i in order if i not in st.tried), order[0])
         opp = opps[st.chosen]
 
+        self._step(st, P1_STEPS, 2)
         market = MarketAnalystAgent(ctx).define_market(brief, opp, docs)
         st.market = market.model_dump()
         mclaims = ledger.add(resolve(market.claims, docs))
@@ -268,6 +283,7 @@ class Orchestrator:
             "", "## Claims", *[f"- {c.md()}" for c in mclaims], "", "## Unknowns (to learn in interviews)",
             *[f"- {u}" for u in market.unknowns]]) + "\n")
 
+        self._step(st, P1_STEPS, 3)
         plan = InterviewerAgent(ctx).plan_interviews(opp, market, brief.founder_name)
         st.interview_plan = plan.model_dump()
         self.write_output(st, "phase1_step3_interview_plan.md", _interview_md(plan))
@@ -279,6 +295,7 @@ class Orchestrator:
         st.ledger = ledger.to_list()
         pain_urls = {d.url for d in docs if d.id in {s.strip("[]") for s in opp.pain_source_ids}}
         excluded = guard.check_product(f"{opp.name} {opp.digital_product} {opp.problem}")
+        self._step(st, P1_STEPS, 4)
         g = discover_gate(sourced_claims=len(ledger.sourced), total_claims=len(ledger.claims),
                           pain_sources=len(pain_urls), best_score=opp.score,
                           excluded_reason=None if excluded.allowed else excluded.reason,
@@ -297,6 +314,7 @@ class Orchestrator:
         docs = self.docs(st)
         opp = Opportunity(**st.opportunities[st.chosen])
         market = Market(**st.market)
+        self._step(st, P2_STEPS, 0)
         canvas = StrategistAgent(ctx).lean_canvas(brief, opp, market, docs)
         st.canvas = canvas.model_dump()
         led = Ledger.from_list(st.ledger)
@@ -304,6 +322,7 @@ class Orchestrator:
         st.ledger = led.to_list()
         self.write_output(st, "phase2_step1_lean_canvas.md", _canvas_md(opp.name, canvas, cclaims))
 
+        self._step(st, P2_STEPS, 1)
         copy = MarketerAgent(ctx).landing_copy(canvas, opp.name)
         html, removed = render_landing(opp.name, copy, st.run_id)
         st.landing = copy.model_dump() | {"removed_by_guard": removed}
@@ -313,6 +332,7 @@ class Orchestrator:
                             detail=", ".join(removed))
         q.submit("publish", f"Publish waitlist landing page: {st.run_id}", html, "publish_landing_local", 2)
 
+        self._step(st, P2_STEPS, 2)
         plan = AnalystAgent(ctx).demand_test(brief, canvas)
         st.demand_plan = plan.model_dump()
         self.write_output(st, "phase2_step3_demand_test.md", "\n".join([
