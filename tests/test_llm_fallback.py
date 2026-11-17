@@ -83,3 +83,17 @@ def test_free_tier_json_validate_failed_is_retried(monkeypatch):
     monkeypatch.setattr(llm_mod.httpx, "post", post)
     out = OpenAICompatLLM(_settings()).structured("sys", "user", Out)
     assert out.x == 3 and len(calls) == 2 and "not valid JSON" in calls[1]
+
+
+def test_request_larger_than_the_per_minute_limit_fails_fast(monkeypatch):
+    slept = []
+    monkeypatch.setattr(llm_mod.time, "sleep", slept.append)
+    r = Resp(429)
+    r.text = "Rate limit reached on tokens per minute (TPM): Limit 8000, Requested 9512, please try again in 11s"
+    monkeypatch.setattr(llm_mod.httpx, "post", lambda *a, **k: r)
+    try:
+        OpenAICompatLLM(_settings(max_rate_wait_s=400)).structured("s", "u", Out)
+        raise AssertionError("expected RateLimited")
+    except RateLimited as e:
+        assert "9512" in str(e)
+    assert slept == []  # no pointless waiting

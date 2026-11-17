@@ -136,10 +136,15 @@ class OpenAICompatLLM:
             )
             if r.status_code != 429:
                 break
+            too_big = re.search(r"Limit (\d+), Requested (\d+)", r.text)
+            if too_big and int(too_big.group(2)) > int(too_big.group(1)):
+                # one request larger than the per-minute budget: waiting can never help, so fail fast (fallback applies)
+                raise RateLimited(f"'{self.model}' request needs {too_big.group(2)} tokens, over the free tier's "
+                                  f"{too_big.group(1)} per minute")
             wait = (_retry_after(r) or min(60, 5 * (attempt + 1))) + 0.5
             if waited + wait > self.settings.max_rate_wait_s:
                 raise RateLimited(f"{self.settings.openai_base_url} rate-limited '{self.model}' "
-                                  f"for longer than {self.settings.max_rate_wait_s:g} s")
+                                  f"for longer than {self.settings.max_rate_wait_s:g} s: {r.text[:160]}")
             time.sleep(wait)
             waited += wait
         r.raise_for_status()
