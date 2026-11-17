@@ -20,9 +20,25 @@ class Settings:
     web_research: bool
     max_sources: int
     public_base_url: str
+    provider: str = "ollama"
+    openai_base_url: str = ""
+    openai_api_key: str = ""
+
+
+def _load_dotenv() -> None:
+    """Read KEY=VALUE lines from .env at the repo root (never committed)."""
+    p = ROOT / ".env"
+    if not p.exists():
+        return
+    for line in p.read_text().splitlines():
+        line = line.strip()
+        if line and not line.startswith("#") and "=" in line:
+            k, v = line.split("=", 1)
+            os.environ.setdefault(k.strip(), v.strip().strip('"').strip("'"))
 
 
 def load_settings() -> Settings:
+    _load_dotenv()
     data_dir = Path(os.getenv("DATA_DIR", ROOT / "data"))
     return Settings(
         ollama_url=os.getenv("OLLAMA_URL", "http://localhost:11434").rstrip("/"),
@@ -35,4 +51,7 @@ def load_settings() -> Settings:
         web_research=os.getenv("WEB_RESEARCH", "1") == "1",
         max_sources=int(os.getenv("MAX_SOURCES", "8")),
         public_base_url=os.getenv("PUBLIC_BASE_URL", "http://localhost:8000").rstrip("/"),
+        provider=os.getenv("LLM_PROVIDER", "ollama").lower(),
+        openai_base_url=os.getenv("OPENAI_BASE_URL", "https://api.groq.com/openai/v1").rstrip("/"),
+        openai_api_key=os.getenv("OPENAI_API_KEY", ""),
     )

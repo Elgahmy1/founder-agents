@@ -101,3 +101,55 @@ def _extract_json(text: str) -> str:
     text = re.sub(r"<think>.*?</think>", "", text, flags=re.S).strip()
     m = re.search(r"\{.*\}", text, flags=re.S)
     return m.group(0) if m else text
+
+
+@dataclass
+class OpenAICompatLLM:
+    """Any OpenAI-compatible endpoint serving an open-weight model on a free
+    tier (for example Groq's free tier with openai/gpt-oss-120b). Used when
+    the laptop has no GPU. Cost is recorded as $0: free tier, no billing."""
+    settings: Settings
+    usage: Usage = field(default_factory=Usage)
+
+    @property
+    def model(self) -> str:
+        return self.settings.model
+
+    def health(self) -> bool:
+        return bool(self.settings.openai_api_key)
+
+    def structured(self, system: str, user: str, schema: type[T]) -> T:
+        sys_msg = (f"{system}\n\nReply with a single JSON object that matches this JSON schema:\n"
+                   f"{json.dumps(schema.model_json_schema())}")
+        messages = [{"role": "system", "content": sys_msg}, {"role": "user", "content": user}]
+        last_err: Exception | None = None
+        for _ in range(2):
+            try:
+                r = httpx.post(
+                    f"{self.settings.openai_base_url}/chat/completions",
+                    headers={"Authorization": f"Bearer {self.settings.openai_api_key}"},
+                    json={"model": self.model, "messages": messages, "temperature": 0.3,
+                          "response_format": {"type": "json_object"}},
+                    timeout=self.settings.llm_timeout_s,
+                )
+                r.raise_for_status()
+            except httpx.HTTPError as e:
+                detail = getattr(getattr(e, "response", None), "text", "")[:300]
+                raise LLMError(f"{self.settings.openai_base_url} failed for '{self.model}': {e} {detail}") from e
+            data = r.json()
+            u = data.get("usage", {})
+            self.usage.calls += 1
+            self.usage.prompt_tokens += int(u.get("prompt_tokens", 0))
+            self.usage.completion_tokens += int(u.get("completion_tokens", 0))
+            content = data["choices"][0]["message"].get("content") or ""
+            try:
+                return schema.model_validate(json.loads(_extract_json(content)))
+            except (json.JSONDecodeError, ValidationError) as e:
+                last_err = e
+                messages += [{"role": "assistant", "content": content},
+                             {"role": "user", "content": f"Invalid for the schema: {e}. Reply with corrected JSON only."}]
+        raise LLMError(f"model returned invalid JSON twice: {last_err}")
+
+
+def make_llm(settings: Settings):
+    return OpenAICompatLLM(settings) if settings.provider == "openai" else OllamaLLM(settings)

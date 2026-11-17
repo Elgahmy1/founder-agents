@@ -13,7 +13,7 @@ from datetime import datetime, timezone
 from app.brief import FounderBrief
 from app.config import load_settings
 from app.decision_log import DecisionLog, validate
-from app.llm import OllamaLLM
+from app.llm import make_llm
 from app.orchestrator import Orchestrator
 
 
@@ -26,9 +26,10 @@ def ask(prompt: str, choices: tuple[str, ...]) -> str:
 
 def run(path: str) -> None:
     s = load_settings()
-    llm = OllamaLLM(s)
+    llm = make_llm(s)
     if not llm.health():
-        sys.exit(f"Model '{s.model}' is not available at {s.ollama_url}. Run: ollama pull {s.model}")
+        sys.exit(f"Model '{s.model}' is not ready (provider {s.provider}). Ollama: run `ollama pull {s.model}`; "
+                 "free-tier endpoint: set OPENAI_API_KEY in .env")
     orch = Orchestrator(s, llm)
     brief = FounderBrief(**json.loads(open(path).read()))
     print(f"Starting run for: {brief.idea}")

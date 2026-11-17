@@ -14,11 +14,11 @@ from app.agents.advisor import AdvisorAgent
 from app.brief import FounderBrief
 from app.config import load_settings
 from app.decision_log import validate
-from app.llm import OllamaLLM
+from app.llm import make_llm
 from app.orchestrator import Orchestrator, RunState
 
 settings = load_settings()
-llm = OllamaLLM(settings)
+llm = make_llm(settings)
 orch = Orchestrator(settings, llm)
 app = FastAPI(title="Founder Agents")
 _busy: dict[str, str] = {}
