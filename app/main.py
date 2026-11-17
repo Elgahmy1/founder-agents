@@ -118,6 +118,7 @@ and can recommend stopping. You approve everything that is published, sent, spen
 <label>Budget (USD)</label><input name="budget_usd" type="number" value="200">
 <label>Hours per week</label><input name="hours_per_week" type="number" value="10">
 <label>Target market</label><input name="target_market" required>
+<label>Where will you sell? (country or city, optional: the agents check local fit, resources and competitors there)</label><input name="location" placeholder="e.g. Egypt, Cairo">
 <label>Values (comma separated)</label><input name="values">
 <label>Sources you already have (one URL per line, optional)</label><textarea name="source_urls" rows="2"></textarea>
 <button>Start Discover</button></form></div>
@@ -134,10 +135,10 @@ def _split(s: str) -> list[str]:
 
 @app.post("/runs")
 def create_run(founder_name: str = Form("Founder"), idea: str = Form(...), skills: str = Form(""),
-               budget_usd: float = Form(0), hours_per_week: float = Form(10), target_market: str = Form(...),
+               budget_usd: float = Form(0), hours_per_week: float = Form(10), target_market: str = Form(...), location: str = Form(""),
                values: str = Form(""), source_urls: str = Form("")):
     brief = FounderBrief(founder_name=founder_name, idea=idea, skills=_split(skills), budget_usd=budget_usd,
-                         hours_per_week=hours_per_week, target_market=target_market, values=_split(values),
+                         hours_per_week=hours_per_week, target_market=target_market, location=location.strip(), values=_split(values),
                          source_urls=[u for u in _split(source_urls) if u.startswith("http")])
     st = orch.create(brief)
     if st.stage == "p1_running":

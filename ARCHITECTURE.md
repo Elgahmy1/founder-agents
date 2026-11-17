@@ -49,6 +49,7 @@ flowchart LR
 
 ### Phase 1: Discover
 - **Core step:** Find opportunities.
+- **Area check first:** if the founder says where they will sell, the researcher adds 2 searches about that place and `area_analyst` judges local fit, whether what the product needs is available there (language, content, access, channels) and where the idea would stand among local and global competitors; `cap_fit` keeps the fit UNKNOWN unless a retrieved source supports a claim about the place. Output: `phase1_step0_area_check`; the opportunities and the co-founder verdict read it.
 - **Agents:** `researcher` (3 queries from the brief), `scout` (up to 3 opportunities scored 1-5 on pain, founder fit, feasibility, reach, differentiation), `market_analyst` (customer, segments, where they gather), `interviewer` (Mom Test script with a "problem confirmed" rule, plus an outreach draft).
 - **Tools:** Hacker News, Stack Exchange, Wikipedia and DuckDuckGo (free, no keys) and founder URLs (`app/research.py`), interleaved so no source fills the budget.
 - **Method:** `app/evidence.py` keeps a citation only if that source was retrieved in this run and supports the claim; otherwise the claim is labelled ASSUMPTION. Excluded opportunities are re-screened in code and never chosen.

@@ -52,9 +52,10 @@ class Opportunities(BaseModel):
 class ScoutAgent(Agent):
     role = "scout"
 
-    def find_opportunities(self, brief: FounderBrief, docs: list[Doc]) -> Opportunities:
+    def find_opportunities(self, brief: FounderBrief, docs: list[Doc], area: str = "") -> Opportunities:
         user = (
-            f"FOUNDER BRIEF\n{brief.as_text()}\n\nSOURCES\n{docs_for_prompt(docs)}\n\n"
+            f"FOUNDER BRIEF\n{brief.as_text()}\n\n" + (f"AREA CHECK (where the founder will sell)\n{area}\n\n" if area else "")
+            + f"SOURCES\n{docs_for_prompt(docs)}\n\n"
             "Produce up to 3 sharpened digital-product opportunities derived from the idea, "
             "including the founder's original framing as one of them."
         )

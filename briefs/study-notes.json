@@ -10,6 +10,7 @@
   "budget_usd": 200,
   "hours_per_week": 10,
   "target_market": "Students",
+  "location": "Egypt",
   "values": [
     "honesty",
     "accessible education",

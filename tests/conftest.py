@@ -14,6 +14,7 @@ sys.path.insert(0, str(ROOT))
 
 from app.agents.interview_analyst import InterviewAnalysis
 from app.agents.cofounder import CofounderVerdict
+from app.agents.area_analyst import AreaCheck
 from app.agents.advisor import Advice  # noqa: E402
 from app.agents.analyst import DemandTestPlan, GateMemo  # noqa: E402
 from app.agents.builder import MvpSpec  # noqa: E402
@@ -149,6 +150,14 @@ class FakeLLM:
                              "rationale": "ASSUMPTION: 5% conversion"},
             GateMemo: {"summary": "s", "what_we_learned": [], "next_steps": []},
             Advice: {"answer": "Talk to 10 students this week."},
+            AreaCheck: {"location": "Egypt", "fit": "good", "why": "Large public universities with crowded lectures; Arabic and English slides.",
+                        "local_factors": ["Exams are mostly in English for STEM", "Students share notes in course WhatsApp groups"],
+                        "resources": [{"need": "Arabic interface", "available": "partly", "note": "S1 mentions bilingual notes"},
+                                      {"need": "internet on phones", "available": "yes", "note": "assumption"}],
+                        "competitors": [{"name": "ChatGPT", "where": "global", "offer": "free summaries", "gap": "not tied to the course"}],
+                        "positioning": "Course-specific practice for Egyptian STEM students, below the price of private tutoring.",
+                        "claims": [{"text": "Students struggle organizing lecture notes before exams", "source_ids": ["S1"]},
+                                   {"text": "Egyptian students use WhatsApp groups to share notes", "source_ids": []}]},
             CofounderVerdict: {"verdict": "strong", "one_line": "Strong for engineering students in Egypt if it beats ChatGPT on their own slides.",
                                "reasons_for": ["S1 shows students rewriting notes", "the founder tutors STEM students"],
                                "reasons_against": ["ChatGPT is free and already used"], "killer_risk": "students stay with ChatGPT",

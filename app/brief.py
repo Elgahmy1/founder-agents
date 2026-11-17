@@ -11,6 +11,7 @@ class FounderBrief(BaseModel):
     budget_usd: float = 0
     hours_per_week: float = 10
     target_market: str
+    location: str = Field(default="", description="Where the founder will sell: a country or city (optional)")
     values: list[str] = Field(default_factory=list)
     source_urls: list[str] = Field(default_factory=list, description="Optional sources the founder already has")
 
@@ -27,7 +28,8 @@ class FounderBrief(BaseModel):
             f"Budget: ${self.budget_usd:,.0f}\n"
             f"Time available: {self.hours_per_week:g} hours/week\n"
             f"Target market: {self.target_market}\n"
-            f"Values: {', '.join(self.values) or 'not stated'}"
+            + (f"Where the founder will sell: {self.location}\n" if self.location else "")
+            + f"Values: {', '.join(self.values) or 'not stated'}"
         )
 
     def all_text(self) -> str:

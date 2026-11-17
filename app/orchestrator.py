@@ -131,6 +131,7 @@ class RunState:
     mvp_app: dict | None = None
     targets: dict | None = None
     results: dict | None = None
+    area: dict | None = None  # Phase 1 step 0: area check where the founder will sell
     verdict: dict | None = None  # Phase 1: co-founder verdict (capped by the evidence gate)
     interviews: list = field(default_factory=list)  # Phase 2: analysed customer interviews (transcripts stay in data/)
     gates: list[dict] = field(default_factory=list)
@@ -331,9 +332,20 @@ class Orchestrator:
             st.docs = [d.__dict__ for d in ResearcherAgent(ctx).gather(brief, self.researcher)]
         docs = self.docs(st)
 
+        area_claims = []
+        if brief.location and not st.area:
+            from app.agents import area_analyst as aa
+            area = aa.AreaAnalystAgent(ctx).check(brief, docs)
+            area_claims = resolve(area.claims, docs)
+            area, note = aa.cap_fit(area, sum(1 for c in area_claims if c.status == "SOURCED"))
+            st.area = {**area.model_dump(), "cap_note": note}
+            self.log.append(agent="critic", action="cap_area_fit", run_id=st.run_id, phase=1, outcome=area.fit,
+                            detail=note or "fit supported by at least one retrieved source about the place")
+            self.write_output(st, "phase1_step0_area_check.md", aa.render_md(area, [c.md() for c in area_claims], note))
+        area_txt = json.dumps({k: v for k, v in (st.area or {}).items() if k != "claims"}, ensure_ascii=False) if st.area else ""
         if not st.opportunities:
             self._step(st, P1_STEPS, 1)
-            opps = ScoutAgent(ctx).find_opportunities(brief, docs)
+            opps = ScoutAgent(ctx).find_opportunities(brief, docs, area_txt)
             st.opportunities = [o.model_dump() for o in opps.opportunities]
         opps = [Opportunity(**o) for o in st.opportunities]
         # The model may drift into excluded territory even from an allowed brief:
@@ -346,6 +358,8 @@ class Orchestrator:
                 self.log.append(agent="guard", action="exclude_opportunity", run_id=st.run_id,
                                 outcome="excluded", rule=v.rule, detail=o.name)
         ledger = Ledger()
+        if st.area:
+            ledger.add(resolve([RawClaim(**c) for c in st.area.get("claims", [])], docs))
         md = [f"# Phase 1, step 1: Find opportunities", "", f"Founder brief:\n\n```\n{brief.as_text()}\n```", ""]
         for i, o in enumerate(opps):
             if i in excluded_opps:
@@ -424,7 +438,9 @@ class Orchestrator:
         if g.recommendation == "stop" and any("excluded" in r.lower() for r in g.reasons):
             return  # excluded products get no advice on how to pursue them
         claims = "\n".join(c.md() for c in ledger.claims) or "(no claims)"
-        v = cf.CofounderAgent(ctx).verdict(brief, opp.model_dump_json(indent=1), market.model_dump_json(indent=1),
+        area = (f"\n\nAREA CHECK\n{json.dumps({k: x for k, x in st.area.items() if k != 'claims'}, ensure_ascii=False)}"
+                if st.area else "")
+        v = cf.CofounderAgent(ctx).verdict(brief, opp.model_dump_json(indent=1), market.model_dump_json(indent=1) + area,
                                            claims, g.md())
         v, note = cf.cap_verdict(v, g.recommendation, opp.score)
         st.verdict = {**v.model_dump(), "cap_note": note}
