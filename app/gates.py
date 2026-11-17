@@ -196,9 +196,9 @@ def commercial_gate(*, free_tier_with_core: bool, comparables: int, sourced_comp
                     guard_flags: list[str], privacy_covers_data: bool, attempt: int = 1,
                     t: CommercialThresholds = CommercialThresholds()) -> GateResult:
     checks = [
-        Check("Core feature in a free tier (no paywall on the core)", "yes", "yes" if free_tier_with_core else "no",
+        Check("Core, privacy and safety features in a free tier (no paywall)", "yes", "yes" if free_tier_with_core else "no",
               free_tier_with_core),
-        Check("Comparable products listed", f">= {t.min_comparables}", str(comparables), comparables >= t.min_comparables),
+        Check("Comparable products listed (each price SOURCED or labelled ASSUMPTION)", f">= {t.min_comparables}", str(comparables), comparables >= t.min_comparables),
         Check("Price basis disclosed (SOURCED or labelled ASSUMPTION)", "all paid tiers",
               "all" if not paid_tiers_without_basis else f"{paid_tiers_without_basis} without basis",
               not paid_tiers_without_basis),

@@ -452,6 +452,8 @@ class Orchestrator:
         spec = MvpSpec(**st.mvp)
         primary = spec.user_stories[0].id
         core = [f.name for f in spec.must_have if primary in f.story_ids] or [spec.must_have[0].name]
+        # Privacy and safety features are never paywalled: every user gets them.
+        core += [f.name for f in spec.must_have if f.name not in core and PROTECTIVE.search(f"{f.name} {f.description}")]
         self._step(st, P4_STEPS, 0)
         plan = PricerAgent(ctx).price(brief, canvas, spec, docs, st.commercial_feedback,
                                       (st.market or {}).get("alternatives", []), core)
@@ -713,13 +715,14 @@ def _overlap(a: str, b: str) -> bool:
     return bool(words & set(re.findall(r"[a-z]{4,}", b.lower())))
 
 
+PROTECTIVE = re.compile(r"\b(delet\w*|privacy|private|security|secure|data protection|consent|accessib\w*)\b", re.I)
 EMAIL = re.compile(r"[\w.+-]+@[\w-]+\.[\w.]+")
 
 
 def _pricing_md(plan: PricingPlan, claims, comps, core: list[str]) -> str:
     return "\n".join([
         "# Phase 4, step 1: Pricing proposal (no payment is configured or taken)", "",
-        f"Core features that must stay free (they serve the primary user story): {', '.join(core)}", "",
+        f"Core features that must stay free (the primary user story, plus privacy and safety features): {', '.join(core)}", "",
         "| Tier | USD / month | Includes | For |", "|---|---|---|---|",
         *[f"| {t.name} | {t.price_usd_per_month:g} | {', '.join(t.includes)} | {t.who_for} |" for t in plan.tiers],
         "", "## Comparable products", *[f"- {c.md()}" for c in comps],

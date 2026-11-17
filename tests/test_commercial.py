@@ -136,3 +136,23 @@ def test_core_is_the_primary_story_features(make_orch, brief):
     g = st.gates[-1]
     assert g["recommendation"] == "repeat"
     assert not g["checks"][0]["passed"]
+
+
+def test_privacy_features_are_never_paywalled(make_orch, brief):
+    orch = make_orch()
+    base_mvp, base_pricing = orch.llm.mvp, orch.llm.pricing
+
+    def mvp():
+        d = base_mvp()
+        d["must_have"].append({"name": "Automatic data deletion", "description": "delete files after processing",
+                               "story_ids": ["US2"], "estimate_hours": 4})
+        return d
+
+    def pricing():
+        d = base_pricing()
+        d["tiers"][1]["includes"].append("Automatic data deletion")  # paid only
+        return d
+    orch.llm.mvp, orch.llm.pricing = mvp, pricing
+    st = _to_commercial(orch, brief)
+    assert st.gates[-1]["recommendation"] == "repeat"
+    assert not st.gates[-1]["checks"][0]["passed"]
