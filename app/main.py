@@ -368,6 +368,11 @@ def view_run(run_id: str):
                         + "<p>Turns the tested code into a small web app with one form. Publishing it needs your approval.</p>"
                         f"<form method=post action='/runs/{run_id}/mvp' class='once'><button>"
                         f"{'Rebuild the MVP app' if m else 'Build the MVP app'}</button></form></div>")
+    if st.opportunities and st.chosen is not None and not busy:
+        body.append(f"<div class='card'><h2>Build your team</h2><p>Which roles this business needs (designer, marketer, sales...), "
+                    "when, what you can do yourself, and links to people looking for that work on LinkedIn, Upwork, Mostaql "
+                    f"and Wuzzuf. Nothing is scraped or sent. Uses 1 model call.</p><form method=post action='/runs/{run_id}/team' "
+                    "class='once'><button>Plan my team</button></form></div>")
     body.append(f"""<div class="card"><h2>Ask the team</h2><form method="post" action="/runs/{run_id}/ask" class="once">
 <textarea name="request" rows="2" placeholder="e.g. how should I find my first 10 interviewees?"></textarea><button>Ask</button></form></div>""")
     u = st.usage
@@ -542,6 +547,16 @@ def landing_export(run_id: str, action: str):
     orch.log.append(agent="founder", action="export_landing_static", approved_by="founder", run_id=run_id, phase=2,
                     detail="static landing page downloaded by the founder; the founder hosts it, sign-ups go to their own endpoint")
     return HTMLResponse(out, headers={"Content-Disposition": f'attachment; filename="landing-{run_id}.html"'})
+
+
+@app.post("/runs/{run_id}/team")
+def team(run_id: str):
+    try:
+        st = orch.founder_plan_team(run_id)
+    except ValueError as e:
+        return page("Team plan", f"<div class=card><p>{html.escape(str(e))}</p><a href='/runs/{run_id}'>Back</a></div>")
+    name = next(o for o in reversed(st.outputs) if "_team_plan" in o)
+    return RedirectResponse(f"/outputs/{name}", status_code=303)
 
 
 @app.post("/runs/{run_id}/fork")

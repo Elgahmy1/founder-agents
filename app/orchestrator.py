@@ -133,6 +133,7 @@ class RunState:
     targets: dict | None = None
     results: dict | None = None
     area: dict | None = None  # Phase 1 step 0: area check where the founder will sell
+    marketing: dict | None = None  # Phase 1: marketing tactics (strong or promising ideas only)
     funding: dict | None = None  # Phase 1: possible funders and sponsors (strong or promising ideas only)
     verdict: dict | None = None  # Phase 1: co-founder verdict (capped by the evidence gate)
     interviews: list = field(default_factory=list)  # Phase 2: analysed customer interviews (transcripts stay in data/)
@@ -466,6 +467,23 @@ class Orchestrator:
         self.write_output(st, "phase1_step4_cofounder_verdict.md", cf.render_md(v, note, opp.name))
         if v.verdict in ("strong", "promising") and q is not None:
             self._funding(st, ctx, brief, opp, v, q)
+            self._marketing(st, ctx, brief, opp, v, market)
+
+    def _marketing(self, st, ctx, brief, opp, v, market) -> None:
+        """Strong or promising ideas only: concrete marketing tactics within the budget, guard-checked."""
+        from app.agents import growth
+        context = "\n".join([f"Opportunity: {opp.name}: {opp.problem} / {opp.digital_product}",
+                              f"Strongest alternative: {getattr(opp, 'strongest_alternative', '')}",
+                              f"Where customers gather: {', '.join(market.where_they_gather)}",
+                              f"Co-founder verdict: {v.one_line}; killer risk: {v.killer_risk}",
+                              f"Best launch window: {v.best_window or 'not given'}",
+                              *([f"Local positioning: {st.area.get('positioning', '')}"] if st.area else [])])
+        plan = growth.GrowthAgent(ctx).plan(brief, context)
+        rows, dropped = growth.apply_rules(plan, brief.budget_usd)
+        st.marketing = {"tactics": rows, "positioning": plan.positioning_line}
+        self.write_output(st, "phase1_step6_marketing.md", growth.render_md(plan, rows, dropped, brief.budget_usd))
+        self.log.append(agent="critic", action="check_marketing_plan", run_id=st.run_id, phase=1, outcome=f"{len(rows)} tactics",
+                        detail=f"{sum(1 for r in rows if r['fits_budget'])} within the ${brief.budget_usd:g} budget, {len(dropped)} removed by the guard")
 
     def _funding(self, st, ctx, brief, opp, v, q) -> None:
         """Strong or promising ideas only: who could fund or sponsor it near the founder, with a draft email."""
@@ -1162,6 +1180,34 @@ class Orchestrator:
             self.log.append(agent="founder", action="import_sales_csv", approved_by="founder", run_id=run_id, phase=6,
                             outcome="imported", detail=f"{LABEL} {c['orders']} completed orders, {c['activations']} "
                             f"activations, {c['not_completed']} not completed; source: {source[:80]}")
+            self.save(st, q)
+            return st
+
+    def founder_plan_team(self, run_id: str) -> RunState:
+        """On demand, after Discover: which roles the business needs, when, and where to find people looking for that work."""
+        from app.agents import team_planner as tp
+        with self.lock(run_id):
+            st, q = self.load(run_id)
+            if not st.opportunities or st.chosen is None:
+                raise ValueError("plan the team after Discover has chosen an opportunity")
+            brief = FounderBrief(**st.brief)
+            opp = st.opportunities[st.chosen]
+            ctx_lines = [f"Opportunity: {opp['name']}: {opp['problem']} / {opp['digital_product']}"]
+            if st.verdict:
+                ctx_lines.append(f"Killer risk: {st.verdict['killer_risk']}")
+            if st.mvp:
+                ctx_lines.append("MVP must-haves: " + "; ".join(f"{f['name']} ({f.get('estimate_hours', '?')} h)" for f in st.mvp.get("must_have", [])))
+            if st.market:
+                ctx_lines.append("Where customers gather: " + ", ".join(st.market.get("where_they_gather", [])))
+            plan = tp.TeamPlannerAgent(self.ctx(st)).plan(brief, "\n".join(ctx_lines))
+            plan, notes = tp.apply_rules(plan, brief)
+            v = guard.check_output(plan.job_post)
+            if not v.allowed:
+                plan = plan.model_copy(update={"job_post": f"(removed by the guard: {v.reason})"})
+            phase = max(1, min(6, int(re.match(r"p(\d)", st.stage).group(1)) if re.match(r"p(\d)", st.stage) else 1))
+            self.write_output(st, f"phase{phase}_step8_team_plan.md", tp.render_md(plan, notes, brief.location or brief.target_market))
+            self.log.append(agent="team_planner", action="plan_team_and_search_links", run_id=run_id, phase=phase,
+                            outcome=f"{len(plan.roles)} roles", detail="; ".join(f"{r.title}: {r.how}" for r in plan.roles)[:300])
             self.save(st, q)
             return st
 

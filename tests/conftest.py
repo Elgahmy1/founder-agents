@@ -16,6 +16,8 @@ from app.agents.interview_analyst import InterviewAnalysis
 from app.agents.cofounder import CofounderVerdict
 from app.agents.area_analyst import AreaCheck
 from app.agents.funding_scout import FundingPlan
+from app.agents.team_planner import TeamPlan
+from app.agents.growth import GrowthPlan
 from app.agents.advisor import Advice  # noqa: E402
 from app.agents.analyst import DemandTestPlan, GateMemo  # noqa: E402
 from app.agents.builder import MvpSpec  # noqa: E402
@@ -154,6 +156,26 @@ class FakeLLM:
                              "rationale": "ASSUMPTION: 5% conversion"},
             GateMemo: {"summary": "s", "what_we_learned": [], "next_steps": []},
             Advice: {"answer": "Talk to 10 students this week."},
+            GrowthPlan: {"positioning_line": "Exam-format summaries from your own lecture notes, which ChatGPT does not give",
+                         "tactics": [
+                {"channel": "Facebook group", "where": "the faculty's student group (search the faculty name + students)",
+                 "action": "post one free summary of this week's lecture and link the waitlist", "cost_usd": 0, "hours": 2,
+                 "metric": "waitlist sign-ups from the post link", "target": "20 sign-ups in 14 days"},
+                {"channel": "Paid ads", "where": "Instagram", "action": "run a boosted post", "cost_usd": 300, "hours": 1,
+                 "metric": "clicks", "target": "200 clicks in 7 days"},
+                {"channel": "Reviews", "where": "app store", "action": "write 20 five-star reviews from friends", "cost_usd": 0,
+                 "hours": 1, "metric": "rating", "target": "4.9 stars"}],
+                         "avoid": ["Paid ads before the message is proven: the $100 budget would be gone in a week"]},
+            TeamPlan: {"roles": [
+                {"title": "UI/UX designer", "why": "the upload and summary screens in the MVP spec", "when": "now", "hours_per_week": 5,
+                 "how": "part_time", "skills": ["Figma", "mobile layouts"]},
+                {"title": "Python developer", "why": "the summarizer core", "when": "now", "hours_per_week": 10, "how": "freelancer",
+                 "skills": ["python", "FastAPI"]},
+                {"title": "Content marketer", "why": "posts in campus groups from the launch kit", "when": "after_launch",
+                 "hours_per_week": 3, "how": "later", "skills": ["Arabic copywriting"]}],
+                       "first_hire": "UI/UX designer: the summary screen decides whether students switch from ChatGPT",
+                       "job_post_title": "Freelance UI/UX designer, 5 h/week, student exam tool",
+                       "job_post": "Early-stage tool, no users yet. One task: design 2 screens in Figma. Paid per task within a $100 budget. Reply with 2 samples."},
             FundingPlan: {"funders": [
                 {"name": "Notion for Startups", "kind": "sponsor", "what_they_fund": "credits for student tools", "history": "runs since 2019",
                  "criteria_met": ["student focus", "early stage"], "criteria_missed": ["incorporated company"],
