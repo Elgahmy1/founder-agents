@@ -67,7 +67,11 @@ class DecisionLog:
             self.path.parent.mkdir(parents=True, exist_ok=True)
             tmp = self.path.with_suffix(".tmp")
             tmp.write_text(json.dumps(entries, indent=1, ensure_ascii=False) + "\n", encoding="utf-8")
-            tmp.replace(self.path)
+            try:
+                tmp.replace(self.path)
+            except OSError:  # e.g. the file is a Docker bind mount
+                self.path.write_text(tmp.read_text(encoding="utf-8"), encoding="utf-8")
+                tmp.unlink(missing_ok=True)
             return entry
 
 
