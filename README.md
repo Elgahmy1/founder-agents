@@ -55,7 +55,7 @@ An explicit state machine (`app/orchestrator.py`) moves a run through the six ph
 
 ## Cost per run
 
-About $0.00 per run (open-weight model, local via Ollama or Groq free tier; the demo run used ~18k tokens for Discover + Validate). The app shows the token count of each run.
+About $0.00 per run (open-weight model, local via Ollama or Groq free tier; the demo run used ~27k tokens in 9 model calls for Discover + Validate + Build). The app shows the token count of each run.
 
 ## Demo video
 
