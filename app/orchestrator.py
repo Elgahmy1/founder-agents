@@ -21,6 +21,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from app import guard
+from app.next_steps import next_step
 from app.guard import invented_identity
 from app.agents.analyst import AnalystAgent, DemandTestPlan
 from app.agents.base import AgentContext
@@ -406,6 +407,7 @@ class Orchestrator:
                           pain_sources=len(pain_urls), best_score=opp.score,
                           excluded_reason=None if excluded.allowed else excluded.reason,
                           attempt=1 + sum(1 for x in st.gates if x["gate"] == "evidence_gate"))
+        g.reasons.append(next_step(g.to_dict(), st.brief, st.market, opp.customer))
         st.gates.append(g.to_dict())
         self.log.append(agent="gate", action="evidence_gate", sources=ledger.urls(), run_id=st.run_id,
                         outcome=g.recommendation, phase=1)
@@ -666,6 +668,7 @@ class Orchestrator:
         self._step(st, P6_STEPS, 2)
         g = learn_gate(targets=targets, visits=op["visits"], signups=op["signups"], paid_orders=op["paid_orders"],
                        feedback_items=len(op["feedback"]), problem_mentions=mentions)
+        g.reasons.append(next_step(g.to_dict(), st.brief, st.market))
         st.gates.append(g.to_dict())
         self.log.append(agent="gate", action="learn_gate", run_id=st.run_id, outcome=g.recommendation, phase=6)
         gmd = g.md()
@@ -1026,6 +1029,7 @@ class Orchestrator:
         self.log.append(agent="founder", action="record_interview_results", approved_by="founder", run_id=run_id,
                         detail=f"{interviews_done} interviews, {pain_confirmed} confirmed pain; {signups} sign-ups counted by app")
         g = demand_gate(DemandTargets(**st.targets), **st.results)
+        g.reasons.append(next_step(g.to_dict(), st.brief, st.market))
         st.gates.append(g.to_dict())
         self.log.append(agent="gate", action="demand_gate", run_id=run_id, outcome=g.recommendation, phase=2)
         self.write_output(st, "phase2_gate_decision.md", g.md())
