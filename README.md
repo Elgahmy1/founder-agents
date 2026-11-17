@@ -40,15 +40,13 @@ Every **Working** row below has real output from the committed demo runs: [docs/
 | Phase 3 Build: clickable prototype from a safe template, published locally after founder approval | **Working** |
 | Phase 3 Build: acceptance tests + build gate (scope vs founder hours, traceability, testability, safety) | **Working** |
 | Phase 3 Build: coder agent writes the primary user story's core code plus one check per acceptance criterion; the sandbox (static allowlist + isolated process, no file/network/process access) runs them, with one repair attempt; CI re-runs the committed code against its checks on every push | **Working** |
-| Phase 3 Build: MVP app: the tested core code wrapped in a working web app at `/mvp/<run>` after founder approval; each request runs the code in the sandbox, nothing is stored; free plan has every feature (5,000 characters per request) | **Working** locally; public hosting **MOCKED** |
+| Phase 3 Build: MVP app: the tested core code wrapped in a working web app at `/mvp/<run>` after founder approval; each request runs the code in the sandbox, nothing is stored | **Working** locally; public hosting **MOCKED** |
 | Phase 3 Build: MVP app storage, accounts and code beyond the primary user story | **STUBBED** |
 | Phase 4 Commercial setup: tiered pricing with the core feature always free; comparable prices SOURCED or labelled ASSUMPTION | **Working** |
 | Phase 4 Commercial setup: terms, privacy and refund policy DRAFTS, each signed off by the founder; commercial gate | **Working** |
 | Phase 5 Launch: store page rendered from the founder-approved prices, launch post drafts per channel, launch targets locked before launch, launch gate | **Working** |
-| Phase 5 Sell, deliver, get paid on the real MVP app: test-mode order from the store page → webhook handler → delivery issues a Pro access key that `/mvp/<run>` enforces (stored hashed); a refund event revokes it; a resent event never delivers twice; reconciliation writes `phase5_step4_test_sales` | **Working** (test mode) |
-| Phase 5: the payment provider, its events, fees and payouts | **MOCKED** (no provider, card field or money; test orders are never counted as revenue) |
-| Phase 5 Launch: public hosting, posting to channels | **MOCKED** (founder posts personally; store served locally) |
-| Phase 5 Launch: sale-to-cash self-test before the launch gate (`payment_test_log.md`) | **Working** on **MOCKED** events |
+| Phase 5 Launch: public hosting, posting to channels, checkout | **MOCKED** (founder posts personally; store served locally; no checkout) |
+| Phase 5 Launch: payment → delivery, refunds, idempotency, reconciliation | **MOCKED** (real logic runs on mock events inside the launch gate; no provider) |
 | Phase 6 Operate and learn: launch results vs the targets locked before launch (sign-ups counted by the app), support reply drafts for real feedback, learn gate (persevere / repeat / pivot / stop), learning memo | **Working** |
 | Phase 6: sending support replies; usage analytics | **MOCKED** (founder sends replies personally and enters store visits from their own analytics) |
 | Founder export: the whole run (brief, gates, decisions, approvals, decision log, outputs) as one Markdown file, no model call | **Working** |

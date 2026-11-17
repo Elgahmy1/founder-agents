@@ -2,7 +2,7 @@
 
 ## Overview
 
-Founder Agents is a team of single-purpose agents coordinated by an explicit state machine. A run starts from a founder brief, passes a policy screen, then moves phase by phase. Every phase ends in a gate: a recommendation computed from thresholds fixed in advance (or tests passing), followed by the founder's decision: **go**, **repeat**, **pivot** or **stop**. Agents only draft; anything that leaves the system (publish, send, spend, sign) becomes an item in the approval queue, and the only code path that executes it refuses unless the founder approved it. All agent actions append to `decision_log.json`. All six phases are built. Phase 3 goes as far as a clickable prototype and the primary story's core code tested against its acceptance criteria in a sandbox and a working MVP app (storage, accounts and deployment are STUBBED). Phase 5 sells that app in test mode: an order, a webhook, an access key the app enforces, refunds that revoke it. The payment provider, public hosting, posting and sending are MOCKED, because the system never takes money or acts on the founder's accounts.
+Founder Agents is a team of single-purpose agents coordinated by an explicit state machine. A run starts from a founder brief, passes a policy screen, then moves phase by phase. Every phase ends in a gate: a recommendation computed from thresholds fixed in advance (or tests passing), followed by the founder's decision: **go**, **repeat**, **pivot** or **stop**. Agents only draft; anything that leaves the system (publish, send, spend, sign) becomes an item in the approval queue, and the only code path that executes it refuses unless the founder approved it. All agent actions append to `decision_log.json`. All six phases are built. Phase 3 goes as far as a clickable prototype and the primary story's core code tested against its acceptance criteria in a sandbox (full-app code and deployment are STUBBED); checkout, public hosting, posting and sending are MOCKED, because the system never takes money or acts on the founder's accounts.
 
 ```mermaid
 flowchart LR
@@ -187,12 +187,12 @@ flowchart LR
 - **Output:** `phase4_step1_pricing-*.md`, `phase4_step2_policies-*.md`, `phase4_gate_decision-*.md`.
 - **Never:** no payment provider, checkout or price is configured anywhere; prices go live only with the Phase 5 store page, which renders them from this approved plan.
 
-### Phase 5: Launch: sell, deliver, get paid (built; payment provider, hosting and posting MOCKED)
+### Phase 5: Launch: sell, deliver, get paid (built; checkout, hosting and posting MOCKED)
 
 ```mermaid
 flowchart LR
     IN[MVP spec + approved pricing + market channels] --> LA[launcher: store copy, FAQ, posts, targets]
-    LA --> ST[our store template: prices from Phase 4 data, paid plan links to the test-mode order page]
+    LA --> ST[our store template: prices from Phase 4 data, no checkout]
     LA --> PO[launch posts, one per channel, founder's voice]
     PO --> GU[guard per post]
     ST --> GU2[guard + structural safety]
@@ -202,15 +202,14 @@ flowchart LR
     LA --> TG[launch targets] --> SI[sign item: founder locks targets]
     ST --> AP[publish item: store page] --> SV["/store/&lt;run&gt;"]
     GU --> PI[publish items: posts, founder posts personally]
-    SV --> OR["/order/&lt;run&gt; test order"] --> WH[webhook handler] --> KEY[Pro access key for /mvp/&lt;run&gt;]
 ```
 
 - **Core step:** Open the store; deliver automatically.
 - **Agents:** `launcher` (`app/agents/launcher.py`) writes store copy, an honest FAQ, one launch post per channel where customers gather (in the founder's voice, for the founder's own accounts) and launch targets; `delivery` runs the sale-to-cash path (`app/sale_to_cash.py`).
-- **Method:** the store page is rendered by our template (`app/store.py`) with prices taken from the Phase 4 plan the founder approved, never from the model; the free tier links to the approved waitlist page and the paid tier links to the test-mode order page (see [Sale to cash](#sale-to-cash)), which opens only after the founder approved both the store page and the MVP app. Each post is guarded; blocked posts are never queued and are shown as BLOCKED in the launch kit. Before the gate, the sale-to-cash test runs at the paid tier's price on MOCKED events and writes `payment_test_log.md`.
+- **Method:** the store page is rendered by our template (`app/store.py`) with prices taken from the Phase 4 plan the founder approved, never from the model; the free tier links to the approved waitlist page and the paid tier shows "Not on sale yet: payments are MOCKED". Each post is guarded; blocked posts are never queued and are shown as BLOCKED in the launch kit. Before the gate, the sale-to-cash test runs at the paid tier's price on MOCKED events and writes `payment_test_log.md`.
 - **Launch gate (`app/gates.py: launch_gate`):** store page passes structural safety and the guard; store prices equal the approved pricing; ≥1 post passes and 0 posts are blocked; targets proposed; policies signed in Phase 4; sale-to-cash test PASS. Failure → **repeat** with feedback; a second failing attempt → **stop**. **GO is refused in code** until the founder approved the store page and locked the launch targets.
-- **Output:** `phase5_step1_store_page-*.html`, `phase5_step2_launch_kit-*.md`, `phase5_step3_payment_test-*.md`, `phase5_gate_decision-*.md`, `payment_test_log.md`, and after test orders `phase5_step4_test_sales-*.md` (orders, events, access and reconciliation).
-- **MOCKED:** public hosting, posting to channels (the founder posts personally) and the payment provider with its events, fees and payouts. The system never creates accounts or takes money.
+- **Output:** `phase5_step1_store_page-*.html`, `phase5_step2_launch_kit-*.md`, `phase5_step3_payment_test-*.md`, `phase5_gate_decision-*.md`, `payment_test_log.md`.
+- **MOCKED:** public hosting, posting to channels (the founder posts personally), checkout and the payment provider. The system never creates accounts or takes money.
 
 ### Phase 6: Operate and learn (built; sending and analytics MOCKED)
 
@@ -230,8 +229,8 @@ flowchart LR
 
 - **Core step:** none (ongoing).
 - **Agents:** `support` (`app/agents/operator.py`) drafts an honest reply to each piece of real feedback, signed with the founder's name or a placeholder; `analyst` writes the learning memo after the gate.
-- **Method:** free sign-ups are counted by the app from real form posts since the launch decision (never typed in); the founder enters store visits from their own analytics and paid orders from their own provider (test-mode orders are not counted, so usually 0). Replies are `send` items the founder sends personally. A reply that promises a refund or asks for transaction, card or account details is removed by the guard (`guard.check_support_reply`), because the system takes no money. "Feedback naming the core problem" is counted in code by matching word stems of the primary user story against each item and the support agent's English rendering of it, so plurals and Arabic feedback count.
-- **Learn gate (`app/gates.py: learn_gate`):** visits and sign-ups against the targets locked before launch, plus at least 3 users giving feedback. All met → **go** (persevere); sign-ups ≥ 50% of target → **repeat** for another window; ≥ 25% or feedback that names the core problem → **pivot** back to Discover; otherwise → **stop**. Paid orders are reported but cannot drive the recommendation while the payment provider is MOCKED.
+- **Method:** free sign-ups are counted by the app from real form posts since the launch decision (never typed in); the founder enters store visits from their own analytics and paid orders from their own provider (checkout is MOCKED, so usually 0). Replies are `send` items the founder sends personally. A reply that promises a refund or asks for transaction, card or account details is removed by the guard (`guard.check_support_reply`), because the system takes no money. "Feedback naming the core problem" is counted in code by matching word stems of the primary user story against each item and the support agent's English rendering of it, so plurals and Arabic feedback count.
+- **Learn gate (`app/gates.py: learn_gate`):** visits and sign-ups against the targets locked before launch, plus at least 3 users giving feedback. All met → **go** (persevere); sign-ups ≥ 50% of target → **repeat** for another window; ≥ 25% or feedback that names the core problem → **pivot** back to Discover; otherwise → **stop**. Paid orders are reported but cannot drive the recommendation while checkout is MOCKED.
 - **Output:** `phase6_step1_metrics-*.md`, `phase6_step2_support_replies-*.md`, `phase6_gate_decision-*.md`, `phase6_step3_learning_memo-*.md`.
 
 ## Gates
@@ -262,38 +261,30 @@ The gate memo is written after the recommendation is computed and may not change
 
 ## Sale to cash
 
-Runs on the real Phase 3 MVP app in **test mode**: the order page, webhook handler, delivery, access keys, refund handling, idempotency and reconciliation are real code; the payment provider, its events, fees and payouts are **MOCKED** (`app/sales.py`, on `app/payments.py`, `app/delivery.py`, `app/reconcile.py`). No provider, card field, account or money is involved, and test orders are never counted as paid orders or revenue.
+Runs inside phase 5 before the launch gate, on **MOCKED** events (`app/payments.py`, `app/delivery.py`, `app/refunds.py`, `app/reconcile.py`, test in `outputs/payment_test_log.md`). No provider, sandbox, card data or money is involved.
 
 ```mermaid
 sequenceDiagram
     participant Buyer
-    participant Store as /store/<run> (founder-approved)
-    participant Order as /order/<run> (test mode)
-    participant Provider as Payment provider (MOCKED)
+    participant Provider as Payment provider (founder's own account, MOCKED)
     participant Hook as Webhook handler
     participant Del as Delivery
-    participant App as /mvp/<run> (founder-approved)
     participant Rec as Reconcile
-    Buyer->>Store: chooses the paid plan
-    Store->>Order: test order (no card field)
-    Order->>Provider: order_id, amount from approved pricing
+    Buyer->>Provider: pays (provider-hosted checkout, never our servers)
     Provider->>Hook: payment_succeeded(event_id, order_id)
-    Hook->>Del: replay stored events + this one
-    Del-->>Buyer: Pro access key, shown once (stored as SHA-256)
-    Buyer->>App: ?key=... -> Pro plan enforced by the server
-    Provider->>Hook: same event resent -> duplicate_ignored, no second key
-    Provider->>Hook: refund_succeeded (founder refunded in the provider)
-    Hook->>Del: revoke -> the key falls back to the free plan
-    Rec->>Rec: orders vs payments vs fees vs payouts -> phase5_step4_test_sales
+    Hook->>Del: handle(event)
+    Del->>Del: event_id seen? -> ignore (idempotent)
+    Del-->>Buyer: grant access / send download link
+    Provider->>Hook: refund_succeeded(event_id, order_id)
+    Hook->>Del: revoke access
+    Rec->>Rec: orders vs payments vs fees vs payouts
 ```
 
-- **Gated by the founder:** the order page returns 404 until the founder approved the pricing, the store page and the MVP app. The free plan keeps every feature; Pro raises the per-request input limit (5,000 → 20,000 characters).
-- **Payment triggers delivery:** only a provider `payment_succeeded` event issues an access key. The key is shown to the buyer once, stored only as a hash, and never written to the decision log.
-- **Refund revokes access:** the founder refunds in their own provider (the system never moves money); the provider's `refund_succeeded` event revokes the key, and the app serves the free plan with a notice.
-- **Idempotency:** state is event-sourced in `data/sales/<run>.json`; each event id is stored once, so a webhook retry (even after a restart) returns `duplicate_ignored`, and a second payment for a delivered order returns `already_delivered`. Only already-received event ids can be resent; a real handler would also verify the provider's signature.
-- **Reconciliation:** every paid order has a payment of the same amount; one order paid twice is flagged; the payout equals the sum of (amount − fee) over non-refunded orders; mismatches are reported, not auto-corrected.
-- **Every step is logged** (`checkout`/`create_test_order`, `webhooks`/`receive_payment_event`, `delivery`/`issue_access_key` and `revoke_access_key`, `reconcile`/`reconcile_orders`).
-- **Self-test before the launch gate:** `app/sale_to_cash.py` runs the same delivery logic on four scripted MOCKED events and writes `payment_test_log.md`.
+- **Payment triggers delivery:** only a provider `payment_succeeded` event grants access; the system never takes payment itself.
+- **Refund revokes access:** `refund_succeeded` flips access off for that order. Refunds are issued by the founder in their provider; we react to the event.
+- **Idempotency:** each provider event id is processed once; a webhook retry returns `duplicate_ignored`, and an order already delivered is never delivered twice.
+- **Roadmap item:** the mock keeps processed event ids in memory; the real handler stores them with the order so a retry after a restart is still ignored.
+- **Reconciliation:** every paid order has a matching payment of the same amount; sum of (amount − fee) over non-refunded orders equals payouts; mismatches are reported, not auto-corrected.
 
 ## Data flow
 
@@ -324,19 +315,19 @@ Persistence is plain files (JSON, CSV, Markdown) so runs are inspectable and por
 | Run metrics from the decision log (`evals/run_metrics.py`, report in `evals/run_metrics.md`): calls, tokens, cost, time, gate recommendation vs founder decision, approval audit; CI checks the report matches the log and re-runs the committed generated code against its acceptance checks | Built |
 | Landing page publishing | Built locally; public hosting MOCKED |
 | Outreach sending | MOCKED (founder sends personally) |
-| Phase 5 sale to cash on the MVP app: test-mode order, webhook handler, access-key delivery enforced by `/mvp/<run>`, refund revokes, idempotency, reconciliation | Built (test mode); payment provider, events, fees and payouts MOCKED |
+| Payment → delivery, refunds, idempotency, reconciliation | MOCKED events, real logic |
 | Phase 3 Build: MVP spec, clickable prototype, acceptance tests, build gate | Built |
 | Phase 3 core code for the primary story, tested against its acceptance criteria in a process sandbox | Built |
 | Phase 3 MVP app: the tested core code in a working web app at `/mvp/<run>`, published after founder approval, each request run in the sandbox | Built (served locally; public hosting MOCKED) |
 | Phase 3 MVP app storage, accounts and code beyond the primary story | STUBBED |
 | Phase 4 Commercial setup: pricing, policy drafts, founder sign-off, commercial gate | Built |
-| Phase 5 Launch: store page, launch posts, launch targets, launch gate | Built (hosting and posting MOCKED) |
+| Phase 5 Launch: store page, launch posts, launch targets, launch gate | Built (hosting, posting, checkout MOCKED) |
 | Phase 6 Operate and learn: results vs targets, support drafts, learn gate, memo | Built (sending replies and analytics MOCKED) |
 
 ## Roadmap
 
 1. Phase 3: grow the MVP app beyond the primary story (more stories, storage) in a no-network container sandbox, with the acceptance checks gating each addition.
 2. Phase 4: a targeted price lookup tool so more comparable prices are SOURCED instead of ASSUMPTION.
-3. Phase 5: point the existing webhook handler at a real provider's test mode in the founder's own account (founder-configured, never our keys) with signature verification, replacing the MOCKED events.
+3. Phase 5: webhook handler for a real provider in the founder's own account (founder-configured, never our keys), replacing the MOCKED events.
 4. Phase 6: read visits and activation from privacy-friendly analytics instead of founder entry.
 5. Community: more free research tools, more red-team prompts in `evals/` (runner: `python evals/run_red_team.py`), translations (Arabic first). See [CONTRIBUTING.md](CONTRIBUTING.md).

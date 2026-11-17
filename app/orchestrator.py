@@ -31,8 +31,6 @@ from app.agents.researcher import ResearcherAgent
 from app.agents.builder import BuilderAgent, MvpSpec
 from app.agents.coder import CoderAgent
 from app import sandbox
-from app.payments import MockPaymentEvent
-from app.sales import SalesBook
 from app.agents.launcher import LaunchKit, LauncherAgent
 from app.agents.operator import SupportAgent, SupportDrafts
 from app.agents.policy_drafter import PolicyDrafterAgent, PolicyDrafts
@@ -914,73 +912,6 @@ class Orchestrator:
             q.submit("publish", f"Publish the MVP app on this computer: {run_id}", bundle, "publish_mvp_local", 3,
                      check=lambda c: guard.check_output(json.loads(c)["page"]))
             st.mvp_app = {"func": ", ".join(names), "checks": passed}
-            self.save(st, q)
-            return st
-
-    # ---------- Phase 5 sale to cash on the MVP app (payments MOCKED, test mode) ----------
-    def sales(self, run_id: str) -> SalesBook:
-        return SalesBook(self.settings.data_dir, run_id)
-
-    def sales_offer(self, run_id: str) -> tuple[RunState, list[dict]]:
-        """The paid plans a test checkout may sell. Needs the founder's approved pricing, the store page the founder
-        approved for publishing, and the MVP app the founder approved for publishing (the thing that is delivered)."""
-        st, q = self.load(run_id)
-        if not st.pricing or not any(i.executor == "publish_store_local" and i.status == "executed" for i in q.items):
-            raise PermissionError("the founder has not approved the store page")
-        if not (self.sites_dir / st.run_id / "mvp.json").exists():
-            raise PermissionError("the founder has not approved the MVP app, so there is nothing to deliver")
-        paid = [t for t in st.pricing["tiers"] if t["price_usd_per_month"] > 0]
-        if not paid:
-            raise PermissionError("the approved pricing has no paid plan")
-        return st, paid
-
-    def test_checkout(self, run_id: str, tier: str) -> dict:
-        """A buyer places a test-mode order; the MOCKED provider then calls our webhook with payment_succeeded."""
-        st, paid = self.sales_offer(run_id)
-        t = next((x for x in paid if x["name"] == tier), None)
-        if t is None:
-            raise ValueError("unknown plan")
-        book = self.sales(run_id)
-        product = MvpSpec(**st.mvp).product_name
-        oid = book.create_test_order(product, t["name"], round(t["price_usd_per_month"] * 100))
-        self.log.append(agent="checkout", action="create_test_order", run_id=run_id, phase=5, outcome="open",
-                        detail=f"{oid}: {t['name']} plan, {t['price_usd_per_month']:g} USD, test mode (payments MOCKED)")
-        ev = book.mock_provider_event(oid, "payment_succeeded")
-        outcome, key = self.receive_payment_event(run_id, ev)
-        return {"order_id": oid, "event_id": ev.event_id, "outcome": outcome, "key": key, "tier": t["name"],
-                "amount": t["price_usd_per_month"], "product": product}
-
-    def receive_payment_event(self, run_id: str, ev: MockPaymentEvent) -> tuple[str, str | None]:
-        """The webhook handler for (MOCKED) provider events. Idempotent per event id; the key is never logged."""
-        outcome, key = self.sales(run_id).handle_event(ev)
-        self.log.append(agent="webhooks", action="receive_payment_event", run_id=run_id, phase=5, outcome=outcome,
-                        detail=f"{ev.event_id} {ev.type} for {ev.order_id} (MOCKED provider)")
-        if outcome == "delivered":
-            self.log.append(agent="delivery", action="issue_access_key", run_id=run_id, phase=5, outcome="delivered",
-                            detail=f"{ev.order_id}: Pro access to /mvp/{run_id} (key shown to the buyer once, stored hashed)")
-        elif outcome == "access_revoked":
-            self.log.append(agent="delivery", action="revoke_access_key", run_id=run_id, phase=5, outcome="revoked",
-                            detail=f"{ev.order_id}: refunded, so its access key no longer works")
-        return outcome, key
-
-    def founder_refund_event(self, run_id: str, order_id: str) -> str:
-        """The founder refunds in their own payment provider; the system never refunds money itself. In test mode the
-        MOCKED provider's refund_succeeded event is sent here, and delivery revokes access."""
-        self.sales_offer(run_id)
-        ev = self.sales(run_id).mock_provider_event(order_id, "refund_succeeded")
-        return self.receive_payment_event(run_id, ev)[0]
-
-    def founder_reconcile_sales(self, run_id: str) -> RunState:
-        with self.lock(run_id):
-            st, q = self.load(run_id)
-            book = self.sales(run_id)
-            md = book.report_md(MvpSpec(**st.mvp).product_name)
-            r = book.reconcile()
-            self.write_output(st, "phase5_step4_test_sales.md", md)
-            self.log.append(agent="reconcile", action="reconcile_orders", run_id=run_id, phase=5,
-                            outcome="pass" if not r["issues"] else "issues",
-                            detail=f"{r['orders']} test orders, {r['paid']} paid, {r['refunded']} refunded, "
-                                   f"{r['deliveries']} deliveries, {len(r['issues'])} issues (payments MOCKED)")
             self.save(st, q)
             return st
 

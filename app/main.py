@@ -9,11 +9,9 @@ from pathlib import Path
 from fastapi import FastAPI, Form, HTTPException
 from fastapi.responses import HTMLResponse, PlainTextResponse, RedirectResponse
 
-from app import guard, mvp_app, sales, sandbox
-from urllib.parse import quote
+from app import guard, mvp_app, sandbox
 import json
 from app.agents.advisor import AdvisorAgent
-from app.agents.builder import MvpSpec
 from app.brief import FounderBrief
 from app.config import load_settings
 from app.decision_log import validate
@@ -36,9 +34,7 @@ STATUS = [
     ("Phase 3 MVP app: storage, accounts and public hosting", "STUBBED"),
     ("Phase 4 Commercial setup: pricing with a free core tier, policy drafts, founder sign-off, commercial gate", "Working"),
     ("Phase 5 Launch: store page, launch post drafts, launch targets, launch gate", "Working"),
-    ("Phase 5 sale to cash on the MVP app: test checkout, webhook, access-key delivery, refund revokes, idempotency, reconciliation", "Working"),
-    ("Phase 5 payment provider, its events, fees and payouts (test mode, no money)", "MOCKED"),
-    ("Phase 5 public hosting and posting", "MOCKED"),
+    ("Phase 5 checkout, public hosting and posting", "MOCKED"),
     ("Phase 6 Operate and learn: results vs locked targets, support reply drafts, learn gate, learning memo", "Working"),
 ]
 
@@ -239,7 +235,7 @@ def _next_step(st: RunState, q, run_id: str) -> str:
 <p>Targets you locked before launch: {t['store_visits']} store visits, {t['free_signups']} free sign-ups, {t['paid_orders']} paid orders.
 Free sign-ups since launch are counted by the app (never typed in): <b>{max(0, orch.signups(run_id) - st.launch.get('signups_at_launch', 0))}</b>.</p>
 <form method="post" action="/runs/{run_id}/operate" class="once"><label>Store visits (from your analytics)</label>
-<input type="number" name="visits" min="0" required><label>Paid orders recorded in your own payment provider (test-mode orders here are not counted, so usually 0)</label>
+<input type="number" name="visits" min="0" required><label>Paid orders recorded in your own payment provider (checkout is MOCKED here, so usually 0)</label>
 <input type="number" name="paid_orders" min="0" value="0" required>
 <label>Real user feedback, one item per line (optional)</label><textarea name="feedback" rows="4"></textarea>
 <button>Run the learn gate</button></form></div>"""
@@ -365,8 +361,6 @@ def view_run(run_id: str):
                         "first. No model call. Publishing it on this computer needs your approval.</p>"
                         f"<form method=post action='/runs/{run_id}/mvp' class='once'><button>"
                         f"{'Rebuild the MVP app' if m else 'Build the MVP app'}</button></form></div>")
-    if not busy:
-        body.append(_sales_card(run_id))
     body.append(f"<p><a href='/runs/{run_id}/export'>Download the full run report (Markdown)</a>: brief, gates, your "
                 "decisions, approvals, decision log and outputs in one file.</p>")
     body.append(f"""<div class="card"><h2>Ask the team</h2><form method="post" action="/runs/{run_id}/ask" class="once">
@@ -460,157 +454,16 @@ def _mvp_bundle(run_id: str) -> dict:
     return json.loads(p.read_text(encoding="utf-8"))
 
 
-def _mvp_access(run_id: str, b: dict, key: str | None) -> tuple[str, int]:
-    """The served page with its plan banner (and the key kept on the form), and the input limit for this plan."""
-    plan, oid = orch.sales(run_id).check_key(key)
-    pg = b["page"]
-    if plan == "pro":
-        banner = (f"Pro access from test order <code>{html.escape(oid)}</code> (payment MOCKED): up to "
-                  f"{sales.PRO_INPUT_CHARS:,} characters per request.")
-        pg = pg.replace(f'action="/mvp/{html.escape(run_id)}"', f'action="/mvp/{html.escape(run_id)}?key={quote(key)}"', 1)
-    elif plan == "revoked":
-        banner = (f"This access key was revoked because order <code>{html.escape(oid)}</code> was refunded. "
-                  f"The free plan applies: up to {sales.FREE_INPUT_CHARS:,} characters per request.")
-    else:
-        banner = f"Free plan: every feature, up to {sales.FREE_INPUT_CHARS:,} characters per request."
-    limit = sales.PRO_INPUT_CHARS if plan == "pro" else sales.FREE_INPUT_CHARS
-    pg = pg.replace("<body>", f"<body><p class='mut' id='plan'>{banner}</p>", 1)
-    return pg, limit
-
-
 @app.get("/mvp/{run_id}", response_class=HTMLResponse)
-def mvp_page(run_id: str, key: str | None = None):
-    return HTMLResponse(_mvp_access(run_id, _mvp_bundle(run_id), key)[0])
+def mvp_page(run_id: str):
+    return HTMLResponse(_mvp_bundle(run_id)["page"])
 
 
 @app.post("/mvp/{run_id}", response_class=HTMLResponse)
-def mvp_run(run_id: str, text: str = Form(...), key: str | None = None):
+def mvp_run(run_id: str, text: str = Form(...)):
     b = _mvp_bundle(run_id)
-    pg, limit = _mvp_access(run_id, b, key)
-    if len(text) > limit:
-        msg = (f"<div class='card'><h2>Result</h2><p>This text has {len(text):,} characters; this plan allows "
-               f"{limit:,} per request. Shorten it"
-               + (", or use a Pro access key." if limit < sales.PRO_INPUT_CHARS else ".") + "</p></div>")
-        return HTMLResponse(pg.replace(mvp_app.RESULT_MARK, msg, 1))
     results = [(f, sandbox.call(b["code"], f, text)) for f in b.get("funcs") or [b["func"]]]
-    return HTMLResponse(pg.replace(mvp_app.RESULT_MARK, mvp_app.result_html(results), 1))
-
-
-SHOP_CSS = """body{font-family:system-ui,sans-serif;max-width:720px;margin:0 auto;padding:16px;color:#1d1d1f;background:#fafafa}
-.card{background:#fff;border:1px solid #e2e2e8;border-radius:10px;padding:16px;margin:14px 0}
-.test{background:#fff4e0;border:2px solid #a15c00;color:#5a3300;border-radius:10px;padding:10px 14px;font-weight:600}
-button{padding:8px 14px;border:0;border-radius:6px;background:#3b3bd6;color:#fff;font-weight:600;cursor:pointer}
-code{word-break:break-all} .mut{color:#666;font-size:.9rem} table{border-collapse:collapse;width:100%}
-td,th{border-bottom:1px solid #e2e2e8;padding:6px;text-align:left}"""
-TEST_BANNER = ("<p class='test'>TEST MODE. Payments are MOCKED: there is no payment provider, no card field and no money. "
-               "This order is not a real purchase and is not counted as revenue.</p>")
-
-
-def _shop(title: str, body: str, status: int = 200) -> HTMLResponse:
-    return HTMLResponse(f"<!doctype html><html lang='en'><head><meta charset='utf-8'><meta name='viewport' "
-                        f"content='width=device-width,initial-scale=1'><title>{html.escape(title)}</title>"
-                        f"<style>{SHOP_CSS}</style></head><body>{TEST_BANNER}{body}</body></html>", status_code=status)
-
-
-def _offer(run_id: str):
-    try:
-        return orch.sales_offer(Path(run_id).name)
-    except FileNotFoundError:
-        raise HTTPException(404)
-    except PermissionError as e:
-        raise HTTPException(404, f"Checkout is not open: {e}.")
-
-
-@app.get("/order/{run_id}", response_class=HTMLResponse)
-def checkout_page(run_id: str):
-    st, paid = _offer(run_id)
-    name = html.escape(MvpSpec(**st.mvp).product_name)
-    plans = "".join(
-        f"<div class='card'><h2>{html.escape(t['name'])}: {t['price_usd_per_month']:g} USD / month</h2>"
-        f"<p>{html.escape(', '.join(t['includes']))}</p>"
-        f"<form method='post' action='/order/{html.escape(st.run_id)}'><input type='hidden' name='tier' "
-        f"value='{html.escape(t['name'])}'><button>Place a test order</button></form></div>" for t in paid)
-    return _shop(f"Checkout: {name}", f"<h1>{name}</h1>{plans}<p class='mut'>The free plan needs no checkout: "
-                 f"<a href='/mvp/{html.escape(st.run_id)}'>use the app</a>.</p>")
-
-
-@app.post("/order/{run_id}", response_class=HTMLResponse)
-def checkout(run_id: str, tier: str = Form(...)):
-    _offer(run_id)
-    try:
-        r = orch.test_checkout(Path(run_id).name, tier)
-    except ValueError:
-        raise HTTPException(400, "Unknown plan.")
-    rid = html.escape(Path(run_id).name)
-    link = f"/mvp/{rid}?key={quote(r['key'])}" if r["key"] else ""
-    body = (f"<h1>Test order {html.escape(r['order_id'])}</h1><div class='card'><table>"
-            f"<tr><td>Plan</td><td>{html.escape(r['tier'])}, {r['amount']:g} USD (test mode)</td></tr>"
-            f"<tr><td>Provider event (MOCKED)</td><td><code>{html.escape(r['event_id'])}</code> payment_succeeded</td></tr>"
-            f"<tr><td>Webhook handler</td><td>{html.escape(r['outcome'])}</td></tr></table></div>")
-    if r["key"]:
-        body += (f"<div class='card'><h2>Your access</h2><p>Access key, shown once (we store only its hash):</p>"
-                 f"<p><code>{html.escape(r['key'])}</code></p><p><a href='{link}'>Open {html.escape(r['product'])} "
-                 f"with Pro access</a></p></div>")
-    body += (f"<div class='card'><h2>Provider retry</h2><p class='mut'>Payment providers resend webhooks. Sending this "
-             f"same event again must not deliver twice.</p><form method='post' action='/webhooks/mock-provider/{rid}/replay'>"
-             f"<input type='hidden' name='event_id' value='{html.escape(r['event_id'])}'><button>Resend event "
-             f"{html.escape(r['event_id'])}</button></form></div>")
-    return _shop("Test order", body)
-
-
-@app.post("/webhooks/mock-provider/{run_id}/replay", response_class=HTMLResponse)
-def replay_event(run_id: str, event_id: str = Form(...)):
-    _offer(run_id)
-    rid = Path(run_id).name
-    try:
-        ev = orch.sales(rid).stored_event(event_id)
-    except KeyError:
-        raise HTTPException(404, "Unknown event: only events the provider already sent can be retried.")
-    outcome, _ = orch.receive_payment_event(rid, ev)
-    return _shop("Webhook retry", f"<h1>Webhook retry</h1><div class='card'><p>Event <code>{html.escape(event_id)}</code> "
-                 f"({html.escape(ev.type)}) for {html.escape(ev.order_id)}: <b>{html.escape(outcome)}</b>. No second "
-                 "delivery and no new access key.</p></div>")
-
-
-@app.post("/runs/{run_id}/sales/{order_id}/refund")
-def refund_event(run_id: str, order_id: str):
-    try:
-        orch.founder_refund_event(run_id, order_id)
-    except (KeyError, PermissionError, FileNotFoundError):
-        raise HTTPException(404)
-    return RedirectResponse(f"/runs/{run_id}#sales", status_code=303)
-
-
-@app.post("/runs/{run_id}/sales/reconcile")
-def reconcile_sales(run_id: str):
-    try:
-        orch.founder_reconcile_sales(run_id)
-    except FileNotFoundError:
-        raise HTTPException(404)
-    return RedirectResponse(f"/runs/{run_id}#sales", status_code=303)
-
-
-def _sales_card(run_id: str) -> str:
-    try:
-        _offer(run_id)
-    except HTTPException:
-        return ""
-    rows = orch.sales(run_id).orders()
-    table = "".join(
-        f"<tr><td>{html.escape(o['order_id'])}</td><td>{html.escape(o['tier'])}</td><td>{o['amount_cents'] / 100:.2f}</td>"
-        f"<td>{o['status']}</td><td>{'active' if o['access'] else 'none'}</td><td>"
-        + (f"<form method=post action='/runs/{run_id}/sales/{html.escape(o['order_id'])}/refund' class='once'>"
-           "<button class='rej'>Send refund event</button></form>" if o["status"] == "paid" else "")
-        + "</td></tr>" for o in rows)
-    return ("<div class='card' id='sales'><h2>Sale to cash (Phase 5, test mode) " + tag("MOCKED") + "</h2>"
-            f"<p>Buyers use the <a href='/order/{run_id}' target='_blank'>test-mode order page</a>. The MOCKED provider's "
-            "payment event goes through the webhook handler, which delivers a Pro access key for the MVP app; a refund "
-            "event revokes it, and a resent event never delivers twice. You refund in your own payment provider: the "
-            "button below only sends the provider's refund event in test mode. No money, card or account is involved.</p>"
-            + (f"<table><tr><th>Order</th><th>Plan</th><th>USD</th><th>Status</th><th>Access</th><th></th></tr>{table}</table>"
-               if rows else "<p class=mut>No test orders yet.</p>")
-            + f"<form method=post action='/runs/{run_id}/sales/reconcile' class='once'><button>Reconcile and write "
-            "phase5_step4_test_sales</button></form></div>")
+    return HTMLResponse(b["page"].replace(mvp_app.RESULT_MARK, mvp_app.result_html(results), 1))
 
 
 @app.post("/runs/{run_id}/retry")

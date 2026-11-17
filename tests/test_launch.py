@@ -24,7 +24,7 @@ def test_launch_phase_outputs_gate_and_approvals(make_orch, brief, settings):
         assert any(o.startswith(prefix) for o in st.outputs), prefix
     store = (settings.outputs_dir / next(o for o in st.outputs if o.startswith("phase5_step1"))).read_text()
     assert "4 USD / month" in store and "Free" in store and "<script" not in store and "<form" not in store
-    assert "test mode, payments MOCKED" in store and f"/order/{st.run_id}" in store
+    assert "Not on sale yet" in store
     kit = (settings.outputs_dir / next(o for o in st.outputs if o.startswith("phase5_step2"))).read_text()
     assert "Only 3 spots left" not in kit and "BLOCKED by guard" in kit  # hype post blocked, never queued
     assert (settings.outputs_dir / "payment_test_log.md").read_text().count("PASS") >= 5
@@ -72,7 +72,7 @@ def test_store_served_only_after_approval(monkeypatch, make_orch, brief):
     store_item = next(i for i in q.pending() if i.executor == "publish_store_local")
     orch.approve(st.run_id, store_item.id, True)
     r = c.get(f"/store/{st.run_id}")
-    assert r.status_code == 200 and "test mode, payments MOCKED" in r.text
+    assert r.status_code == 200 and "Not on sale yet" in r.text
 
 
 def test_finished_commercial_run_can_continue_into_launch(make_orch, brief):

@@ -31,7 +31,7 @@ def run_payment_test(product: str = "demo-product", amount_cents: int = 1500) ->
         ok = got == expected
         ok_all &= ok
         lines.append(f"| {name} | {ev.event_id} {ev.type} | {expected} | {got} | {'PASS' if ok else 'FAIL'} |")
-    ledger.payouts.append({"amount_cents": amount_cents - 2 * fee})  # two fees kept; ord_2's amount refunded
+    ledger.payouts.append({"amount_cents": amount_cents - fee})
     issues = reconcile(ledger)
     lines += ["", f"Deliveries made: {d.deliveries} (expected 2, idempotency held: {d.deliveries == 2})",
               f"Access now: {d.access}", f"Reconciliation issues: {issues or 'none'}"]
