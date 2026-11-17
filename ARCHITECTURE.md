@@ -4,7 +4,7 @@ The key facts for each part come first; every threshold, per-phase diagram and t
 
 ## Overview
 
-Founder Agents is a team of single-purpose agents run by an explicit state machine (`app/orchestrator.py`). A run starts from a founder brief, passes a policy screen, then moves through six phases. Every step ends in a gate: a pre-set threshold, tests that must pass, or a founder approval. Every phase ends in a gate that recommends **go**, **repeat**, **pivot** or **stop** from thresholds fixed before the evidence, and the founder decides. Agents only draft; anything that leaves the system (publish, send, spend, sign) becomes an item in the approval queue (`app/approval.py`), whose executor refuses anything the founder did not approve. Every action is appended to `decision_log.json`. Checkout, public hosting, posting and sending are MOCKED: the system never takes money or acts on the founder's accounts.
+Founder Agents is a team of single-purpose agents run by an explicit state machine (`app/orchestrator.py`). A run starts from a founder brief, passes a policy screen, then moves through six phases. Every step ends in a gate: a pre-set threshold, tests that must pass, or a founder approval. Every phase ends in a gate that recommends **go**, **repeat**, **pivot** or **stop** from thresholds fixed before the evidence, and the founder decides. Agents only draft; anything that leaves the system (publish, send, spend, sign) becomes an item in the approval queue (`app/approval.py`), whose executor refuses anything the founder did not approve. Every action is appended to `decision_log.json`. Key drafts pass a specificity critic in code (`app/specificity.py`): stock advice, or a draft that ignores the founder's budget, hours, skills and market, is sent back once with the problems listed, and each gate ends with a next step built from the run's own numbers (`app/next_steps.py`). Checkout, public hosting, posting and sending are MOCKED: the system never takes money or acts on the founder's accounts.
 
 ```mermaid
 flowchart LR
@@ -57,10 +57,10 @@ flowchart LR
 
 ### Phase 2: Validate
 - **Core step:** Design the business.
-- **Agents:** `strategist` (Lean Canvas, riskiest assumptions first), `marketer` (landing copy only), `analyst` (demand targets).
-- **Method:** our template renders the landing page, so it cannot carry scripts, timers, testimonials or payment fields; every line passes the guard. After a `publish` approval the page runs at `/lp/<run>` and counts real sign-ups. The founder locks the targets **before** any result exists, then enters real interview results.
+- **Agents:** `strategist` (Lean Canvas, riskiest assumptions first), `marketer` (landing copy only), `analyst` (demand targets), `interview_analyst` (Mom Test analysis of each real interview).
+- **Method:** our template renders the landing page, so it cannot carry scripts, timers, testimonials or payment fields; every line passes the guard. After a `publish` approval the page runs at `/lp/<run>` and counts real sign-ups. The founder locks the targets **before** any result exists. Each real interview (pasted notes, or a recording transcribed by open-weight Whisper) goes to `interview_analyst`, which applies the plan's "problem confirmed if" rule, separates evidence from compliments and hypotheticals, and suggests the next questions; code keeps only quotes found in the transcript and overturns a confirmation without one (`app/interviews.py`). The counts pre-fill the demand gate; the founder can still edit them.
 - **Gate:** demand gate on sign-ups, interviews and the share confirming the problem, against the locked targets.
-- **Output:** `phase2_step1_lean_canvas`, `phase2_step2_landing_page`, `phase2_step3_demand_test`, `phase2_gate_decision`.
+- **Output:** `phase2_step1_lean_canvas`, `phase2_step2_landing_page`, `phase2_step3_demand_test`, `phase2_step4_interviews`, `phase2_gate_decision`.
 
 ### Phase 3: Build
 - **Core step:** Build the product: a tested MVP with user docs.

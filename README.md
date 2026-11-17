@@ -27,6 +27,7 @@ Every **Working** row has real output from the committed demo runs ([step-to-out
 | 1 Discover: market definition and Mom Test interview plan with outreach draft | **Working** |
 | Evidence ledger: every claim SOURCED (a retrieved URL) or labelled ASSUMPTION, enforced in code and audited in CI | **Working** |
 | 2 Validate: Lean Canvas, landing page with real sign-up form, targets locked by the founder before the test | **Working** |
+| 2 Validate: each real customer interview (pasted notes, or a recording in Arabic or English transcribed by open-weight Whisper) analysed by a Mom Test agent; every quote is checked against the transcript in code and the counts feed the demand gate | **Working** (added after the committed demo run; audio needs the free-tier endpoint, STUBBED with local Ollama) |
 | 3 Build: MVP spec (user stories, acceptance criteria, hours vs budget), clickable prototype, build gate | **Working** |
 | 3 Build: core code for every user story, tested against its acceptance criteria in a sandbox (CI re-runs the checks) | **Working** |
 | 3 Build: MVP app at `/mvp/<run>` (each request runs the tested code in the sandbox) and its user guide at `/mvp/<run>/guide` | **Working** |
@@ -35,6 +36,7 @@ Every **Working** row has real output from the committed demo runs ([step-to-out
 | 5 Launch: payment → automatic delivery, refund revokes access, idempotency, reconciliation | **MOCKED** (real logic on mock events; no provider, no money) |
 | 6 Operate and learn: results vs locked targets (counted by the app), support reply drafts, learn gate, learning memo | **Working** |
 | Gates after every phase (go / repeat / pivot / stop), recommending STOP on weak evidence; overruling a recommendation needs a written reason, logged | **Working** |
+| Founder-specific advice: a specificity critic in code sends back drafts with stock advice or that ignore the founder's budget, hours, skills and market; gates end with a next step built from the run's numbers | **Working** |
 | Founder approval queue for everything published, sent, spent or signed, enforced in code | **Working** |
 | Decision log (`decision_log.json`): every agent action, required keys, tamper-evident hash chain | **Working** |
 | Red-team guard (fake reviews, urgency, income promises, impersonation, money, credentials, prompt injection; English + Arabic), 0 failures | **Working** |
