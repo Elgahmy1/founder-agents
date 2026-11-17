@@ -64,3 +64,22 @@ def test_no_fallback_when_local_model_missing(monkeypatch):
 def test_without_fallback_model_primary_is_used_directly():
     assert isinstance(make_llm(_settings()), OpenAICompatLLM)
     assert isinstance(make_llm(replace(load_settings(), provider="ollama")), OllamaLLM)
+
+
+def test_free_tier_json_validate_failed_is_retried(monkeypatch):
+    import httpx
+    calls = []
+
+    class Bad:
+        status_code, headers = 400, {}
+        text = '{"error":{"code":"json_validate_failed","message":"Failed to generate JSON."}}'
+        def json(self): return {}
+        def raise_for_status(self):
+            raise httpx.HTTPStatusError("400", request=httpx.Request("POST", "http://x"), response=self)
+
+    def post(*a, **k):
+        calls.append(k["json"]["messages"][-1]["content"])
+        return Bad() if len(calls) == 1 else Resp(200, {"choices": [{"message": {"content": '{"x": 3}'}}], "usage": {}})
+    monkeypatch.setattr(llm_mod.httpx, "post", post)
+    out = OpenAICompatLLM(_settings()).structured("sys", "user", Out)
+    assert out.x == 3 and len(calls) == 2 and "not valid JSON" in calls[1]

@@ -99,7 +99,7 @@ class OllamaLLM:
                     {"role": "assistant", "content": content},
                     {"role": "user", "content": f"That was not valid JSON for the schema: {e}. Reply with JSON only."},
                 ]
-        raise LLMError(f"model returned invalid JSON twice: {last_err}")
+        raise LLMError(f"model returned invalid JSON three times: {last_err}")
 
 
 def _extract_json(text: str) -> str:
@@ -150,11 +150,18 @@ class OpenAICompatLLM:
                    f"{json.dumps(schema.model_json_schema())}")
         messages = [{"role": "system", "content": sys_msg}, {"role": "user", "content": user}]
         last_err: Exception | None = None
-        for _ in range(2):
+        for attempt in range(3):
             try:
                 r = self._post(messages)
             except httpx.HTTPError as e:
                 detail = getattr(getattr(e, "response", None), "text", "")[:300]
+                # The free tier sometimes rejects its own JSON-mode output for long answers (for example generated code):
+                # HTTP 400 "json_validate_failed". That is a transient generation failure, so ask again (twice at most).
+                if "json_validate_failed" in detail and attempt < 2:
+                    last_err = e
+                    messages = messages[:2] + [{"role": "user", "content": "Your previous reply was not valid JSON. Reply again "
+                                                "with one valid JSON object only; escape newlines and quotes inside strings."}]
+                    continue
                 raise LLMError(f"{self.settings.openai_base_url} failed for '{self.model}': {e} {detail}") from e
             data = r.json()
             u = data.get("usage", {})
@@ -168,7 +175,7 @@ class OpenAICompatLLM:
                 last_err = e
                 messages += [{"role": "assistant", "content": content},
                              {"role": "user", "content": f"Invalid for the schema: {e}. Reply with corrected JSON only."}]
-        raise LLMError(f"model returned invalid JSON twice: {last_err}")
+        raise LLMError(f"model returned invalid JSON three times: {last_err}")
 
 
 @dataclass
