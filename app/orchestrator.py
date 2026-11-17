@@ -131,6 +131,7 @@ class RunState:
     mvp_app: dict | None = None
     targets: dict | None = None
     results: dict | None = None
+    interviews: list = field(default_factory=list)  # Phase 2: analysed customer interviews (transcripts stay in data/)
     gates: list[dict] = field(default_factory=list)
     approvals: list[dict] = field(default_factory=list)
     outputs: list[str] = field(default_factory=list)
@@ -1013,6 +1014,34 @@ class Orchestrator:
         if email not in existing:
             with p.open("a", encoding="utf-8") as f:
                 f.write(email + "\n")
+
+    def founder_add_interview(self, run_id: str, transcript: str, source: str = "typed notes") -> RunState:
+        """Phase 2: the founder adds one real customer interview (typed notes, or the transcript of a recording).
+        The interview analyst reads it against the plan's "problem confirmed if" rule, every quote is checked in
+        code against the transcript, and the running result is written to phase2_step4_interviews."""
+        from app import interviews as iv
+        from app.agents.interview_analyst import InterviewAnalystAgent
+        with self.lock(run_id):
+            st, q = self.load(run_id)
+            if st.stage != "p2_collecting":
+                raise ValueError(f"interviews are added while the demand test runs (stage={st.stage})")
+            text = guard.sanitize_source((transcript or "").strip())[:30000]
+            if len(text.split()) < 20:
+                raise ValueError("the interview is too short to analyse: paste at least a few exchanges")
+            plan = st.interview_plan or {}
+            raw = InterviewAnalystAgent(self.ctx(st)).analyse(plan, text, st.brief["idea"])
+            a, dropped = iv.verify(raw, text)
+            st.interviews.append({"source": source, "words": len(text.split()), "transcript": text,
+                                  "analysis": a.model_dump(), "dropped": dropped})
+            done, confirmed = iv.summary(st.interviews)
+            self.log.append(agent="evidence", action="verify_interview_quotes", run_id=run_id, phase=2,
+                            outcome="confirmed" if a.problem_confirmed else "not_confirmed",
+                            detail=f"interview {done}: {len(a.evidence)} quote(s) verified, {len(dropped)} dropped; "
+                                   f"{confirmed} of {done} confirm the problem")
+            self.write_output(st, "phase2_step4_interviews.md",
+                              iv.render_md([{k: v for k, v in i.items() if k != "transcript"} for i in st.interviews], plan))
+            self.save(st, q)
+            return st
 
     def founder_record_results(self, run_id: str, interviews_done: int, pain_confirmed: int) -> RunState:
         with self.lock(run_id):

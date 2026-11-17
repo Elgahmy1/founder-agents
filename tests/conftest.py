@@ -12,6 +12,7 @@ import pytest
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
+from app.agents.interview_analyst import InterviewAnalysis
 from app.agents.advisor import Advice  # noqa: E402
 from app.agents.analyst import DemandTestPlan, GateMemo  # noqa: E402
 from app.agents.builder import MvpSpec  # noqa: E402
@@ -147,6 +148,14 @@ class FakeLLM:
                              "rationale": "ASSUMPTION: 5% conversion"},
             GateMemo: {"summary": "s", "what_we_learned": [], "next_steps": []},
             Advice: {"answer": "Talk to 10 students this week."},
+            InterviewAnalysis: {"language": "English", "problem_confirmed": True,
+                                "why": "She rewrites notes for hours before every exam, which meets the rule.",
+                                "current_workaround": "rewrites slides by hand into a notebook",
+                                "cost_of_problem": "about 4 hours per exam", "commitment": "offered to share her notes",
+                                "evidence": [{"quote": "I spend like four hours rewriting the slides", "shows": "cost"},
+                                             {"quote": "the professor said this would change everything", "shows": "invented"}],
+                                "red_flags": [{"quote": "sounds like a cool idea", "shows": "compliment"}],
+                                "surprise": "she prints the slides first", "ask_next_time": ["Tell me about your last exam week."]},
             MvpSpec: self.mvp(),
             PricingPlan: self.pricing(),
             PolicyDrafts: self.policies(),

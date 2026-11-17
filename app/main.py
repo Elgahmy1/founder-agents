@@ -6,10 +6,10 @@ import html
 import threading
 from pathlib import Path
 
-from fastapi import FastAPI, Form, HTTPException, Request
+from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import HTMLResponse, PlainTextResponse, RedirectResponse
 
-from app import analytics, guard, mvp_app, replay, sandbox
+from app import analytics, guard, mvp_app, replay, sandbox, transcribe
 import json
 from app.agents.advisor import AdvisorAgent
 from app.brief import FounderBrief
@@ -281,8 +281,9 @@ views you open from this dashboard are not counted.</p>
 <h2>Run the test, then enter what really happened</h2>
 <p>Share <a href="/lp/{run_id}" target="_blank">your landing page</a> and talk to customers using the interview plan.
 Sign-ups so far (counted by the app, never typed in): <b>{orch.signups(run_id)}</b></p>
-<form method="post" action="/runs/{run_id}/results" class="once"><label>Interviews completed</label><input type="number" name="interviews_done" min="0" required>
-<label>How many confirmed the problem</label><input type="number" name="pain_confirmed" min="0" required>
+{_interviews_html(st, run_id)}
+<form method="post" action="/runs/{run_id}/results" class="once"><label>Interviews completed</label><input type="number" name="interviews_done" min="0" required value="{len(st.interviews) if st.interviews else ''}">
+<label>How many confirmed the problem</label><input type="number" name="pain_confirmed" min="0" required value="{sum(1 for i in st.interviews if i['analysis']['problem_confirmed']) if st.interviews else ''}">
 <button>Run the demand gate</button></form></div>"""
     if st.stage == "stopped":
         g = st.gates[-1] if st.gates else None
@@ -403,6 +404,42 @@ def gate(run_id: str, decision: str = Form(...), note: str = Form("")):
 @app.post("/runs/{run_id}/targets")
 def targets(run_id: str, approve: str = Form(...)):
     _bg(run_id, "Updating targets", orch.founder_lock_targets, run_id, approve == "1")
+    return RedirectResponse(f"/runs/{run_id}", status_code=303)
+
+
+def _interviews_html(st, run_id: str) -> str:
+    """Phase 2: analysed interviews and the form to add one (typed notes or a recording)."""
+    rows = "".join(
+        f"<li><b>Interview {n}</b> ({html.escape(i['source'])}): "
+        + ("<span class='go'>problem confirmed</span>" if i["analysis"]["problem_confirmed"] else "<span class='stop'>not confirmed</span>")
+        + f" &middot; {html.escape(i['analysis']['why'])}</li>" for n, i in enumerate(st.interviews, 1))
+    audio = ("<label>...or upload the recording (any language; transcribed with an open-weight Whisper model on the free tier, "
+             "not stored)</label><input type=file name=audio accept='audio/*'>") if transcribe.available(settings) else \
+            "<p class=mut>Audio upload needs the free-tier endpoint (STUBBED with local Ollama): paste the transcript instead.</p>"
+    return (f"<div class=card><h3>Customer interviews, analysed by your co-founder agent</h3>"
+            + (f"<ol>{rows}</ol><p class=mut>Full analysis with verified quotes: phase2_step4_interviews.</p>" if rows else "")
+            + f"<form method=post action='/runs/{run_id}/interview' enctype='multipart/form-data' class=once>"
+            "<label>Paste the transcript or your notes of one interview (Arabic or English)</label>"
+            "<textarea name=transcript rows=6></textarea>" + audio
+            + "<label><input type=checkbox name=consent value=1 required> The interviewee agreed to take part and to be quoted anonymously</label>"
+            "<button>Analyse this interview</button></form></div>")
+
+
+@app.post("/runs/{run_id}/interview", response_class=HTMLResponse)
+async def interview(run_id: str, transcript: str = Form(""), consent: str = Form(""), audio: UploadFile | None = File(None)):
+    if consent != "1":
+        raise HTTPException(400, "the interviewee's consent is required")
+    source, text = "typed notes", transcript
+    try:
+        data = await audio.read() if audio is not None and audio.filename else b""
+        if data and not text.strip():
+            text = transcribe.transcribe(settings, data, audio.filename)
+            source = "recording"
+            orch.log.append(agent="transcriber", action="transcribe_recording", model=transcribe.model_name(), cost=0,
+                            run_id=run_id, detail=f"{len(text.split())} words; the recording was not stored")
+        orch.founder_add_interview(run_id, text, source)
+    except (ValueError, transcribe.TranscriptionUnavailable) as e:
+        return page("Interview not analysed", f"<div class=card><p>{html.escape(str(e))}</p><a href='/runs/{run_id}'>Back</a></div>")
     return RedirectResponse(f"/runs/{run_id}", status_code=303)
 
 
